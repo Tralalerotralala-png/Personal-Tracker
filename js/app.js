@@ -1,5 +1,6 @@
 // App shell: header, navigation, sign-in gate, sync indicator, service worker.
 import { initData } from './data/app-data.js';
+import { startTranslations, t } from './ui/language.js';
 import { createPhotos } from './photos.js';
 import { h, toast, openSheet } from './ui/dom.js';
 import { glyphSvg } from './ui/pixel-icon.js';
@@ -14,6 +15,11 @@ import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
 
 const root = document.getElementById('app');
+function updateDayPhase() {
+  const hour = new Date().getHours();
+  document.documentElement.dataset.dayPhase = hour < 6 || hour >= 20 ? 'night' : hour < 10 ? 'morning' : hour < 17 ? 'day' : 'evening';
+}
+updateDayPhase(); setInterval(updateDayPhase, 60_000);
 
 let ctx;
 try {
@@ -154,6 +160,7 @@ const header = h('header', { class: 'top' },
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
 root.replaceChildren(header, main, nav);
+startTranslations(document.body);
 
 const mounted = new Set();
 async function route() {
@@ -164,7 +171,7 @@ async function route() {
   if (!mounted.has(key)) { mounted.add(key); await VIEWS[key].mount(); }
   for (const [k, view] of Object.entries(VIEWS)) if (k !== key) view.hide?.();
   VIEWS[key].show?.();
-  document.title = `${NAV.find((n) => n[0] === key)[1]} - Personal Tracker`;
+  document.title = `${t(NAV.find((n) => n[0] === key)[1])} - Personal Tracker`;
 }
 window.addEventListener('hashchange', route);
 await route();

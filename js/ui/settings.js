@@ -1,5 +1,6 @@
 // Settings sheet: account, sync, rarity meanings, categories, display, backup.
 import { h, toast, openSheet, confirmDialog } from './dom.js';
+import { language } from './language.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 import { exportAll, importAll, downloadBackup } from '../data/backup.js';
@@ -16,6 +17,13 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const ui = await store.getSetting('ui');
   const place = await store.getSetting('location');
   const categories = (await store.list('categories')).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const languageBlock = h('section', { class: 'set-block' },
+    h('h3', {}, 'Language / Idioma'),
+    h('label', {}, 'Language / Idioma'),
+    h('select', { 'aria-label': 'Language', onchange: e => { localStorage.setItem('tracker-language', e.target.value); location.reload(); } },
+      h('option', { value: 'en', selected: language() === 'en' }, 'English'),
+      h('option', { value: 'es', selected: language() === 'es' }, 'Español')));
 
   // -- account & sync
   const account = h('section', { class: 'set-block' },
@@ -193,5 +201,5 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('h3', {}, 'Install on your phone'),
     h('p', { class: 'prose' }, 'iPhone: open this page in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, open the menu, then Install app.'));
 
-  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, account, mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, typography, navigation, backup, install) });
+  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, languageBlock, account, mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, typography, navigation, backup, install) });
 }

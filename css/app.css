@@ -686,3 +686,14 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .w-mud-compact .w-mud-label { font-size: 1.05rem; }
 .w-mud-compact .w-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); min-height: 42px; }
 @container widget (max-height: 165px) { .w-weather-place, .w-mud-bottom .w-section-label { display: none; } .w-weather-glyph svg { width: 26px; height: 26px; } }
+
+/* Ambient time-of-day accents, intentionally subtle. */
+:root[data-day-phase="morning"] { --day-accent: rgba(220,169,94,.10); }
+:root[data-day-phase="day"] { --day-accent: rgba(92,187,183,.06); }
+:root[data-day-phase="evening"] { --day-accent: rgba(212,132,100,.10); }
+:root[data-day-phase="night"] { --day-accent: rgba(71,99,155,.11); }
+.overview { background: radial-gradient(ellipse at 95% 0%,var(--day-accent,transparent),transparent 65%); }
+.ov-today { display:flex; gap:.7rem; align-items:center; flex-wrap:wrap; padding:.65rem 1rem; margin:0 0 .9rem; border:1px solid var(--line,#4b514f); border-radius:6px; }
+.ov-today strong { color:var(--accent,#68b8b1); }
+.ov-today span:last-child { opacity:.75; margin-left:auto; }
+@media (prefers-reduced-motion: reduce) { .overview { transition:none; } }

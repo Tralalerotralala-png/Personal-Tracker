@@ -22,6 +22,7 @@ export function createInventoryView({ store, photos }) {
     lostOnly: false,
     placeId: null, // a place id, or 'none' for "no place"
     sort: 'newest',
+    display: localStorage.getItem('tracker-pack-display') || 'grid',
   };
   let data = { items: [], locations: [], categories: [], rarityLabels: DEFAULT_SETTINGS.rarity_labels };
 
@@ -209,7 +210,7 @@ export function createInventoryView({ store, photos }) {
       resultsEl.replaceChildren(h('div', { class: 'empty' }, h('p', {}, 'No items match these filters.'),
         h('button', { class: 'btn', type: 'button', onclick: clearFilters }, 'Clear filters')));
     } else {
-      resultsEl.replaceChildren(h('div', { class: 'grid' }, items.map(tile)));
+      resultsEl.replaceChildren(h('div', { class: state.display === 'list' ? 'rows' : 'grid' }, items.map(state.display === 'list' ? resultRow : tile)));
     }
   }
 
@@ -407,6 +408,8 @@ export function createInventoryView({ store, photos }) {
 
   const tabItems = h('button', { class: 'seg on', type: 'button', onclick: () => { state.pane = 'items'; renderPane(); } }, 'Items');
   const tabPlaces = h('button', { class: 'seg', type: 'button', onclick: () => { state.pane = 'places'; renderPane(); } }, 'Places');
+  const displaySelect = h('select', { class: 'sort-select', 'aria-label': 'Inventory view', onchange: e => { state.display = e.target.value; localStorage.setItem('tracker-pack-display', state.display); renderResults(); } },
+    ...[['grid','Grid view'],['list','List view']].map(([value,label]) => h('option', { value, selected: state.display === value }, label)));
   const sortSelect = h('select', { class: 'sort-select', 'aria-label': 'Sort items', onchange: (e) => { state.sort = e.target.value; renderResults(); } },
     [['newest', 'Newest'], ['name', 'Name'], ['rarity', 'Rarity'], ['place', 'Place']]
       .map(([v, l]) => h('option', { value: v }, `Sort: ${l}`)));
@@ -425,11 +428,12 @@ export function createInventoryView({ store, photos }) {
     placesPane.hidden = isItems;
     fab.hidden = !isItems;
     sortSelect.hidden = !isItems;
+    displaySelect.hidden = !isItems;
     if (!isItems) places.render();
   }
 
   el.append(
-    h('div', { class: 'segmented', role: 'group', 'aria-label': 'Inventory sections' }, tabItems, tabPlaces, h('span', { class: 'spacer' }), sortSelect),
+    h('div', { class: 'segmented', role: 'group', 'aria-label': 'Inventory sections' }, tabItems, tabPlaces, h('span', { class: 'spacer' }), sortSelect, displaySelect),
     itemsPane, placesPane, fab);
 
   // ---- refresh on data changes ---------------------------------------------------
