@@ -60,22 +60,25 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
 
   // -- optional second clock inside the Overview weather / mud widget
   const clockZone = h('input', { type: 'text', value: ui?.extra_clock_timezone ?? '',
-    placeholder: 'e.g. Europe/London', 'aria-label': 'Second clock time zone' });
+    placeholder: 'e.g. GMT-4 or Europe/London', 'aria-label': 'Second clock time zone' });
   const clockLabel = h('input', { type: 'text', value: ui?.extra_clock_label ?? '',
     placeholder: 'e.g. London', maxlength: 32, 'aria-label': 'Second clock label' });
   const clockFeedback = h('p', { class: 'hint' }, 'Leave the time zone empty to show only your local clock.');
   const clockSettings = h('section', { class: 'set-block' },
     h('h3', {}, 'Overview clocks'),
-    h('p', { class: 'hint' }, 'Local time appears above the compact mud forecast. Optionally add a second city using its IANA time zone.'),
+    h('p', { class: 'hint' }, 'Add a city time zone (America/New_York) or a fixed offset (GMT-4). City zones automatically adjust for daylight saving.'),
     h('label', {}, 'Second clock time zone'), clockZone,
     h('label', {}, 'Second clock name'), clockLabel,
     h('button', { class: 'btn small', type: 'button', onclick: async () => {
-      const zone = clockZone.value.trim();
+      const entered = clockZone.value.trim();
+      const fixed = /^(?:GMT|UTC)\s*([+-])(\d{1,2})$/i.exec(entered);
+      const zone = fixed ? `Etc/GMT${fixed[1] === '+' ? '-' : '+'}${Number(fixed[2])}` : entered;
       try {
+        if (fixed && Number(fixed[2]) > 14) throw new RangeError('Offset out of range');
         if (zone) new Intl.DateTimeFormat('en', { timeZone: zone }).format(new Date());
-        await store.setSetting('ui', { ...(await store.getSetting('ui')), extra_clock_timezone: zone, extra_clock_label: clockLabel.value.trim() });
+        await store.setSetting('ui', { ...(await store.getSetting('ui')), extra_clock_timezone: zone, extra_clock_label: clockLabel.value.trim() || entered });
         clockFeedback.textContent = 'Clock settings saved.';
-      } catch { clockFeedback.textContent = 'Invalid time zone. Use a name such as America/New_York or Europe/London.'; }
+      } catch { clockFeedback.textContent = 'Invalid time zone. Try GMT-4, America/New_York, or Europe/London.'; }
     } }, 'Save clocks'), clockFeedback);
 
   // -- feed and layout
@@ -225,5 +228,35 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('h3', {}, 'Install on your phone'),
     h('p', { class: 'prose' }, 'iPhone: open this page in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, open the menu, then Install app.'));
 
-  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, languageBlock, account, mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock, personalHub, rarity, cats, display, typography, navigation, backup, install) });
+  // Compact settings categories: only the selected section is visible.
+  const groups = [
+    ['general', 'General', [languageBlock, account, install]],
+    ['overview', 'Overview & weather', [mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock]],
+    ['pack', 'Pack', [cats, rarity]],
+    ['appearance', 'Appearance', [display, typography, navigation]],
+    ['data', 'Data & tools', [personalHub, backup]],
+  ];
+  const selected = sessionStorage.getItem('tracker-settings-section') || 'general';
+  const tabs = h('nav', { class: 'settings-tabs', 'aria-label': t('Settings') });
+  const panes = new Map();
+  const buttons = new Map();
+  const content = h('div', { class: 'settings-content' });
+  for (const [id, name, blocks] of groups) {
+    const btn = h('button', { class: 'btn small settings-tab', type: 'button', onclick: () => show(id) }, t(name));
+    buttons.set(id, btn); tabs.append(btn);
+    const pane = h('div', { class: 'settings-pane', id: `settings-${id}` }, ...blocks);
+    panes.set(id, pane); content.append(pane);
+  }
+  function show(id) {
+    if (!panes.has(id)) id = 'general';
+    sessionStorage.setItem('tracker-settings-section', id);
+    for (const [key, pane] of panes) {
+      pane.hidden = key !== id;
+      buttons.get(key).classList.toggle('active', key === id);
+      buttons.get(key).setAttribute('aria-pressed', String(key === id));
+    }
+    content.closest('.sheet-body')?.scrollTo({top: 0});
+  }
+  show(selected);
+  openSheet({ title: t('Settings'), body: h('div', { class: 'settings settings-organized' }, tabs, content) });
 }

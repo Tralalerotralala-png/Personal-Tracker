@@ -12,6 +12,7 @@ import { createWeatherService } from './weather/service.js';
 import { createFeedService } from './feed/service.js';
 import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
+import { loadHub, openPersonalHub } from './ui/personal-hub.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
 
@@ -158,9 +159,38 @@ navButtons.forEach((a) => {
 });
 window.addEventListener('tracker-nav-change', e => { moveNav(e.detail.from, e.detail.to); });
 
+const globalSearchInput = h('input', { type: 'search', class: 'global-search-input', placeholder: t('Search everything'), 'aria-label': t('Search everything'), autocomplete: 'off' });
+const searchResults = h('div', { class: 'global-search-results', hidden: true, role: 'listbox', 'aria-label': t('Search') });
+const searchWrap = h('div', { class: 'global-search-wrap' }, globalSearchInput, searchResults);
+let searchSeq = 0;
+async function renderGlobalSearch() {
+  const seq = ++searchSeq;
+  const query = globalSearchInput.value.trim().toLocaleLowerCase();
+  if (!query) { searchResults.hidden = true; searchResults.replaceChildren(); return; }
+  const [items, events, places, hub] = await Promise.all([store.list('items'), store.list('events'), store.list('places'), loadHub(store)]);
+  if (seq !== searchSeq) return;
+  const entries = [
+    ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory' })),
+    ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar' })),
+    ...places.map(x => ({ type: t('Places'), title: x.name, detail: x.notes || '', target: 'inventory' })),
+    ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', hub: true })),
+    ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', hub: true })),
+    ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', hub: true })),
+  ];
+  const found = entries.filter(x => `${x.title || ''} ${x.detail} ${x.type}`.toLocaleLowerCase().includes(query)).slice(0, 12);
+  searchResults.replaceChildren(...(found.length ? found.map(entry => h('button', { class: 'global-search-result', type: 'button', role: 'option', onclick: () => {
+    searchResults.hidden = true; globalSearchInput.value = '';
+    if (entry.hub) openPersonalHub({ store }); else location.hash = `#${entry.target}`;
+  } }, h('span', {}, entry.title || entry.type), h('small', {}, entry.type))) : [h('p', { class: 'hint' }, t('No matching results.'))]));
+  searchResults.hidden = false;
+}
+globalSearchInput.addEventListener('input', () => { renderGlobalSearch().catch(() => { searchResults.hidden = true; }); });
+globalSearchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.hidden = true; globalSearchInput.blur(); } });
+document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.target)) searchResults.hidden = true; });
+
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
-  h('span', { class: 'spacer' }), pill,
+  searchWrap, h('span', { class: 'spacer' }), pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 

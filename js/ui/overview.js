@@ -23,11 +23,9 @@ export function createOverviewView({ store, ctx }) {
     clear();
     const grid = h('div', { class: 'ov-grid', role: 'list' });
     const today = new Date();
-    const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 18 ? 'Good afternoon' : 'Good evening';
     const events = await store.list('events');
     const day = keyOf(today.getFullYear(), today.getMonth()+1, today.getDate());
     const upcoming = (groupByDay(events, day, day).get(day) || []).length;
-    const summary = h('div', { class: 'ov-today' }, h('strong', {}, t(greeting)), h('span', {}, today.toLocaleDateString(locale(), { weekday: 'long', month: 'long', day: 'numeric' })), h('span', {}, upcoming ? `${upcoming} event(s) listed today` : t('Your dashboard at a glance')));
     const hub = await loadHub(store);
     const {alerts,items} = await collectAlerts(store,hub);
     const todayTasks = hub.task.filter(x=>x.due===day);
@@ -49,7 +47,7 @@ export function createOverviewView({ store, ctx }) {
       h('div', { class: 'panel-head' },
         h('h2', {}, 'Overview'),
         h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
-      summary, dayStatus, grid);
+      dayStatus, grid);
   }
 
   let queued = false;
