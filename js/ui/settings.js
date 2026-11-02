@@ -47,6 +47,26 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       h('button', { class: 'btn small', type: 'button', onclick: () => openPlaceSearchSheet({ weather, current: hasPlace ? place : null }) }, hasPlace ? 'Change place' : 'Choose a place'),
       h('button', { class: 'btn small desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, 'Tune the mud model')));
 
+  // -- optional second clock inside the Overview weather / mud widget
+  const clockZone = h('input', { type: 'text', value: ui?.extra_clock_timezone ?? '',
+    placeholder: 'e.g. Europe/London', 'aria-label': 'Second clock time zone' });
+  const clockLabel = h('input', { type: 'text', value: ui?.extra_clock_label ?? '',
+    placeholder: 'e.g. London', maxlength: 32, 'aria-label': 'Second clock label' });
+  const clockFeedback = h('p', { class: 'hint' }, 'Leave the time zone empty to show only your local clock.');
+  const clockSettings = h('section', { class: 'set-block' },
+    h('h3', {}, 'Overview clocks'),
+    h('p', { class: 'hint' }, 'Local time appears above the compact mud forecast. Optionally add a second city using its IANA time zone.'),
+    h('label', {}, 'Second clock time zone'), clockZone,
+    h('label', {}, 'Second clock name'), clockLabel,
+    h('button', { class: 'btn small', type: 'button', onclick: async () => {
+      const zone = clockZone.value.trim();
+      try {
+        if (zone) new Intl.DateTimeFormat('en', { timeZone: zone }).format(new Date());
+        await store.setSetting('ui', { ...(await store.getSetting('ui')), extra_clock_timezone: zone, extra_clock_label: clockLabel.value.trim() });
+        clockFeedback.textContent = 'Clock settings saved.';
+      } catch { clockFeedback.textContent = 'Invalid time zone. Use a name such as America/New_York or Europe/London.'; }
+    } }, 'Save clocks'), clockFeedback);
+
   // -- feed and layout
   const feedBlock = h('section', { class: 'set-block' },
     h('h3', {}, 'Feed'),
@@ -173,5 +193,5 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('h3', {}, 'Install on your phone'),
     h('p', { class: 'prose' }, 'iPhone: open this page in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, open the menu, then Install app.'));
 
-  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, account, mudBlock, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, typography, navigation, backup, install) });
+  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, account, mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, typography, navigation, backup, install) });
 }

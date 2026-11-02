@@ -10,6 +10,7 @@ import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js
 import { locationPath } from '../data/inventory-logic.js';
 import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
+import { weatherGlyph, glyphSvg } from '../ui/pixel-icon.js';
 
 // Render now, and again (at most once per frame) whenever something it
 // depends on changes. `subscribe(run)` returns the unsubscribe functions.
@@ -34,25 +35,46 @@ const note = (text) => h('p', { class: 'w-note' }, text);
 
 // ---- mud ---------------------------------------------------------------------------------
 
-function mountMud(el, { weather }) {
+function mountMud(el, { weather, store }) {
+  let ui = {};
+  const readSettings = async () => { ui = (await store.getSetting('ui')) ?? {}; run(); };
   const render = () => {
     const s = weather.getState();
-    if (s.status === 'no-location') return replace(el, note('Choose a place in the Mud tab to see the forecast.'));
-    if (!s.rows.length) return replace(el, note(s.status === 'error' ? 'The forecast could not be loaded.' : 'Loading the forecast...'));
-    const sum = s.summary;
-    replace(el, h('div', { class: 'w-mud' },
-      sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
-        h('span', { class: 'w-mud-label' }, sum.today.label),
-        h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`),
-        s.place?.name ? h('span', { class: 'w-mud-place' }, s.place.name) : null) : null,
-      sum ? h('p', { class: 'w-mud-text' }, summarySentence(sum)) : null,
-      // one column per day: the score on top, a bar that rises with it, the day name underneath
-      h('div', { class: 'w-strip' }, s.rows.map((r) => h('div', { class: `w-cell ${mudClass(r.label)}${r.phase === 'today' ? ' today' : ''}${r.phase === 'past' ? ' past' : ''}`, title: `${dayLong(r.date)}: ${r.label} ${r.index}` },
-        h('b', {}, r.index),
-        h('div', { class: 'w-bar', style: `--p:${r.index}%` }),
-        h('span', {}, r.phase === 'today' ? 'Now' : dayShort(r.date).slice(0, 2)))))));
+    const now = new Date();
+    const clock = (tz) => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz });
+    const extra = ui?.extra_clock_timezone;
+    const localClock = h('div', { class: 'w-weather-clock' },
+      h('div', { class: 'w-time-unit' }, h('span', {}, 'LOCAL TIME'), h('strong', {}, clock(undefined))),
+      extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
+    const c = s.current;
+    const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
+      h('span', { class: 'w-weather-glyph', html: glyphSvg(weatherGlyph(c.weather_code).glyph) }),
+      h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
+        h('span', {}, weatherGlyph(c.weather_code).text)),
+      h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
+    const forecast = !s.rows.length ? note(s.status === 'no-location' ? 'Choose a place in the Mud tab for weather and mud.' : 'Loading the forecast...') : (() => {
+      const sum = s.summary;
+      return h('div', { class: 'w-mud-compact' },
+        sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
+          h('span', { class: 'w-mud-label' }, sum.today.label),
+          h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
+        h('div', { class: 'w-strip' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) =>
+          h('div', { class: `w-cell ${mudClass(r.label)}${r.phase === 'today' ? ' today' : ''}`, title: `${dayLong(r.date)}: ${r.label} ${r.index}` },
+            h('b', {}, r.index), h('div', { class: 'w-bar', style: `--p:${r.index}%` }),
+            h('span', {}, r.phase === 'today' ? 'Now' : dayShort(r.date).slice(0, 2))))));
+    })();
+    replace(el, h('div', { class: 'w-mud w-mud-dashboard' },
+      h('div', { class: 'w-weather-top' }, localClock, wx),
+      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, 'MUD OUTLOOK'), forecast)));
   };
-  return live(render, (run) => [weather.subscribe(run)]);
+  let run = () => {};
+  const inst = live(render, (trigger) => {
+    run = trigger;
+    return [weather.subscribe(trigger), storeTables(store, ['settings'], readSettings)];
+  });
+  readSettings();
+  const timer = setInterval(() => inst.refresh(), 30_000);
+  return { destroy() { clearInterval(timer); inst.destroy(); }, refresh: inst.refresh };
 }
 
 // ---- calendar ------------------------------------------------------------------------------
