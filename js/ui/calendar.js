@@ -167,8 +167,8 @@ export function createCalendarView({ store, weather }) {
     }));
 
     const repeat = h('select', { id: 'ev-repeat', onchange: syncVisibility },
-      [['', 'Does not repeat'], ['DAILY', 'Every day'], ['WEEKLY', 'Every week'], ['MONTHLY', 'Every month'], ['YEARLY', 'Every year']].map(([v, l]) => h('option', { value: v }, l)));
-    repeat.value = rule?.freq ?? '';
+      [['', 'Does not repeat'], ['DAILY', 'Every day'], ['WEEKLY', 'Every week'], ['BIWEEKLY', 'Every 2 weeks / Cada 2 semanas'], ['MONTHLY', 'Every month'], ['YEARLY', 'Every year']].map(([v, l]) => h('option', { value: v }, l)));
+    repeat.value = rule?.freq === 'WEEKLY' && rule.interval === 2 ? 'BIWEEKLY' : (rule?.freq ?? '');
     const every = h('input', { type: 'number', id: 'ev-every', min: 1, max: 99, step: 1, value: rule?.interval ?? 1 });
     const until = h('input', { type: 'date', id: 'ev-until', value: rule?.until ?? '' });
     const chosenDays = new Set(rule?.byday ?? [weekdayOfKey(parts.key)]);
@@ -188,7 +188,9 @@ export function createCalendarView({ store, weather }) {
       timeRow.hidden = allDay.checked;
       endDayRow.hidden = !allDay.checked;
       repeatBlock.hidden = !repeat.value;
-      dayToggles.hidden = repeat.value !== 'WEEKLY';
+      dayToggles.hidden = !['WEEKLY', 'BIWEEKLY'].includes(repeat.value);
+      every.parentElement?.classList?.toggle('unused', repeat.value === 'BIWEEKLY');
+      every.disabled = repeat.value === 'BIWEEKLY';
     }
 
     async function save() {
@@ -211,10 +213,10 @@ export function createCalendarView({ store, weather }) {
 
       let rrule = null;
       if (repeat.value) {
-        const interval = Math.max(1, parseInt(every.value, 10) || 1);
-        if (repeat.value === 'WEEKLY' && chosenDays.size === 0) { error.textContent = 'Pick at least one weekday to repeat on.'; return; }
+        const interval = repeat.value === 'BIWEEKLY' ? 2 : Math.max(1, parseInt(every.value, 10) || 1);
+        if (['WEEKLY', 'BIWEEKLY'].includes(repeat.value) && chosenDays.size === 0) { error.textContent = 'Pick at least one weekday to repeat on.'; return; }
         if (until.value && until.value < date.value) { error.textContent = 'The repeat cannot stop before the event starts.'; return; }
-        rrule = buildRRule({ freq: repeat.value, interval, byday: repeat.value === 'WEEKLY' ? [...chosenDays] : null, count: rule?.count ?? null, until: until.value || null });
+        rrule = buildRRule({ freq: repeat.value === 'BIWEEKLY' ? 'WEEKLY' : repeat.value, interval, byday: ['WEEKLY', 'BIWEEKLY'].includes(repeat.value) ? [...chosenDays] : null, count: rule?.count ?? null, until: until.value || null });
       }
 
       await store.upsert('events', {

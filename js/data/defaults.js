@@ -10,6 +10,7 @@ export const DEFAULT_CATEGORIES = [
   { id: 'c0000000-0000-4000-8000-000000000004', name: 'Clothing & Gear', icon: '🥾', color: '#b07acc', sort_order: 4 },
   { id: 'c0000000-0000-4000-8000-000000000005', name: 'Household',      icon: '🏠', color: '#d97a6c', sort_order: 5 },
   { id: 'c0000000-0000-4000-8000-000000000006', name: 'Keepsakes',      icon: '⭐', color: '#e8d44d', sort_order: 6 },
+  { id: 'c0000000-0000-4000-8000-000000000007', name: 'Farmacia', icon: '💊', color: '#70b9a0', sort_order: 7 },
 ];
 
 export const DEFAULT_SETTINGS = {
@@ -19,6 +20,11 @@ export const DEFAULT_SETTINGS = {
     uncommon:  { label: 'Uncommon',  meaning: 'Useful, takes some effort to replace' },
     rare:      { label: 'Rare',      meaning: 'Hard or expensive to replace' },
     legendary: { label: 'Legendary', meaning: 'Irreplaceable' },
+  },
+  category_tracking_defaults: {
+    'c0000000-0000-4000-8000-000000000001': { durability: true, quantity: false, condition: true, expiration: false },
+    'c0000000-0000-4000-8000-000000000002': { durability: true, quantity: false, condition: true, expiration: false },
+    'c0000000-0000-4000-8000-000000000007': { durability: false, quantity: true, condition: false, expiration: true },
   },
   // Elevation is always in meters.
   location: { name: null, lat: null, lon: null, elevation_m: null },
@@ -73,7 +79,12 @@ export async function upgradeLayouts(store) {
 // Idempotent: runs once per account (guarded by a setting), never overwrites
 // anything that already exists.
 export async function ensureDefaults(store) {
-  if (await store.get('settings', 'defaults_seeded')) return false;
+  if (await store.get('settings', 'defaults_seeded')) {
+    const pharmacy = DEFAULT_CATEGORIES.find((c) => c.name === 'Farmacia');
+    if (!(await store.get('categories', pharmacy.id))) await store.upsert('categories', pharmacy);
+    if (!(await store.get('settings', 'category_tracking_defaults'))) await store.setSetting('category_tracking_defaults', DEFAULT_SETTINGS.category_tracking_defaults);
+    return false;
+  }
   for (const c of DEFAULT_CATEGORIES) {
     if (!(await store.get('categories', c.id))) await store.upsert('categories', c);
   }
