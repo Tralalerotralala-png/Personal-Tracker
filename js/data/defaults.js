@@ -1,0 +1,88 @@
+import { DEFAULT_MUD_PARAMS } from '../weather/mud.js';
+
+// First-run defaults. Fixed ids mean two devices seeding at the same moment
+// produce the same rows instead of duplicates.
+
+export const DEFAULT_CATEGORIES = [
+  { id: 'c0000000-0000-4000-8000-000000000001', name: 'Tools',          icon: '🔧', color: '#e0a030', sort_order: 1 },
+  { id: 'c0000000-0000-4000-8000-000000000002', name: 'Electronics',    icon: '🔌', color: '#4aa3df', sort_order: 2 },
+  { id: 'c0000000-0000-4000-8000-000000000003', name: 'Outdoor & Garden', icon: '🌲', color: '#5fb85f', sort_order: 3 },
+  { id: 'c0000000-0000-4000-8000-000000000004', name: 'Clothing & Gear', icon: '🥾', color: '#b07acc', sort_order: 4 },
+  { id: 'c0000000-0000-4000-8000-000000000005', name: 'Household',      icon: '🏠', color: '#d97a6c', sort_order: 5 },
+  { id: 'c0000000-0000-4000-8000-000000000006', name: 'Keepsakes',      icon: '⭐', color: '#e8d44d', sort_order: 6 },
+];
+
+export const DEFAULT_SETTINGS = {
+  // You decide what each tier means. These are just a starting point.
+  rarity_labels: {
+    common:    { label: 'Common',    meaning: 'Easy to replace' },
+    uncommon:  { label: 'Uncommon',  meaning: 'Useful, takes some effort to replace' },
+    rare:      { label: 'Rare',      meaning: 'Hard or expensive to replace' },
+    legendary: { label: 'Legendary', meaning: 'Irreplaceable' },
+  },
+  // Elevation is always in meters.
+  location: { name: null, lat: null, lon: null, elevation_m: null },
+  units: 'metric',
+  // Placeholder weights; stage 3 defines the actual Mud Index formula and may add keys.
+  mud_weights: { recent_rain: 0.4, soil_moisture: 0.3, poor_drying: 0.2, freeze_thaw: 0.1 },
+  mud_params: DEFAULT_MUD_PARAMS,
+  refresh_minutes: { weather: 60, feed: 15, wallpaper: 10 },
+  feed_keywords: [],
+  ui: { theme: 'dark', scanlines: true },
+};
+
+// Starting layouts on the 12-column grid ({id, x, y, w, h}); see js/widgets/defs.js.
+export const DEFAULT_LAYOUTS = {
+  desktop: [
+    { id: 'mud',      x: 0, y: 0, w: 8, h: 4 },
+    { id: 'calendar', x: 8, y: 0, w: 4, h: 6 },
+    { id: 'loot',     x: 0, y: 4, w: 4, h: 3 },
+    { id: 'stats',    x: 4, y: 4, w: 4, h: 2 },
+    { id: 'feed',     x: 8, y: 6, w: 4, h: 4 },
+  ],
+  mobile: [
+    { id: 'stats',    x: 0, y: 0,  w: 12, h: 2 },
+    { id: 'loot',     x: 0, y: 2,  w: 12, h: 3 },
+    { id: 'mud',      x: 0, y: 5,  w: 12, h: 4 },
+    { id: 'calendar', x: 0, y: 9,  w: 12, h: 5 },
+    { id: 'feed',     x: 0, y: 14, w: 12, h: 5 },
+  ],
+  wallpaper: [
+    { id: 'mud',      x: 0, y: 0, w: 7, h: 4 },
+    { id: 'calendar', x: 7, y: 0, w: 5, h: 4 },
+    { id: 'feed',     x: 4, y: 4, w: 8, h: 4 },
+    { id: 'loot',     x: 0, y: 4, w: 4, h: 2 },
+    { id: 'clock',    x: 0, y: 6, w: 4, h: 2 },
+  ],
+};
+
+const LAYOUT_VERSION = 2;
+
+// Layouts from before the widgets existed are replaced once with the real
+// defaults. Callers must make sure the first sync has finished (cloud mode),
+// otherwise these fresh timestamps could overwrite a layout you saved elsewhere.
+export async function upgradeLayouts(store) {
+  if ((await store.getSetting('layout_version', 0)) >= LAYOUT_VERSION) return false;
+  for (const [profile, layout] of Object.entries(DEFAULT_LAYOUTS)) {
+    await store.upsert('widget_layout', { profile, layout });
+  }
+  await store.setSetting('layout_version', LAYOUT_VERSION);
+  return true;
+}
+
+// Idempotent: runs once per account (guarded by a setting), never overwrites
+// anything that already exists.
+export async function ensureDefaults(store) {
+  if (await store.get('settings', 'defaults_seeded')) return false;
+  for (const c of DEFAULT_CATEGORIES) {
+    if (!(await store.get('categories', c.id))) await store.upsert('categories', c);
+  }
+  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+    if (!(await store.get('settings', key))) await store.upsert('settings', { key, value });
+  }
+  for (const [profile, layout] of Object.entries(DEFAULT_LAYOUTS)) {
+    if (!(await store.get('widget_layout', profile))) await store.upsert('widget_layout', { profile, layout });
+  }
+  await store.upsert('settings', { key: 'defaults_seeded', value: true });
+  return true;
+}

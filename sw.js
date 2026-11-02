@@ -1,0 +1,120 @@
+// Service worker: makes the app open instantly and work offline.
+//  - App files are served from the cache and refreshed in the background.
+//  - Fonts and the Supabase script (CDN) are cached the same way.
+//  - Requests to Supabase itself are never touched (sync handles those).
+// Bump VERSION whenever you deploy, so installed copies notice the update.
+const VERSION = 'v4';
+const SHELL = `tracker-shell-${VERSION}`;
+const RUNTIME = `tracker-runtime-${VERSION}`;
+
+const PRECACHE = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './css/app.css',
+  './icons/apple-touch-icon.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
+  './js/app.js',
+  './js/photos.js',
+  './js/calendar/ics.js',
+  './js/calendar/recurrence.js',
+  './js/data/adapters.js',
+  './js/data/app-data.js',
+  './js/data/backup.js',
+  './js/data/defaults.js',
+  './js/data/inventory-logic.js',
+  './js/data/sample-data.js',
+  './js/data/schema.js',
+  './js/data/store.js',
+  './js/data/supabase.js',
+  './js/data/sync.js',
+  './js/data/util.js',
+  './js/feed/parse.js',
+  './js/feed/service.js',
+  './js/feed/sources.js',
+  './js/ui/calendar.js',
+  './js/ui/dom.js',
+  './js/ui/feed.js',
+  './js/ui/format.js',
+  './js/ui/inventory.js',
+  './js/ui/layout-editor.js',
+  './js/ui/login.js',
+  './js/ui/mud-format.js',
+  './js/ui/mud-settings.js',
+  './js/ui/mud.js',
+  './js/ui/overview.js',
+  './js/ui/pixel-icon.js',
+  './js/ui/place-search.js',
+  './js/ui/places.js',
+  './js/ui/settings.js',
+  './js/ui/wallpaper-settings.js',
+  './js/wallpaper/config.js',
+  './js/wallpaper/main.js',
+  './js/wallpaper/snapshot.js',
+  './js/wallpaper/store.js',
+  './js/weather/mud.js',
+  './js/weather/open-meteo.js',
+  './js/weather/service.js',
+  './js/widgets/defs.js',
+  './js/widgets/layout.js',
+  './js/widgets/registry.js',
+  './js/widgets/store.js',
+];
+// Not required to exist (local-only mode has no config.js).
+const OPTIONAL = ['./config.js'];
+
+const CDN_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net']);
+
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(SHELL);
+    await Promise.all(PRECACHE.map((url) =>
+      cache.add(new Request(url, { cache: 'reload' })).catch((err) => console.warn('precache failed:', url, err))));
+    await Promise.all(OPTIONAL.map((url) => cache.add(new Request(url, { cache: 'reload' })).catch(() => {})));
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    for (const key of await caches.keys()) {
+      if (key !== SHELL && key !== RUNTIME) await caches.delete(key);
+    }
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  const sameOrigin = url.origin === self.location.origin;
+  if (!sameOrigin && !CDN_HOSTS.has(url.hostname)) return; // Supabase and everything else: untouched
+  event.respondWith(staleWhileRevalidate(event, req, sameOrigin));
+});
+
+async function staleWhileRevalidate(event, req, sameOrigin) {
+  const cache = await caches.open(sameOrigin ? SHELL : RUNTIME);
+  const cached = await cache.match(req, { ignoreSearch: sameOrigin });
+
+  const refresh = fetch(req, sameOrigin ? { cache: 'no-cache' } : undefined)
+    .then((res) => {
+      if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+      return res;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    event.waitUntil(refresh);
+    return cached;
+  }
+  const res = await refresh;
+  if (res) return res;
+  if (req.mode === 'navigate') {
+    const shell = await cache.match('./index.html');
+    if (shell) return shell;
+  }
+  return Response.error();
+}
