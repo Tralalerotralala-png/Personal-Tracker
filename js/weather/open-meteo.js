@@ -37,7 +37,10 @@ export function buildForecastUrl({ lat, lon }, kind) {
     forecast_days: String(FORECAST_DAYS),
   });
   if (kind === 'soil') p.set('hourly', SOIL_VARS.join(','));
-  else p.set('daily', DAILY_VARS.join(','));
+  else {
+    p.set('daily', DAILY_VARS.join(','));
+    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m');
+  }
   return `${FORECAST_URL}?${p}`;
 }
 
@@ -136,6 +139,7 @@ export async function fetchWeather({ lat, lon }, opts = {}) {
     timezone: dailyRes.value.timezone ?? null,
     elevation_m: typeof dailyRes.value.elevation === 'number' ? dailyRes.value.elevation : null,
     soilAvailable: days.some((d) => d.soil_moisture !== null),
+    current: dailyRes.value.current ?? null,
     days,
     fetchedAt: new Date().toISOString(),
   };

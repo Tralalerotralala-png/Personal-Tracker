@@ -2018,7 +2018,10 @@ function buildForecastUrl({ lat, lon }, kind) {
     forecast_days: String(FORECAST_DAYS),
   });
   if (kind === 'soil') p.set('hourly', SOIL_VARS.join(','));
-  else p.set('daily', DAILY_VARS.join(','));
+  else {
+    p.set('daily', DAILY_VARS.join(','));
+    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m');
+  }
   return `${FORECAST_URL}?${p}`;
 }
 
@@ -2117,6 +2120,7 @@ async function fetchWeather({ lat, lon }, opts = {}) {
     timezone: dailyRes.value.timezone ?? null,
     elevation_m: typeof dailyRes.value.elevation === 'number' ? dailyRes.value.elevation : null,
     soilAvailable: days.some((d) => d.soil_moisture !== null),
+    current: dailyRes.value.current ?? null,
     days,
     fetchedAt: new Date().toISOString(),
   };
@@ -2143,7 +2147,7 @@ const { computeMud, displayWindow, summarize } = __require("js/weather/mud.js");
 const CACHE_KEY = 'weather-cache';
 
 function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () => new Date() }) {
-  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false };
+  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null };
   const listeners = new Set();
   let running = null;
 
@@ -2169,7 +2173,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
     if (running) return running;
     running = (async () => {
       const place = await loadPlace();
-      if (!place) { set({ status: 'no-location', place: null, rows: [], summary: null, error: null }); return state; }
+      if (!place) { set({ status: 'no-location', place: null, rows: [], summary: null, current: null, error: null }); return state; }
 
       const interval = ((await store.getSetting('refresh_minutes'))?.weather ?? 60) * 60_000;
       const cached = (await store.meta.get(CACHE_KEY)) ?? null;
@@ -2179,8 +2183,8 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       // Show what we have straight away.
       if (sameplace) {
         const c = await compute(cached.raw);
-        if (c.todayFound) set({ place, ...c, fetchedAt: cached.raw.fetchedAt, soilAvailable: cached.raw.soilAvailable, status: age < interval ? 'ok' : 'stale', error: null });
-      } else set({ place, rows: [], summary: null, status: 'loading', error: null });
+        if (c.todayFound) set({ place, ...c, fetchedAt: cached.raw.fetchedAt, soilAvailable: cached.raw.soilAvailable, current: cached.raw.current ?? null, status: age < interval ? 'ok' : 'stale', error: null });
+      } else set({ place, rows: [], summary: null, current: null, status: 'loading', error: null });
 
       if (!force && sameplace && age < interval && state.rows.length) return state;
 
@@ -2190,7 +2194,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);
-        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, status: c.todayFound ? 'ok' : 'error', error: c.todayFound ? null : 'The weather data did not include today.' });
+        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, status: c.todayFound ? 'ok' : 'error', error: c.todayFound ? null : 'The weather data did not include today.' });
       } catch (err) {
         set({ place, status: state.rows.length ? 'stale' : 'error', error: err.message });
       }

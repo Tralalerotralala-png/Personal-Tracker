@@ -107,6 +107,44 @@ export function createMudView({ store, weather }) {
     h('span', { class: 'mud-why' }, r.why));
   }
 
+  // Current conditions share the existing forecast request and offline cache.
+  function weatherPanel(state, today, future) {
+    if (!today) return null;
+    const current = state.current;
+    const raw = today.raw;
+    const code = current?.weather_code ?? raw.weather_code;
+    const g = weatherGlyph(code);
+    const kind = g.glyph === 'storm' ? 'storm' : g.glyph === 'rain' ? 'rain' : g.glyph === 'snow' ? 'snow' : g.glyph === 'sun' ? 'sun' : 'cloud';
+    const temp = current?.temperature_2m;
+    const number = (value, unit = '') => typeof value === 'number' ? `${Math.round(value)}${unit}` : '—';
+    const stat = (label, value) => h('div', { class: 'wx-stat' }, h('span', { class: 'wx-stat-label' }, label), h('strong', {}, value));
+    const days = [today, ...future].slice(0, 6);
+    return h('section', { class: 'wx-panel', 'aria-label': 'Weather conditions and six day outlook' },
+      h('div', { class: 'wx-heading' }, h('h3', {}, 'Weather'), h('span', { class: 'hint' }, current ? 'Current conditions' : 'Daily forecast')),
+      h('div', { class: 'wx-hero' },
+        h('div', { class: `wx-scene wx-${kind}`, 'aria-hidden': 'true' },
+          h('span', { class: 'wx-scene-glyph', html: glyphSvg(g.glyph) }),
+          h('span', { class: 'wx-particles' }, Array.from({length: 8}, (_, i) => h('i', { class: 'wx-particle', style: `--i:${i}` })))),
+        h('div', { class: 'wx-main' },
+          h('strong', { class: 'wx-temperature' }, typeof temp === 'number' ? `${Math.round(temp)}°C` : `${number(raw.tmax, '°')} / ${number(raw.tmin, '°')}C`),
+          h('span', { class: 'wx-condition' }, g.text),
+          h('span', { class: 'hint' }, `High ${number(raw.tmax, '°')} · Low ${number(raw.tmin, '°')}`))),
+      h('div', { class: 'wx-stats' },
+        stat('Feels like', number(current?.apparent_temperature, '°C')),
+        stat('Humidity', number(current?.relative_humidity_2m, '%')),
+        stat('Wind', number(current?.wind_speed_10m ?? raw.wind_max, ' km/h')),
+        stat('Rain today', raw.precip === null ? '—' : `${fmt(raw.precip)} mm`)),
+      h('h4', { class: 'wx-outlook-title' }, 'Next six days'),
+      h('div', { class: 'wx-outlook' }, days.map((d) => {
+        const icon = weatherGlyph(d.raw.weather_code);
+        return h('div', { class: 'wx-day', title: icon.text },
+          h('span', {}, d.phase === 'today' ? 'Today' : dayShort(d.date)),
+          h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
+          h('strong', {}, `${number(d.raw.tmax, '°')} / ${number(d.raw.tmin, '°')}`),
+          h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`));
+      })));
+  }
+
   function render(state) {
     if (state.status === 'no-location' || (!state.place && state.status === 'idle')) {
       const search = createPlaceSearch({ weather, autofocus: false });
@@ -135,6 +173,8 @@ export function createMudView({ store, weather }) {
     replace(el,
       placeHeader(state),
       banner(state),
+      weatherPanel(state, today, future),
+      h('h3', { class: 'group' }, 'Mud conditions'),
       s ? h('section', { class: `mud-summary ${mudClass(s.today.label)}`, 'aria-label': 'Today at a glance' },
         h('div', { class: 'mud-big' }, h('span', { class: 'mud-big-label' }, s.today.label), h('span', { class: 'mud-big-num' }, `${s.today.index}/100`)),
         h('p', {}, `${s.today.why}.`),
