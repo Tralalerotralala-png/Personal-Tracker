@@ -14,6 +14,9 @@ import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 
 const RARITY_RANK = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
 const FALLBACK_COLOR = '#c9b58a';
+const methotrexateIcon = './icons/inventory/methotrexate-16.png';
+const isMethotrexate = name => /^methotrexate(?:\b|$)/i.test((name || '').trim());
+
 
 export function createInventoryView({ store, photos }) {
   const state = {
@@ -79,6 +82,7 @@ export function createInventoryView({ store, photos }) {
   function art(item, cls = 'art') {
     const cat = catById().get(item.category_id);
     const box = h('span', { class: cls, html: pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
+    if (!item.photo_path && isMethotrexate(item.name)) box.replaceChildren(h('img', { src: methotrexateIcon, alt: '', class: 'pixel-inventory-icon' }));
     if (item.photo_path) {
       photos.urlFor(item).then((url) => {
         if (url && box.isConnected !== false) box.replaceChildren(h('img', { src: url, alt: '', loading: 'lazy' }));
@@ -363,6 +367,38 @@ export function createInventoryView({ store, photos }) {
           } }, 'Remove photo') : null));
     }
     renderPhoto(null);
+    // Native, offline sprite generation: no API credentials or third-party upload.
+    const generateIcon = h('button', { class: 'btn small', type: 'button', onclick: async () => {
+      try {
+        const color = catById().get(category.value)?.color || FALLBACK_COLOR;
+        const svg = pixelIconSvg(name.value.trim() || id, { color });
+        const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+        const img = new Image();
+        try {
+          await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+          const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16;
+          const canvasCtx = canvas.getContext('2d'); canvasCtx.imageSmoothingEnabled = false;
+          canvasCtx.drawImage(img, 0, 0, 16, 16);
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          if (!blob) throw new Error('Could not create the icon.');
+          draft.photoFile = new File([blob], 'pixel-icon.png', { type: 'image/png' });
+          draft.removePhoto = false;
+          renderPhoto(URL.createObjectURL(blob));
+          toast('Pixel icon ready. Save this item to apply it.');
+        } finally { URL.revokeObjectURL(url); }
+      } catch (err) { toast(err.message || 'Icon creation failed'); }
+    } }, t('Generate 16×16 icon'));
+    const builtInIcon = h('button', { class: 'btn small', type: 'button', onclick: async () => {
+      try {
+        const response = await fetch(methotrexateIcon);
+        if (!response.ok) throw new Error('Built-in icon unavailable');
+        const blob = await response.blob();
+        draft.photoFile = new File([blob], 'methotrexate-16.png', { type: 'image/png' });
+        draft.removePhoto = false;
+        renderPhoto(URL.createObjectURL(blob));
+        toast('Methotrexate icon selected. Save the item to apply it.');
+      } catch (err) { toast(err.message); }
+    } }, t('Use Methotrexate icon'));
 
     const desc = h('textarea', { id: 'it-desc', rows: 3, placeholder: 'e.g. 16x16 pixel art icon of an orange headlamp, 8 colours, transparent background' }, existing?.pixel_description ?? '');
     const suggest = () => {
@@ -461,7 +497,8 @@ export function createInventoryView({ store, photos }) {
             store, locations: data.locations,
             onSaved: async (row) => { await load(); place.replaceChildren(...placeOptions(data.locations)); place.value = row.id; },
           }) }, 'New place')),
-        h('label', {}, 'Photo'), photoBox, fileInput,
+        h('label', {}, 'Photo / pixel icon'), photoBox, fileInput,
+        h('div', { class: 'inline-actions' }, generateIcon, builtInIcon),
         advanced,
         error,
         h('button', { type: 'submit', class: 'visually-hidden' }, 'Save')),

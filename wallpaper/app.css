@@ -758,3 +758,14 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .settings-tab.active { border-color:var(--accent); color:var(--accent); }
 .settings-pane .set-block { margin:0; }
 @media(max-width: 600px) { .top { gap:6px; padding:8px; } .brand-name { display:none; } .global-search-input { padding:8px 6px; font-size:.82rem; } .settings-tab { flex:1 1 43%; } }
+
+/* Compact search trigger and icon assets */
+.pixel-search-toggle { border: 1px solid var(--edge); color: var(--ink); background: var(--panel); padding: 7px; cursor: pointer; display: grid; place-items: center; min-height: 36px; min-width: 36px; }
+.pixel-search-toggle:hover,.pixel-search-toggle:focus-visible { border-color: var(--accent); }
+.global-search-wrap { flex: 0 0 auto; max-width: min(560px, 90vw); min-width: 0; display:flex; align-items:center; gap:6px; }
+.global-search-wrap:not([data-open="true"]) .global-search-input { display:none; }
+.global-search-wrap[data-open="true"] { flex:1 1 auto; }
+.global-search-wrap[data-open="true"] .global-search-input { min-width:0; width:100%; }
+.pixel-inventory-icon { width:100%; height:100%; image-rendering:pixelated; object-fit:contain; }
+.theme-color-field { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.theme-color-field input { width:56px; min-height:32px; }

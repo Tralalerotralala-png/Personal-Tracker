@@ -165,12 +165,15 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   // -- display
   const scan = h('input', { type: 'checkbox', id: 'st-scan', checked: Boolean(ui?.scanlines),
     onchange: async (e) => { await store.setSetting('ui', { ...(await store.getSetting('ui')), scanlines: e.target.checked }); } });
-  const accentColor = h('input',{type:'color',value: /^#[0-9a-f]{6}$/i.test(ui?.accent_color||'')?ui.accent_color:'#43b9ad', onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),accent_color:e.target.value})});
+  const accentColor = h('input',{type:'color',value: /^#[0-9a-f]{6}$/i.test(ui?.accent_color||'')?ui.accent_color:'#43b9ad', onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),accent_color:e.target.value}); window.dispatchEvent(new Event('tracker-theme-refresh'));}});
+  const paletteColors = [ ['Background', 'background_color', '#17130f'], ['Panels', 'panel_color', '#231c15'], ['Secondary panels', 'panel_secondary_color', '#2e251c'], ['Text', 'text_color', '#eadfc4'], ['Muted text', 'muted_color', '#a39475'], ['Borders', 'border_color', '#4a3b2a'] ];
+  const customColors = paletteColors.map(([label,key,def]) => h('label', { class: 'theme-color-field' }, h('span', {}, label), h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(ui?.[key] || '') ? ui[key] : def, onchange: async e => { await store.setSetting('ui', { ...(await store.getSetting('ui')), [key]:e.target.value }); window.dispatchEvent(new Event('tracker-theme-refresh')); } })));
   const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100})});
   const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked})});
   const display = h('section', { class: 'set-block' },
     h('h3', {}, 'Display'),
     h('label', {}, 'Accent color'), accentColor,
+    h('p', { class: 'hint' }, 'Customize each part of the palette. Changes sync with your account.'), ...customColors,
     h('label', {}, 'Panel opacity'), panelOpacity,
     h('label', {class:'check'}, lessMotion, 'Reduce animations'),
     h('label', { class: 'check', for: 'st-scan' }, scan, 'Scanline effect'),

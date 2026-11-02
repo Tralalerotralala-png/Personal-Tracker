@@ -11,6 +11,7 @@ import { locationPath } from '../data/inventory-logic.js';
 import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
 import { weatherGlyph, glyphSvg } from '../ui/pixel-icon.js';
+import { moonPhase, moonPhaseSvg, isNightAtLocation } from '../weather/moon-phase.js';
 
 // Render now, and again (at most once per frame) whenever something it
 // depends on changes. `subscribe(run)` returns the unsubscribe functions.
@@ -47,10 +48,14 @@ function mountMud(el, { weather, store }) {
       h('div', { class: 'w-time-unit' }, h('span', {}, 'LOCAL TIME'), h('strong', {}, clock(undefined))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
     const c = s.current;
+    const night = isNightAtLocation(c, now);
+    const moon = moonPhase(now);
+    const code = c ? Number(c.weather_code) : 0;
+    const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
-      h('span', { class: 'w-weather-glyph', html: glyphSvg(weatherGlyph(c.weather_code).glyph) }),
+      h('span', { class: 'w-weather-glyph', title: night ? moon.label : weatherGlyph(code).text, html: night && clearEnough ? moonPhaseSvg(now) : glyphSvg(weatherGlyph(code).glyph) }),
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
-        h('span', {}, weatherGlyph(c.weather_code).text)),
+        h('span', {}, night && clearEnough ? `${weatherGlyph(code).text} · ${moon.label}` : weatherGlyph(code).text)),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
     const forecast = !s.rows.length ? note(s.status === 'no-location' ? 'Choose a place in the Mud tab for weather and mud.' : 'Loading the forecast...') : (() => {
       const sum = s.summary;

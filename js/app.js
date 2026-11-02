@@ -51,10 +51,16 @@ async function applyDisplay() {
   document.documentElement.classList.toggle('scanlines', Boolean(ui?.scanlines));
   const valid = s => /^#[0-9a-fA-F]{6}$/.test(s || '');
   document.documentElement.style.setProperty('--accent', valid(ui?.accent_color) ? ui.accent_color : '#43b9ad');
+  for (const [key, cssName, fallback] of [
+    ['background_color','--bg','#17130f'], ['panel_color','--panel','#231c15'],
+    ['panel_secondary_color','--panel-2','#2e251c'], ['text_color','--ink','#eadfc4'],
+    ['muted_color','--ink-dim','#a39475'], ['border_color','--edge','#4a3b2a']
+  ]) document.documentElement.style.setProperty(cssName, valid(ui?.[key]) ? ui[key] : fallback);
   document.documentElement.style.setProperty('--panel-opacity', `${Math.max(.65,Math.min(1,Number(ui?.panel_opacity) || 1))}`);
   document.documentElement.classList.toggle('reduce-animations', Boolean(ui?.reduce_animations));
 }
 applyDisplay();
+window.addEventListener('tracker-theme-refresh', applyDisplay);
 
 // ---- sync indicator ----------------------------------------------------------------
 const SYNC_TEXT = {
@@ -161,7 +167,12 @@ window.addEventListener('tracker-nav-change', e => { moveNav(e.detail.from, e.de
 
 const globalSearchInput = h('input', { type: 'search', class: 'global-search-input', placeholder: t('Search everything'), 'aria-label': t('Search everything'), autocomplete: 'off' });
 const searchResults = h('div', { class: 'global-search-results', hidden: true, role: 'listbox', 'aria-label': t('Search') });
-const searchWrap = h('div', { class: 'global-search-wrap' }, globalSearchInput, searchResults);
+const searchToggle = h('button', { class: 'pixel-search-toggle', type: 'button', 'aria-label': t('Search'), title: 'Search (Ctrl+K)', 'aria-expanded': 'false', html: '<svg viewBox="0 0 16 16" width="24" height="24" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M4 1h6v2H4zM2 3h2v7H2zM10 3h2v7h-2zM4 10h6v2H4zM10 11h2v2h-2zM12 13h2v2h-2z"/></svg>' });
+const searchWrap = h('div', { class: 'global-search-wrap', 'data-open': 'false' }, searchToggle, globalSearchInput, searchResults);
+const openSearch = () => { searchWrap.dataset.open = 'true'; searchToggle.setAttribute('aria-expanded','true'); globalSearchInput.focus(); };
+const closeSearch = () => { searchWrap.dataset.open = 'false'; searchToggle.setAttribute('aria-expanded','false'); searchResults.hidden = true; globalSearchInput.value = ''; };
+searchToggle.addEventListener('click', () => searchWrap.dataset.open === 'true' ? closeSearch() : openSearch());
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); } else if (e.key === 'Escape' && searchWrap.dataset.open === 'true') closeSearch(); });
 let searchSeq = 0;
 async function renderGlobalSearch() {
   const seq = ++searchSeq;
@@ -186,7 +197,7 @@ async function renderGlobalSearch() {
 }
 globalSearchInput.addEventListener('input', () => { renderGlobalSearch().catch(() => { searchResults.hidden = true; }); });
 globalSearchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.hidden = true; globalSearchInput.blur(); } });
-document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.target)) searchResults.hidden = true; });
+document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.target)) closeSearch(); });
 
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
