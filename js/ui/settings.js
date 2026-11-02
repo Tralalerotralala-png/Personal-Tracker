@@ -124,6 +124,31 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       h('option', { value: 'mon', selected: ui?.week_start !== 'sun' }, 'Monday'),
       h('option', { value: 'sun', selected: ui?.week_start === 'sun' }, 'Sunday')));
 
+  // -- typography and navigation (saved on this device)
+  const fontSelect = h('select', { 'aria-label': 'Interface font' },
+    [['clean', 'Clean / sharper (recommended)'], ['pixel', 'Original pixel font'], ['mono', 'Monospace']].map(([value, label]) =>
+      h('option', { value, selected: (localStorage.getItem('tracker-font-v1') || 'clean') === value }, label)));
+  const sizeSelect = h('select', { 'aria-label': 'Text size' },
+    [14, 15, 16, 17, 18, 19, 20, 21].map(value => h('option', { value: String(value), selected: Number(localStorage.getItem('tracker-font-size-v1') || 16) === value }, `${value}px`)));
+  fontSelect.addEventListener('change', () => { localStorage.setItem('tracker-font-v1', fontSelect.value); window.dispatchEvent(new Event('tracker-display-change')); });
+  sizeSelect.addEventListener('change', () => { localStorage.setItem('tracker-font-size-v1', sizeSelect.value); window.dispatchEvent(new Event('tracker-display-change')); });
+  const typography = h('section', { class: 'set-block' }, h('h3', {}, 'Typography'),
+    h('p', { class: 'hint' }, 'Choose a sharper font and a comfortable text size. Saved on this device.'),
+    h('label', {}, 'Font'), fontSelect, h('label', {}, 'Text size'), sizeSelect);
+  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Mud', calendar: 'Calendar', feed: 'Feed' };
+  const navOrder = h('div');
+  function renderNavOrder() {
+    const order = (() => { try { return JSON.parse(localStorage.getItem('tracker-nav-order-v1') || 'null'); } catch { return null; } })();
+    const keys = Array.isArray(order) && order.length === 5 ? order : Object.keys(navNames);
+    navOrder.replaceChildren(...keys.map((key, i) => h('div', { class: 'nav-order-row' },
+      h('span', {}, navNames[key]), h('div', { class: 'inline-actions' },
+        h('button', { class: 'btn small', type: 'button', disabled: i === 0, 'aria-label': `Move ${navNames[key]} earlier`, onclick: () => { window.dispatchEvent(new CustomEvent('tracker-nav-change', { detail: { from: key, to: keys[i-1] } })); renderNavOrder(); } }, 'Up'),
+        h('button', { class: 'btn small', type: 'button', disabled: i === keys.length-1, 'aria-label': `Move ${navNames[key]} later`, onclick: () => { window.dispatchEvent(new CustomEvent('tracker-nav-change', { detail: { from: key, to: keys[i+1] } })); renderNavOrder(); } }, 'Down')))));
+  }
+  renderNavOrder();
+  const navigation = h('section', { class: 'set-block' }, h('h3', {}, 'Navigation order'),
+    h('p', { class: 'hint' }, 'Drag tabs on desktop, or use these buttons on desktop or phone. Saved on this device.'), navOrder);
+
   // -- backup
   const file = h('input', { type: 'file', accept: 'application/json', 'aria-label': 'Backup file' });
   const out = h('p', { class: 'prose' });
@@ -148,5 +173,5 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('h3', {}, 'Install on your phone'),
     h('p', { class: 'prose' }, 'iPhone: open this page in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, open the menu, then Install app.'));
 
-  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, account, mudBlock, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, backup, install) });
+  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, account, mudBlock, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, typography, navigation, backup, install) });
 }

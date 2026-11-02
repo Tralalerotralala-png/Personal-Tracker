@@ -140,6 +140,7 @@ export function createMudView({ store, weather }) {
         return h('div', { class: 'wx-day', title: icon.text },
           h('span', {}, d.phase === 'today' ? 'Today' : dayShort(d.date)),
           h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
+          h('span', { class: 'wx-day-description' }, icon.text),
           h('strong', {}, `${number(d.raw.tmax, '°')} / ${number(d.raw.tmin, '°')}`),
           h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`));
       })));

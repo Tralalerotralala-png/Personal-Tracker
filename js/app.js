@@ -104,15 +104,48 @@ const VIEWS = {
   overview,
 };
 const NAV = [
-  ['inventory', 'Pack', 'pack'], ['mud', 'Mud', 'mud'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['overview', 'Overview', 'board'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Mud', 'mud'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'],
 ];
 
 const main = h('main', { id: 'main' });
 for (const [key, view] of Object.entries(VIEWS)) { view.el.hidden = true; view.el.dataset.view = key; main.append(view.el); }
 
+// Navigation preferences are device-local so they work even before sign-in.
+const NAV_KEY = 'tracker-nav-order-v1';
+const savedNav = (() => { try { return JSON.parse(localStorage.getItem(NAV_KEY) || 'null'); } catch { return null; } })();
+if (Array.isArray(savedNav) && savedNav.length === NAV.length && NAV.every(([k]) => savedNav.includes(k))) {
+  NAV.sort((a, b) => savedNav.indexOf(a[0]) - savedNav.indexOf(b[0]));
+}
+const fontChoices = { pixel: "'Pixelify Sans', ui-monospace, monospace", clean: "system-ui, 'Segoe UI', sans-serif", mono: "Consolas, 'Courier New', monospace" };
+function applyTypography() {
+  const font = localStorage.getItem('tracker-font-v1') || 'clean';
+  const size = Math.max(14, Math.min(21, Number(localStorage.getItem('tracker-font-size-v1')) || 16));
+  document.documentElement.style.setProperty('--font', fontChoices[font] || fontChoices.clean);
+  document.documentElement.style.fontSize = `${size}px`;
+}
+applyTypography();
+window.addEventListener('tracker-display-change', applyTypography);
 const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href: `#${key}`, 'data-route': key },
   h('span', { class: 'slot-icon', html: glyphSvg(glyph) }), h('span', { class: 'slot-label' }, label)));
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
+function saveNavOrder() { localStorage.setItem(NAV_KEY, JSON.stringify([...nav.children].map(n => n.dataset.route))); }
+function moveNav(from, to) {
+  const items = [...nav.children];
+  const source = items.find(n => n.dataset.route === from);
+  const target = items.find(n => n.dataset.route === to);
+  if (!source || !target || source === target) return;
+  const sourceIndex = items.indexOf(source), targetIndex = items.indexOf(target);
+  nav.insertBefore(source, sourceIndex < targetIndex ? target.nextSibling : target);
+  saveNavOrder();
+}
+navButtons.forEach((a) => {
+  a.draggable = true;
+  a.title = 'Drag to rearrange navigation';
+  a.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', a.dataset.route); e.dataTransfer.effectAllowed = 'move'; });
+  a.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  a.addEventListener('drop', e => { e.preventDefault(); moveNav(e.dataTransfer.getData('text/plain'), a.dataset.route); });
+});
+window.addEventListener('tracker-nav-change', e => { moveNav(e.detail.from, e.detail.to); });
 
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
@@ -125,7 +158,7 @@ root.replaceChildren(header, main, nav);
 const mounted = new Set();
 async function route() {
   const wanted = location.hash.replace(/^#\/?/, '');
-  const key = VIEWS[wanted] ? wanted : 'inventory'; // unknown hashes (e.g. sign-in tokens) are ignored, not rewritten
+  const key = VIEWS[wanted] ? wanted : 'overview'; // unknown hashes (e.g. sign-in tokens) are ignored, not rewritten
   for (const [k, view] of Object.entries(VIEWS)) view.el.hidden = k !== key;
   navButtons.forEach((a) => { const on = a.dataset.route === key; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   if (!mounted.has(key)) { mounted.add(key); await VIEWS[key].mount(); }

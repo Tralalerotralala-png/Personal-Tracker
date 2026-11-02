@@ -661,3 +661,10 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 @keyframes wx-fall { from { transform: translateY(-10px); } to { transform: translateY(125px); } }
 @media (max-width: 650px) { .wx-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } .wx-outlook { grid-template-columns: repeat(3,minmax(0,1fr)); } }
 @media (prefers-reduced-motion: reduce) { .wx-scene-glyph, .wx-particle { animation: none !important; } .wx-particle { opacity: 0 !important; } }
+
+/* Readable forecast labels and user-selected typography. */
+.wx-day-description { color: var(--ink); font-size: .78rem; line-height: 1.3; overflow-wrap: anywhere; min-height: 2em; }
+.slot[draggable='true'] { cursor: grab; }
+.slot[draggable='true']:active { cursor: grabbing; }
+.nav-order-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--edge); }
+.nav-order-row .inline-actions { display: flex; gap: 5px; }
