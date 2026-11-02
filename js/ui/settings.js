@@ -1,6 +1,8 @@
 // Settings sheet: account, sync, rarity meanings, categories, display, backup.
 import { h, toast, openSheet, confirmDialog } from './dom.js';
-import { language } from './language.js';
+import { language, t } from './language.js';
+import { TRACK_FIELDS, TRACK_LABELS, categoryFields } from '../data/tracking.js';
+import { openPersonalHub } from './personal-hub.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 import { exportAll, importAll, downloadBackup } from '../data/backup.js';
@@ -16,6 +18,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const labels = await store.getSetting('rarity_labels');
   const ui = await store.getSetting('ui');
   const place = await store.getSetting('location');
+  let categoryDefaults = (await store.getSetting('category_tracking_defaults')) || {};
   const categories = (await store.list('categories')).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const languageBlock = h('section', { class: 'set-block' },
@@ -120,7 +123,16 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       const color = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(c.color ?? '') ? c.color : '#c9b58a', 'aria-label': `${c.name} colour` });
       const save = async () => { if (name.value.trim()) await store.upsert('categories', { ...c, name: name.value.trim(), icon: icon.value.trim() || null, color: color.value }); };
       [icon, name, color].forEach((i) => i.addEventListener('change', save));
-      return h('div', { class: 'cat-row' }, icon, name, color,
+      const fieldControls = h('div', { class:'cat-field-controls' }, TRACK_FIELDS.map(key => {
+        const checkbox = h('input', { type:'checkbox', checked: Boolean(categoryFields(categoryDefaults,c.id)[key]), onchange: async e => {
+          categoryDefaults = { ...categoryDefaults, [c.id]: { ...categoryFields(categoryDefaults,c.id), [key]: e.target.checked } };
+          await store.setSetting('category_tracking_defaults', categoryDefaults);
+          toast('Category defaults saved');
+        } });
+        return h('label', { class:'check' }, checkbox, t(TRACK_LABELS[key]));
+      }));
+      return h('div', { class: 'cat-row cat-row-with-fields' }, h('div', { class:'cat-main' }, icon, name, color),
+        fieldControls,
         h('button', { class: 'btn small ghost', type: 'button', onclick: async () => {
           const ok = await confirmDialog({ title: `Delete ${c.name}?`, message: 'Items in this category stay in your pack, with no category.', confirmLabel: 'Delete category', danger: true });
           if (!ok) return;
@@ -132,7 +144,8 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   renderCats(categories);
   const newCat = h('input', { type: 'text', placeholder: 'New category name', maxlength: 80, 'aria-label': 'New category name' });
   const cats = h('section', { class: 'set-block' },
-    h('h3', {}, 'Categories'), catList,
+    h('h3', {}, 'Categories'),
+    h('p', { class: 'hint' }, 'Choose which inventory fields are enabled by default in each category. Individual items can override any checkbox. Saved values are never deleted when hidden.'), catList,
     h('div', { class: 'cat-row' }, newCat,
       h('button', { class: 'btn small', type: 'button', onclick: async () => {
         const nm = newCat.value.trim();
@@ -141,11 +154,22 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
         categories.push(row); renderCats(categories); newCat.value = '';
       } }, 'Add category')));
 
+  const personalHub = h('section', { class:'set-block' },
+    h('h3', {}, t('Personal hub')),
+    h('p', { class:'hint' }, 'Tasks, personal notes, expense records, search, and notifications in one place.'),
+    h('button', { class:'btn', type:'button', onclick: () => openPersonalHub({ store }) }, 'Open personal hub'));
+
   // -- display
   const scan = h('input', { type: 'checkbox', id: 'st-scan', checked: Boolean(ui?.scanlines),
     onchange: async (e) => { await store.setSetting('ui', { ...(await store.getSetting('ui')), scanlines: e.target.checked }); } });
+  const accentColor = h('input',{type:'color',value: /^#[0-9a-f]{6}$/i.test(ui?.accent_color||'')?ui.accent_color:'#43b9ad', onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),accent_color:e.target.value})});
+  const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100})});
+  const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked})});
   const display = h('section', { class: 'set-block' },
     h('h3', {}, 'Display'),
+    h('label', {}, 'Accent color'), accentColor,
+    h('label', {}, 'Panel opacity'), panelOpacity,
+    h('label', {class:'check'}, lessMotion, 'Reduce animations'),
     h('label', { class: 'check', for: 'st-scan' }, scan, 'Scanline effect'),
     h('label', { for: 'st-week' }, 'Calendar week starts on'),
     h('select', { id: 'st-week', onchange: async (e) => { await store.setSetting('ui', { ...(await store.getSetting('ui')), week_start: e.target.value }); } },
@@ -201,5 +225,5 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('h3', {}, 'Install on your phone'),
     h('p', { class: 'prose' }, 'iPhone: open this page in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, open the menu, then Install app.'));
 
-  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, languageBlock, account, mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock, rarity, cats, display, typography, navigation, backup, install) });
+  openSheet({ title: 'Settings', body: h('div', { class: 'settings' }, languageBlock, account, mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock, personalHub, rarity, cats, display, typography, navigation, backup, install) });
 }

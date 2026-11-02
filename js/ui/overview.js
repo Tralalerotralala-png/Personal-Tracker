@@ -4,6 +4,9 @@ import { h, replace } from './dom.js';
 import { createWidgetCard } from '../widgets/registry.js';
 import { loadLayout } from '../widgets/store.js';
 import { openLayoutEditor } from './layout-editor.js';
+import { loadHub, collectAlerts, openPersonalHub } from './personal-hub.js';
+import { t,locale } from './language.js';
+import { groupByDay, keyOf } from '../calendar/recurrence.js';
 
 export function createOverviewView({ store, ctx }) {
   const el = h('div', { class: 'view overview' });
@@ -22,9 +25,18 @@ export function createOverviewView({ store, ctx }) {
     const today = new Date();
     const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 18 ? 'Good afternoon' : 'Good evening';
     const events = await store.list('events');
-    const day = today.toISOString().slice(0, 10);
-    const upcoming = events.filter(e => String(e.start_at || e.start || e.date || '').slice(0, 10) === day).length;
-    const summary = h('div', { class: 'ov-today' }, h('strong', {}, greeting), h('span', {}, today.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })), h('span', {}, upcoming ? `${upcoming} event(s) listed today` : 'Your dashboard at a glance'));
+    const day = keyOf(today.getFullYear(), today.getMonth()+1, today.getDate());
+    const upcoming = (groupByDay(events, day, day).get(day) || []).length;
+    const summary = h('div', { class: 'ov-today' }, h('strong', {}, t(greeting)), h('span', {}, today.toLocaleDateString(locale(), { weekday: 'long', month: 'long', day: 'numeric' })), h('span', {}, upcoming ? `${upcoming} event(s) listed today` : t('Your dashboard at a glance')));
+    const hub = await loadHub(store);
+    const {alerts,items} = await collectAlerts(store,hub);
+    const todayTasks = hub.task.filter(x=>x.due===day);
+    const dayStatus = h('section', {class:'ov-status', 'aria-label':'Daily status'},
+      h('div',{class:'ov-status-head'},h('h3',{},'Your day'),h('button',{class:'btn small',type:'button',onclick:()=>openPersonalHub({store})},'Open personal hub')),
+      h('div',{class:'ov-status-cards'},
+        ...[['Events',upcoming],['Items',items.length],['Tasks',todayTasks.length],['Alerts',alerts.length]].map(([label,value])=>h('div',{class:'ov-status-card'},h('b',{},value),h('span',{},label)))),
+      ...alerts.slice(0,3).map(a=>h('p',{class:'ov-alert'},`${t(a.reason)}: ${a.label}`))
+    );
     for (const item of layout) {
       const card = createWidgetCard(item.id, ctx, { link: true });
       card.el.setAttribute('role', 'listitem');
@@ -37,7 +49,7 @@ export function createOverviewView({ store, ctx }) {
       h('div', { class: 'panel-head' },
         h('h2', {}, 'Overview'),
         h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
-      summary, grid);
+      summary, dayStatus, grid);
   }
 
   let queued = false;

@@ -1,6 +1,7 @@
 // App shell: header, navigation, sign-in gate, sync indicator, service worker.
 import { initData } from './data/app-data.js';
-import { startTranslations, t } from './ui/language.js';
+import { startTranslations, t, locale } from './ui/language.js';
+document.documentElement.lang = locale();
 import { createPhotos } from './photos.js';
 import { h, toast, openSheet } from './ui/dom.js';
 import { glyphSvg } from './ui/pixel-icon.js';
@@ -47,6 +48,10 @@ const proxySuggestion = ctx.config?.SUPABASE_URL && !/YOUR-/i.test(ctx.config.SU
 async function applyDisplay() {
   const ui = await store.getSetting('ui');
   document.documentElement.classList.toggle('scanlines', Boolean(ui?.scanlines));
+  const valid = s => /^#[0-9a-fA-F]{6}$/.test(s || '');
+  document.documentElement.style.setProperty('--accent', valid(ui?.accent_color) ? ui.accent_color : '#43b9ad');
+  document.documentElement.style.setProperty('--panel-opacity', `${Math.max(.65,Math.min(1,Number(ui?.panel_opacity) || 1))}`);
+  document.documentElement.classList.toggle('reduce-animations', Boolean(ui?.reduce_animations));
 }
 applyDisplay();
 

@@ -1,6 +1,7 @@
 // The Calendar tab: a month grid with a mud dot on every day that has a
 // forecast, the next two weeks as a list, and add / edit / import of events.
 import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
+import { t, locale } from './language.js';
 import { mudClass, dayLong, dayMonth, mudChip } from './mud-format.js';
 import {
   groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts,
@@ -8,7 +9,7 @@ import {
 import { importIcsText, fetchIcsText } from '../calendar/ics.js';
 
 const EVENT_COLORS = ['#43b9ad', '#e0a23a', '#7fb356', '#5a9de0', '#c06ae0', '#d9604c'];
-const MONTH = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const MONTH = () => new Intl.DateTimeFormat(locale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -53,7 +54,7 @@ export function createCalendarView({ store, weather }) {
     const mud = mudByDate();
     const today = todayKey();
 
-    const head = Array.from({ length: 7 }, (_, i) => h('div', { class: 'cal-wd', 'aria-hidden': 'true' }, WEEKDAY_NAMES[(state.weekStart + i) % 7]));
+    const head = Array.from({ length: 7 }, (_, i) => h('div', { class: 'cal-wd', 'aria-hidden': 'true' }, new Intl.DateTimeFormat(locale(), {weekday:'short', timeZone:'UTC'}).format(new Date(Date.UTC(2026,10,1 + ((state.weekStart + i)%7))))));
     const cells = [];
     for (let i = 0; i < 42; i += 1) {
       const key = addDaysKey(start, i);
@@ -70,7 +71,7 @@ export function createCalendarView({ store, weather }) {
       h('span', { class: 'cal-evs' }, occs.slice(0, 3).map((o) => h('span', { class: 'cal-ev', style: `--c:${o.event.color || EVENT_COLORS[0]}` }, h('span', { class: 'cal-ev-text' }, o.event.title))),
         occs.length > 3 ? h('span', { class: 'cal-more' }, `+${occs.length - 3}`) : null)));
     }
-    return h('div', { class: 'cal-grid', role: 'group', 'aria-label': MONTH.format(new Date(Date.UTC(state.y, state.m - 1, 1))) }, head, cells);
+    return h('div', { class: 'cal-grid', role: 'group', 'aria-label': MONTH().format(new Date(Date.UTC(state.y, state.m - 1, 1))) }, head, cells);
   }
 
   // ---- agenda -----------------------------------------------------------------------
@@ -96,7 +97,7 @@ export function createCalendarView({ store, weather }) {
   // ---- render ------------------------------------------------------------------------
 
   function render() {
-    const title = MONTH.format(new Date(Date.UTC(state.y, state.m - 1, 1)));
+    const title = MONTH().format(new Date(Date.UTC(state.y, state.m - 1, 1)));
     const shift = (delta) => { const d = new Date(Date.UTC(state.y, state.m - 1 + delta, 1)); state.y = d.getUTCFullYear(); state.m = d.getUTCMonth() + 1; render(); };
     replace(el,
       h('div', { class: 'cal-head' },
@@ -167,7 +168,7 @@ export function createCalendarView({ store, weather }) {
     }));
 
     const repeat = h('select', { id: 'ev-repeat', onchange: syncVisibility },
-      [['', 'Does not repeat'], ['DAILY', 'Every day'], ['WEEKLY', 'Every week'], ['BIWEEKLY', 'Every 2 weeks / Cada 2 semanas'], ['MONTHLY', 'Every month'], ['YEARLY', 'Every year']].map(([v, l]) => h('option', { value: v }, l)));
+      [['', 'Does not repeat'], ['DAILY', 'Every day'], ['WEEKLY', 'Every week'], ['BIWEEKLY', 'Every 2 weeks'], ['MONTHLY', 'Every month'], ['YEARLY', 'Every year']].map(([v, l]) => h('option', { value: v }, t(l))));
     repeat.value = rule?.freq === 'WEEKLY' && rule.interval === 2 ? 'BIWEEKLY' : (rule?.freq ?? '');
     const every = h('input', { type: 'number', id: 'ev-every', min: 1, max: 99, step: 1, value: rule?.interval ?? 1 });
     const until = h('input', { type: 'date', id: 'ev-until', value: rule?.until ?? '' });

@@ -7,6 +7,8 @@ import {
 } from '../data/inventory-logic.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
+import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor } from '../data/tracking.js';
+import { t, locale } from './language.js';
 import { uuid } from '../data/util.js';
 import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 
@@ -24,7 +26,7 @@ export function createInventoryView({ store, photos }) {
     sort: 'newest',
     display: localStorage.getItem('tracker-pack-display') || 'grid',
   };
-  let data = { items: [], locations: [], categories: [], rarityLabels: DEFAULT_SETTINGS.rarity_labels };
+  let data = { items: [], locations: [], categories: [], rarityLabels: DEFAULT_SETTINGS.rarity_labels, tracking: {}, categoryDefaults: {} };
 
   const el = h('div', { class: 'view inventory' });
 
@@ -35,13 +37,31 @@ export function createInventoryView({ store, photos }) {
       store.list('items'), store.list('locations'), store.list('categories'), store.getSetting('rarity_labels'),
     ]);
     categories.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
-    data = { items, locations, categories, rarityLabels };
+    const [trackingRows, categoryDefaults] = await Promise.all([store.list('settings', { where: r => r.key.startsWith('item_tracking:') }), store.getSetting('category_tracking_defaults')]);
+    data = { items, locations, categories, rarityLabels, tracking: Object.fromEntries(trackingRows.map(r => [r.key.slice('item_tracking:'.length), r.value])), categoryDefaults: categoryDefaults || {} };
   }
 
   const ctx = () => ({ items: data.items, locations: data.locations, categories: data.categories });
   const catById = () => indexById(data.categories);
   const rarityLabel = (r) => data.rarityLabels?.[r]?.label ?? r;
   const pathOf = (item) => locationPath(data.locations, item.location_id);
+  const metaOf = item => data.tracking[item.id] || {};
+  const fieldsOf = item => itemFields(metaOf(item), categoryFields(data.categoryDefaults, item.category_id));
+  const barFor = (item) => {
+    const meta = metaOf(item), enabled = fieldsOf(item);
+    const parts = [];
+    if (enabled.durability) {
+      const n = Math.max(0, Math.min(100, Number.isFinite(meta.durability) ? meta.durability : 100));
+      parts.push(h('span', { class: 'track-readout' }, `${t('Durability')} ${n}%`));
+      parts.push(h('span', { class: 'track-meter', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(n), 'aria-label': t('Durability') }, h('span', { style: `width:${n}%;--meter-color:${n<=25?'#d9604c':n<=50?'#e0a23a':'#7fb356'}` })));
+    }
+    if (enabled.quantity) parts.push(h('span', { class: 'track-readout' }, `${item.quantity}/${Math.max(item.quantity, meta.max_quantity ?? item.quantity)}`));
+    if (enabled.condition) parts.push(h('span', { class: 'track-chip' }, t(meta.condition || 'Good')));
+    if (enabled.expiration && meta.expiration_date) parts.push(h('span', { class: 'track-chip' }, `${t('Expiration')}: ${meta.expiration_date}`));
+    const alerts = attentionFor(item, meta, categoryFields(data.categoryDefaults, item.category_id));
+    if (alerts.length) parts.push(h('span', { class: 'track-warning' }, alerts.map(t).join(' · ')));
+    return parts.length ? h('span', { class: 'track-summary' }, parts) : null;
+  };
 
   function passes(item, allowedPlaces) {
     if (state.category && item.category_id !== state.category) return false;
@@ -86,9 +106,9 @@ export function createInventoryView({ store, photos }) {
     },
     h('span', { class: 'tile-frame' },
       art(item, 'art'),
-      item.quantity > 1 ? h('span', { class: 'qty' }, item.quantity) : null,
+      item.quantity > 1 && fieldsOf(item).quantity ? h('span', { class: 'qty' }, item.quantity) : null,
       item.is_lost ? h('span', { class: 'lost-mark', 'aria-hidden': 'true' }, '?') : null),
-    h('span', { class: 'tile-name' }, item.name));
+    h('span', { class: 'tile-name' }, item.name), barFor(item));
   }
 
   function resultRow(item) {
@@ -96,9 +116,9 @@ export function createInventoryView({ store, photos }) {
       h('span', { class: 'row-art' }, art(item, 'art')),
       h('span', { class: 'row-text' },
         h('span', { class: 'row-name' }, item.name,
-          item.quantity > 1 ? h('span', { class: 'row-qty' }, ` x${item.quantity}`) : null),
+          item.quantity > 1 && fieldsOf(item).quantity ? h('span', { class: 'row-qty' }, ` x${item.quantity}`) : null),
         item.is_lost ? h('span', { class: 'lost-tag' }, 'Lost, last seen:') : null,
-        breadcrumb(item)));
+        breadcrumb(item), barFor(item)));
   }
 
   // ---- results ---------------------------------------------------------------
@@ -244,13 +264,61 @@ export function createInventoryView({ store, photos }) {
     };
 
     const name = h('input', { type: 'text', id: 'it-name', value: existing?.name ?? preset.name ?? '', maxlength: 200, autocomplete: 'off' });
+    const initialMeta = trackMeta(existing ? metaOf(existing) : {});
     const qty = h('input', { type: 'number', id: 'it-qty', min: 0, step: 1, inputmode: 'numeric', value: existing?.quantity ?? 1 });
-    const stepQty = (d) => { qty.value = Math.max(0, (parseInt(qty.value, 10) || 0) + d); };
+    const stepQty = (d) => { qty.value = Math.max(0, (parseInt(qty.value, 10) || 0) + d); if (Number(qty.value)>Number(maximum.value)) maximum.value=qty.value; };
+    const qtyGroup = h('div', { class:'tracking-control' }, h('label', { for:'it-qty' }, t('Remaining quantity')),
+      h('div', { class: 'stepper' },
+        h('button', { class:'btn', type:'button', 'aria-label':'One fewer', onclick: () => stepQty(-1) }, '−'), qty,
+        h('button', { class:'btn', type:'button', 'aria-label':'One more', onclick: () => stepQty(1) }, '+')));
 
     const category = h('select', { id: 'it-cat' },
       h('option', { value: '' }, 'No category'),
       data.categories.map((c) => h('option', { value: c.id }, `${c.icon ? `${c.icon} ` : ''}${c.name}`)));
     category.value = existing?.category_id ?? '';
+
+    // Checkbox values inherit the category unless the item explicitly overrides them.
+    // The 'Reset to category defaults' button restores inheritance without deleting values.
+    const overrides = { ...(initialMeta.overrides || {}) };
+    const fieldChecks = {};
+    const trackingInputs = h('div', { class: 'tracking-inputs' });
+    const trackingNote = h('p', { class: 'hint' });
+    const durability = h('input', { type: 'range', min: 0, max: 100, step: 1, value: initialMeta.durability });
+    const durabilityValue = h('output', {}, `${initialMeta.durability}%`);
+    durability.addEventListener('input', () => { durabilityValue.textContent = `${durability.value}%`; });
+    const maximum = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.max_quantity ?? Math.max(1, Number(qty.value) || 1) });
+    const threshold = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.low_stock_threshold });
+    const condition = h('select', {}, CONDITIONS.map(x => h('option', { value:x, selected: initialMeta.condition === x }, t(x))));
+    const expiration = h('input', { type: 'date', value: initialMeta.expiration_date });
+    const price = h('input', { type: 'number', min: 0, step: '0.01', value: initialMeta.purchase_price ?? '', placeholder: 'Optional' });
+    const currency = h('select', {}, ['MXN','USD','EUR','GBP'].map(c => h('option', { value:c, selected: initialMeta.currency === c }, c)));
+    const purchaseDate = h('input', { type: 'date', value: initialMeta.purchase_date });
+    const warrantyDate = h('input', { type: 'date', value: initialMeta.warranty_date });
+    function catDefaults() { return categoryFields(data.categoryDefaults, category.value || null); }
+    function drawTracking() {
+      const flags = itemFields({ overrides }, catDefaults());
+      for (const field of TRACK_FIELDS) {
+        fieldChecks[field].checked = flags[field];
+        fieldChecks[field].dataset.inherited = String(typeof overrides[field] !== 'boolean');
+      }
+      qtyGroup.hidden = !flags.quantity;
+      trackingInputs.replaceChildren(
+        flags.durability ? h('div', { class:'tracking-control' }, h('label', {}, t('Durability')), h('div', { class:'track-slider' }, durability, durabilityValue)) : null,
+        flags.quantity ? h('div', { class:'tracking-control' }, h('label', {}, t('Maximum quantity')), maximum, h('label', {}, t('Low stock threshold')), threshold) : null,
+        flags.condition ? h('div', { class:'tracking-control' }, h('label', {}, t('Condition')), condition) : null,
+        flags.expiration ? h('div', { class:'tracking-control' }, h('label', {}, t('Expiration')), expiration) : null
+      );
+      trackingNote.textContent = Object.keys(overrides).length ? 'Customized for this item. Other fields inherit the category defaults.' : 'All fields currently inherit the category defaults.';
+    }
+    const trackingChoices = h('div', { class:'tracking-choices' }, TRACK_FIELDS.map(field => {
+      const cb = h('input', { type:'checkbox', 'aria-label': t(TRACK_LABELS[field]), onchange: () => { overrides[field] = cb.checked; drawTracking(); } });
+      fieldChecks[field] = cb;
+      return h('label', { class:'check' }, cb, t(TRACK_LABELS[field]));
+    }));
+    const resetTracking = h('button', { class:'btn small ghost', type:'button', onclick: () => { for (const key of TRACK_FIELDS) delete overrides[key]; drawTracking(); } }, t('Use category defaults'));
+    category.addEventListener('change', drawTracking);
+    drawTracking();
+
 
     const place = h('select', { id: 'it-place' }, placeOptions(data.locations));
     store.meta.get('last_place').then((last) => {
@@ -316,6 +384,10 @@ export function createInventoryView({ store, photos }) {
       error.textContent = '';
       const nm = name.value.trim();
       const q = Number(qty.value);
+      const max = Number(maximum.value);
+      if (itemFields({ overrides }, catDefaults()).quantity && (!Number.isInteger(max) || max < q)) { error.textContent = 'Maximum quantity must be a whole number not smaller than remaining quantity.'; maximum.focus(); return; }
+      const stockMin = Number(threshold.value);
+      if (!Number.isInteger(stockMin) || stockMin < 0) { error.textContent = 'Low-stock threshold must be zero or higher.'; threshold.focus(); return; }
       if (!nm) { error.textContent = 'Give the item a name.'; name.focus(); return; }
       if (!Number.isInteger(q) || q < 0) { error.textContent = 'Quantity must be a whole number, 0 or more.'; qty.focus(); return; }
 
@@ -336,6 +408,7 @@ export function createInventoryView({ store, photos }) {
       };
       try {
         await store.upsert('items', row);
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
@@ -355,6 +428,7 @@ export function createInventoryView({ store, photos }) {
       if (!ok) return;
       await photos.removePhoto(id);
       await store.remove('items', id);
+      if (await store.get('settings', TRACKING_KEY(id))) await store.remove('settings', TRACKING_KEY(id));
       sheet.close();
       toast('Item deleted');
     }
@@ -362,6 +436,12 @@ export function createInventoryView({ store, photos }) {
     const advanced = h('details', { class: 'more', open: isEdit },
       h('summary', {}, 'More details'),
       h('label', { for: 'it-cat' }, 'Category'), category,
+      h('h3', { class:'tracking-heading' }, t('Inventory tracking')),
+      h('p', { class:'hint' }, 'Select which fields this item uses. They start with your category defaults.'),
+      trackingChoices, resetTracking, trackingNote, trackingInputs,
+      h('h3', { class:'tracking-heading' }, 'Purchase & warranty'),
+      h('label', {}, t('Purchase price')), price, h('label', {}, 'Currency'), currency,
+      h('label', {}, 'Purchase date'), purchaseDate, h('label', {}, t('Warranty ends')), warrantyDate,
       h('label', {}, 'Rarity'), h('div', { class: 'rarity-row' }, rarityBtns), meaning,
       h('label', { for: 'it-desc' }, 'Pixel art description'), desc,
       h('div', { class: 'inline-actions' },
@@ -374,11 +454,7 @@ export function createInventoryView({ store, photos }) {
       title: isEdit ? 'Edit item' : 'Add item',
       body: h('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label', { for: 'it-name' }, 'Name'), name,
-        h('label', { for: 'it-qty' }, 'Quantity'),
-        h('div', { class: 'stepper' },
-          h('button', { class: 'btn', type: 'button', 'aria-label': 'One fewer', onclick: () => stepQty(-1) }, '−'),
-          qty,
-          h('button', { class: 'btn', type: 'button', 'aria-label': 'One more', onclick: () => stepQty(1) }, '+')),
+        qtyGroup,
         h('label', { for: 'it-place' }, 'Where is it?'),
         h('div', { class: 'place-pick' }, place,
           h('button', { class: 'btn small', type: 'button', onclick: () => openPlaceSheet({
