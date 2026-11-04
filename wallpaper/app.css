@@ -82,8 +82,8 @@ input[type='text'], input[type='email'], input[type='number'], input[type='searc
 main { flex: 1; padding: 14px 14px calc(var(--hotbar-h) + var(--safe-b) + 84px); max-width: 1100px; width: 100%; margin: 0 auto; }
 
 .hotbar {
-  position: fixed; inset: auto 0 0 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-  padding: 8px 10px calc(8px + var(--safe-b)); background: var(--bg); border-top: 3px solid var(--edge);
+  position: fixed; inset: auto 0 0 0; z-index: 6; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px;
+  padding: 6px 6px calc(6px + var(--safe-b)); background: var(--bg); border-top: 3px solid var(--edge);
 }
 .slot {
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 0 5px;
@@ -792,3 +792,35 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .journal-entry>small{color:var(--ink-dim)}.journal-art{max-width:100%;max-height:180px;object-fit:contain}
 
 @media(max-width:480px){.hotbar{padding-left:3px;padding-right:3px}.slot{min-width:0;border-width:2px}.slot-label{font-size:.63rem;letter-spacing:-.02em}.slot svg{width:20px;height:20px}}
+
+/* The daily phrase lives inside the same resizable widget grid as all other panels. */
+.widget.wd-phrase .widget-body{padding:0;overflow:auto;container-type:inline-size}
+.widget.wd-phrase .phrase-panel{border:0;margin:0;padding:10px 12px;background:transparent;min-width:0}
+.widget.wd-phrase .phrase-grid{gap:8px}
+.widget.wd-phrase .phrase-heading{margin-bottom:5px}
+.widget.wd-phrase .phrase-day{color:var(--ink-dim);font-size:.78rem}
+.widget.wd-phrase .phrase-char{font-size:1.5rem}
+.widget.wd-phrase .phrase-word{font-size:1rem}
+.widget.wd-phrase .phrase-hanzi,.widget.wd-phrase .phrase-german{min-height:36px}
+.widget.wd-phrase .phrase-gloss{margin-top:5px;min-height:20px}
+@container (max-width:400px){.widget.wd-phrase .phrase-grid{grid-template-columns:1fr}}
+.phrase-archive{display:grid;gap:12px;padding-top:12px}
+.phrase-archive .phrase-panel{margin:4px 0;background:var(--panel-2)}
+.phrase-date-picker{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--ink-dim)}
+.phrase-date-picker input{color:var(--ink);background:var(--panel-2);border:2px solid var(--edge);padding:6px}
+.phrase-history-list{display:grid;gap:6px;max-height:38vh;overflow:auto}
+.phrase-history-row{width:100%;display:grid;grid-template-columns:minmax(95px,1fr) 1fr 2fr;gap:9px;align-items:center;text-align:left;padding:8px;background:var(--panel-2);border:1px solid var(--edge);cursor:pointer;color:var(--ink)}
+.phrase-history-row:hover,.phrase-history-row:focus-visible{border-color:var(--accent)}
+.phrase-history-row time{color:var(--ink-dim);font-size:.8rem}
+.phrase-history-row span{overflow-wrap:anywhere}
+
+/* The unlocked private journal occupies the main app canvas, not a side drawer. */
+.private-journal-view{width:100%;min-width:0;align-content:start}
+.private-journal-view .journal-page-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.private-journal-view .journal-shell{width:100%;min-width:0;min-height:60vh;padding:18px;background:var(--panel);border:2px solid var(--edge);display:grid;align-content:start;gap:18px}
+.private-journal-view .hub-tabs{border-bottom:2px solid var(--edge);padding-bottom:12px}
+.private-journal-view .journal-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,275px),1fr));gap:12px;align-content:start}
+.private-journal-view .journal-list-head,.private-journal-view .journal-list>.hint{grid-column:1/-1}
+.private-journal-view .journal-list>.journal-entry{height:100%;min-height:100px;align-self:start}
+.private-journal-view .journal-list>.journal-entry:focus-visible{border-color:var(--accent)}
+@media(max-width:650px){.private-journal-view .journal-shell{padding:12px;gap:12px}.phrase-history-row{grid-template-columns:1fr 1fr}.phrase-history-row span:last-child{grid-column:1/-1}}

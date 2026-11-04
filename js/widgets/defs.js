@@ -7,6 +7,7 @@ export const WIDGET_DEFS = {
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
   stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 2, route: 'inventory' },
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
+  phrase:   { title: 'Phrase of the day',     minW: 4, minH: 3, defaultW: 8, defaultH: 4, route: null },
 };
 export const WIDGET_IDS = Object.keys(WIDGET_DEFS);
 

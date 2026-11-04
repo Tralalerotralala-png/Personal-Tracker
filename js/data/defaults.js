@@ -1,4 +1,6 @@
 import { DEFAULT_MUD_PARAMS } from '../weather/mud.js';
+import { WIDGET_DEFS, PROFILES } from '../widgets/defs.js';
+import { normalizeLayout, addItem } from '../widgets/layout.js';
 
 // First-run defaults. Fixed ids mean two devices seeding at the same moment
 // produce the same rows instead of duplicates.
@@ -52,6 +54,7 @@ export const DEFAULT_LAYOUTS = {
     { id: 'mud',      x: 0, y: 5,  w: 12, h: 4 },
     { id: 'calendar', x: 0, y: 9,  w: 12, h: 5 },
     { id: 'feed',     x: 0, y: 14, w: 12, h: 5 },
+    { id: 'phrase',   x: 0, y: 19, w: 12, h: 4 },
   ],
   wallpaper: [
     { id: 'mud',      x: 0, y: 0, w: 7, h: 4 },
@@ -62,15 +65,31 @@ export const DEFAULT_LAYOUTS = {
   ],
 };
 
-const LAYOUT_VERSION = 2;
+const LAYOUT_VERSION = 3;
 
-// Layouts from before the widgets existed are replaced once with the real
-// defaults. Callers must make sure the first sync has finished (cloud mode),
-// otherwise these fresh timestamps could overwrite a layout you saved elsewhere.
+// Migrations only run after cloud sync. Existing widget positions and custom
+// layouts are preserved, and a newly introduced widget is added once. Removing
+// it later in the layout editor will *not* cause it to reappear.
 export async function upgradeLayouts(store) {
-  if ((await store.getSetting('layout_version', 0)) >= LAYOUT_VERSION) return false;
-  for (const [profile, layout] of Object.entries(DEFAULT_LAYOUTS)) {
-    await store.upsert('widget_layout', { profile, layout });
+  const version = await store.getSetting('layout_version', 0);
+  if (version >= LAYOUT_VERSION) return false;
+  if (version < 2) {
+    // Legacy versions predate the widget layout system. Do not overwrite
+    // an existing layout even if the legacy version flag is missing.
+    for (const [profile, layout] of Object.entries(DEFAULT_LAYOUTS)) {
+      if (!(await store.get('widget_layout', profile))) await store.upsert('widget_layout', { profile, layout });
+    }
+  }
+  if (version < 3) {
+    for (const profile of ['desktop','mobile']) {
+      const row = await store.get('widget_layout', profile);
+      const bounds = {cols: PROFILES[profile].cols, rows: PROFILES[profile].rows};
+      const current = normalizeLayout(row?.layout, WIDGET_DEFS, bounds);
+      const basis = current.length ? current : DEFAULT_LAYOUTS[profile];
+      if (basis.some(item=>item.id==='phrase')) continue;
+      const upgraded = addItem(basis, 'phrase', WIDGET_DEFS.phrase, bounds);
+      if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
+    }
   }
   await store.setSetting('layout_version', LAYOUT_VERSION);
   return true;

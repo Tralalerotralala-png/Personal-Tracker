@@ -181,6 +181,8 @@ Object.assign(__exports, { keyOf, todayKeyLocal, parseKey, addDaysKey, weekdayOf
 __define("js/data/defaults.js", function (__require, __exports) {
 "use strict";
 const { DEFAULT_MUD_PARAMS } = __require("js/weather/mud.js");
+const { WIDGET_DEFS, PROFILES } = __require("js/widgets/defs.js");
+const { normalizeLayout, addItem } = __require("js/widgets/layout.js");
 
 // First-run defaults. Fixed ids mean two devices seeding at the same moment
 // produce the same rows instead of duplicates.
@@ -234,6 +236,7 @@ const DEFAULT_LAYOUTS = {
     { id: 'mud',      x: 0, y: 5,  w: 12, h: 4 },
     { id: 'calendar', x: 0, y: 9,  w: 12, h: 5 },
     { id: 'feed',     x: 0, y: 14, w: 12, h: 5 },
+    { id: 'phrase',   x: 0, y: 19, w: 12, h: 4 },
   ],
   wallpaper: [
     { id: 'mud',      x: 0, y: 0, w: 7, h: 4 },
@@ -244,15 +247,31 @@ const DEFAULT_LAYOUTS = {
   ],
 };
 
-const LAYOUT_VERSION = 2;
+const LAYOUT_VERSION = 3;
 
-// Layouts from before the widgets existed are replaced once with the real
-// defaults. Callers must make sure the first sync has finished (cloud mode),
-// otherwise these fresh timestamps could overwrite a layout you saved elsewhere.
+// Migrations only run after cloud sync. Existing widget positions and custom
+// layouts are preserved, and a newly introduced widget is added once. Removing
+// it later in the layout editor will *not* cause it to reappear.
 async function upgradeLayouts(store) {
-  if ((await store.getSetting('layout_version', 0)) >= LAYOUT_VERSION) return false;
-  for (const [profile, layout] of Object.entries(DEFAULT_LAYOUTS)) {
-    await store.upsert('widget_layout', { profile, layout });
+  const version = await store.getSetting('layout_version', 0);
+  if (version >= LAYOUT_VERSION) return false;
+  if (version < 2) {
+    // Legacy versions predate the widget layout system. Do not overwrite
+    // an existing layout even if the legacy version flag is missing.
+    for (const [profile, layout] of Object.entries(DEFAULT_LAYOUTS)) {
+      if (!(await store.get('widget_layout', profile))) await store.upsert('widget_layout', { profile, layout });
+    }
+  }
+  if (version < 3) {
+    for (const profile of ['desktop','mobile']) {
+      const row = await store.get('widget_layout', profile);
+      const bounds = {cols: PROFILES[profile].cols, rows: PROFILES[profile].rows};
+      const current = normalizeLayout(row?.layout, WIDGET_DEFS, bounds);
+      const basis = current.length ? current : DEFAULT_LAYOUTS[profile];
+      if (basis.some(item=>item.id==='phrase')) continue;
+      const upgraded = addItem(basis, 'phrase', WIDGET_DEFS.phrase, bounds);
+      if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
+    }
   }
   await store.setSetting('layout_version', LAYOUT_VERSION);
   return true;
@@ -902,6 +921,116 @@ async function fetchSource(source, ctx = {}) {
 }
 Object.assign(__exports, { FeedError, fetchText, normalizeBlueskyInput, normalizeMastodonInput, ADAPTERS, ADDABLE_KINDS, fetchSource });
 });
+__define("js/ui/daily-phrases.js", function (__require, __exports) {
+"use strict";
+// Offline, curated, deterministic daily language practice. All Hanzi glosses
+// are context-specific; German uses word-level glosses (letters have no meaning).
+const { h, replace, openSheet } = __require("js/ui/dom.js");
+const { language } = __require("js/ui/language.js");
+const LESSONS = [
+ {zh:'早上好',py:'zǎoshang hǎo',en:'Good morning',de:'Guten Morgen',ipa:'ˈɡuːtn̩ ˈmɔʁɡn̩',chars:['early / morning','up / on','good'],charPy:['zǎo','shang','hǎo'],words:['good (greeting form)','morning']},
+ {zh:'谢谢你',py:'xièxie nǐ',en:'Thank you',de:'Danke schön',ipa:'ˈdaŋkə ʃøːn',chars:['thank','thank (repeated)','you'],charPy:['xiè','xie','nǐ'],words:['thanks','nicely / kindly']},
+ {zh:'我喜欢茶',py:'wǒ xǐhuan chá',en:'I like tea',de:'Ich mag Tee',ipa:'ɪç maːk teː',chars:['I / me','like / happy','like / pleased','tea'],charPy:['wǒ','xǐ','huan','chá'],words:['I','like','tea']},
+ {zh:'今天天气好',py:'jīntiān tiānqì hǎo',en:'The weather is nice today',de:'Heute ist das Wetter schön',ipa:'ˈhɔʏtə ɪst das ˈvɛtɐ ʃøːn',chars:['now / today','day / sky','sky / day','air / atmosphere','good'],charPy:['jīn','tiān','tiān','qì','hǎo'],words:['today','is','the','weather','nice']},
+ {zh:'我在学习',py:'wǒ zài xuéxí',en:'I am studying',de:'Ich lerne',ipa:'ɪç ˈlɛʁnə',chars:['I / me','in the process of','learn','practice'],charPy:['wǒ','zài','xué','xí'],words:['I','am learning']},
+ {zh:'明天见',py:'míngtiān jiàn',en:'See you tomorrow',de:'Bis morgen',ipa:'bɪs ˈmɔʁɡn̩',chars:['bright / next','day','see / meet'],charPy:['míng','tiān','jiàn'],words:['until','tomorrow']},
+ {zh:'我很开心',py:'wǒ hěn kāixīn',en:'I am happy',de:'Ich bin glücklich',ipa:'ɪç bɪn ˈɡlʏklɪç',chars:['I / me','very (also a linking adverb)','open / joyful','heart / mind'],charPy:['wǒ','hěn','kāi','xīn'],words:['I','am','happy']},
+ {zh:'请慢一点',py:'qǐng màn yìdiǎn',en:'Please slow down a little',de:'Bitte etwas langsamer',ipa:'ˈbɪtə ˈɛtvas ˈlaŋzaːmɐ',chars:['please / request','slow','one / a','little / point'],charPy:['qǐng','màn','yì','diǎn'],words:['please','a little','slower']},
+ {zh:'我想喝水',py:'wǒ xiǎng hē shuǐ',en:'I want to drink water',de:'Ich möchte Wasser trinken',ipa:'ɪç ˈmœçtə ˈvasɐ ˈtʁɪŋkn̩',chars:['I / me','want / think','drink','water'],charPy:['wǒ','xiǎng','hē','shuǐ'],words:['I','would like','water','to drink']},
+ {zh:'今天星期几',py:'jīntiān xīngqī jǐ',en:'What day is it today?',de:'Welcher Wochentag ist heute?',ipa:'ˈvɛlçɐ ˈvɔxn̩taːk ɪst ˈhɔʏtə',chars:['now','day','star / week','period / week','which / how many'],charPy:['jīn','tiān','xīng','qī','jǐ'],words:['which','day of the week','is','today']},
+ {zh:'我喜欢音乐',py:'wǒ xǐhuan yīnyuè',en:'I like music',de:'Ich mag Musik',ipa:'ɪç maːk muˈziːk',chars:['I / me','like','pleased','sound','music / joy'],charPy:['wǒ','xǐ','huan','yīn','yuè'],words:['I','like','music']},
+ {zh:'晚安',py:'wǎn ān',en:'Good night',de:'Gute Nacht',ipa:'ˈɡuːtə naxt',chars:['evening / late','peace / safe'],charPy:['wǎn','ān'],words:['good (feminine form)','night']},
+ {zh:'你好吗',py:'nǐ hǎo ma',en:'How are you?',de:'Wie geht es dir?',ipa:'viː ɡeːt ɛs diːɐ̯',chars:['you','good','question particle'],charPy:['nǐ','hǎo','ma'],words:['how','goes','it','to you']},
+ {zh:'我很好',py:'wǒ hěn hǎo',en:'I am doing well',de:'Mir geht es gut',ipa:'miːɐ̯ ɡeːt ɛs ɡuːt',chars:['I / me','very (linking adverb)','good'],charPy:['wǒ','hěn','hǎo'],words:['to me','goes','it','well']},
+ {zh:'再见',py:'zàijiàn',en:'Goodbye',de:'Auf Wiedersehen',ipa:'aʊf ˈviːdɐzeːən',chars:['again','see / meet'],charPy:['zài','jiàn'],words:['on / until','seeing again']},
+ {zh:'对不起',py:'duìbuqǐ',en:'Sorry',de:'Es tut mir leid',ipa:'ɛs tuːt miːɐ̯ laɪ̯t',chars:['toward / to face','not','rise / get up (in this apology)'],charPy:['duì','bu','qǐ'],words:['it','does','to me','sorrow']},
+ {zh:'没关系',py:'méi guānxi',en:'No problem',de:'Kein Problem',ipa:'kaɪ̯n pʁoˈbleːm',chars:['not / without','relation','connection'],charPy:['méi','guān','xi'],words:['no','problem']},
+ {zh:'我不知道',py:'wǒ bù zhīdào',en:'I do not know',de:'Ich weiß es nicht',ipa:'ɪç vaɪ̯s ɛs nɪçt',chars:['I / me','not','know','way / know'],charPy:['wǒ','bù','zhī','dào'],words:['I','know','it','not']},
+ {zh:'可以吗',py:'kěyǐ ma',en:'Is it okay?',de:'Ist das okay?',ipa:'ɪst das oˈkɛɪ̯',chars:['can / may','use / by','question particle'],charPy:['kě','yǐ','ma'],words:['is','that','okay']},
+ {zh:'我爱你',py:'wǒ ài nǐ',en:'I love you',de:'Ich liebe dich',ipa:'ɪç ˈliːbə dɪç',chars:['I / me','love','you'],charPy:['wǒ','ài','nǐ'],words:['I','love','you']},
+ {zh:'请进',py:'qǐng jìn',en:'Please come in',de:'Bitte komm rein',ipa:'ˈbɪtə kɔm ʁaɪ̯n',chars:['please / request','enter'],charPy:['qǐng','jìn'],words:['please','come','inside']},
+ {zh:'我饿了',py:'wǒ è le',en:'I am hungry',de:'Ich habe Hunger',ipa:'ɪç ˈhaːbə ˈhʊŋɐ',chars:['I / me','hungry','change-of-state particle'],charPy:['wǒ','è','le'],words:['I','have','hunger']},
+ {zh:'我累了',py:'wǒ lèi le',en:'I am tired',de:'Ich bin müde',ipa:'ɪç bɪn ˈmyːdə',chars:['I / me','tired','change-of-state particle'],charPy:['wǒ','lèi','le'],words:['I','am','tired']},
+ {zh:'现在几点',py:'xiànzài jǐ diǎn',en:'What time is it now?',de:'Wie spät ist es?',ipa:'viː ʃpɛːt ɪst ɛs',chars:['present / appear','at / existing','how many','clock hour / point'],charPy:['xiàn','zài','jǐ','diǎn'],words:['how','late','is','it']},
+ {zh:'我想回家',py:'wǒ xiǎng huí jiā',en:'I want to go home',de:'Ich möchte nach Hause',ipa:'ɪç ˈmœçtə naːx ˈhaʊ̯zə',chars:['I / me','want / think','return','home / family'],charPy:['wǒ','xiǎng','huí','jiā'],words:['I','would like','toward','home']},
+ {zh:'祝你好运',py:'zhù nǐ hǎo yùn',en:'Good luck',de:'Viel Glück',ipa:'fiːl ɡlʏk',chars:['wish / congratulate','you','good','fortune'],charPy:['zhù','nǐ','hǎo','yùn'],words:['much','luck']},
+ {zh:'你在哪里',py:'nǐ zài nǎlǐ',en:'Where are you?',de:'Wo bist du?',ipa:'voː bɪst duː',chars:['you','at / located','which / where','inside / place'],charPy:['nǐ','zài','nǎ','lǐ'],words:['where','are','you']},
+ {zh:'我有时间',py:'wǒ yǒu shíjiān',en:'I have time',de:'Ich habe Zeit',ipa:'ɪç ˈhaːbə tsaɪ̯t',chars:['I / me','have','time','interval / between'],charPy:['wǒ','yǒu','shí','jiān'],words:['I','have','time']},
+ {zh:'你喜欢什么',py:'nǐ xǐhuan shénme',en:'What do you like?',de:'Was magst du?',ipa:'vas maːkst duː',chars:['you','like / happy','pleased','what','what / indefinite'],charPy:['nǐ','xǐ','huan','shén','me'],words:['what','do you like','you']},
+ {zh:'我想睡觉',py:'wǒ xiǎng shuìjiào',en:'I want to sleep',de:'Ich möchte schlafen',ipa:'ɪç ˈmœçtə ˈʃlaːfn̩',chars:['I / me','want / think','sleep','sleep / awakening'],charPy:['wǒ','xiǎng','shuì','jiào'],words:['I','would like','to sleep']},
+
+];
+// Calendar-day keys deliberately use the device's local date, not UTC midnight.
+const PHRASE_ARCHIVE_START = '2026-11-03';
+const PHRASE_EXPANSION_DATE = '2026-11-04';
+const originalCount = 12;
+function phraseDateKey(date = new Date()) {
+ return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+function phraseDateFromKey(key) {
+ const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+ if (!match) return null;
+ const date = new Date(Number(match[1]), Number(match[2])-1, Number(match[3]));
+ return phraseDateKey(date) === key ? date : null;
+}
+function lessonForDate(date=new Date()) {
+ const key = phraseDateKey(date);
+ const days = Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000);
+ // Preserve the exact daily selections shown by the first release.
+ if (key < PHRASE_EXPANSION_DATE) return LESSONS[((days % originalCount)+originalCount)%originalCount];
+ const start = Math.floor(Date.UTC(2026,10,4)/86400000);
+ return LESSONS[((days-start)%LESSONS.length+LESSONS.length)%LESSONS.length];
+}
+// Calendar history is deterministic: older lessons remain accessible even if the app was closed.
+// No personal journal data or history needs to be uploaded to Supabase.
+function phraseHistory(until=new Date(), max=30) {
+ const today = phraseDateKey(until);
+ const items = [];
+ const step = new Date(until.getFullYear(), until.getMonth(), until.getDate()-1);
+ for (let i=0;i<Math.max(0,Math.min(max,366)) && phraseDateKey(step)>=PHRASE_ARCHIVE_START;i++) {
+  const key = phraseDateKey(step);
+  if (key<today) items.push({date:key,lesson:lessonForDate(step)});
+  step.setDate(step.getDate()-1);
+ }
+ return items;
+}
+function createPhraseOfDay({ date=new Date(), onHistory=null }={}) {
+ const lesson=lessonForDate(date); const es=language()==='es';
+ const line=h('div',{class:'phrase-hanzi','aria-label':lesson.zh},Array.from(lesson.zh).map((char,i)=>
+   h('button',{class:'phrase-char',type:'button',title:`${char} (${lesson.charPy[i]}): ${lesson.chars[i]}`,'aria-label':`${char} (${lesson.charPy[i]}): ${lesson.chars[i]}`,onclick:e=>{const note=e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss');note.textContent=`${char} (${lesson.charPy[i]}) — ${lesson.chars[i]}`;},onmouseenter:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${char} (${lesson.charPy[i]}) — ${lesson.chars[i]}`;},onfocus:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${char} (${lesson.charPy[i]}) — ${lesson.chars[i]}`;}},char)));
+ const german=h('div',{class:'phrase-german'},lesson.de.split(' ').map((word,i)=>h('button',{class:'phrase-word',type:'button',title:`${word}: ${lesson.words[i]}`,'aria-label':`${word}: ${lesson.words[i]}`,onclick:e=>{const note=e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss');note.textContent=`${word} — ${lesson.words[i]}`;},onmouseenter:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${word} — ${lesson.words[i]}`;},onfocus:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${word} — ${lesson.words[i]}`;}},word+' ')));
+ return h('section',{class:'phrase-panel','aria-label':'Daily language phrase'},
+   h('div',{class:'phrase-heading'},h('span',{class:'phrase-day'},phraseDateKey(date)),onHistory?h('button',{class:'btn small',type:'button',onclick:onHistory},es?'Historial':'History'):null),
+   h('div',{class:'phrase-grid'},
+     h('div',{},h('small',{},es?'MANDARÍN':'MANDARIN'),line,h('div',{class:'phrase-pronunciation'},lesson.py)),
+     h('div',{},h('small',{},es?'ALEMÁN':'GERMAN'),german,h('div',{class:'phrase-pronunciation'},`IPA: ${lesson.ipa}`))),
+   h('div',{class:'phrase-gloss','aria-live':'polite'},es?'Toca un carácter chino o una palabra alemana para ver su significado.':'Hover or tap for literal meanings.'),
+   h('div',{class:'phrase-meaning'},`${es?'Significado':'Meaning'}: ${lesson.en}`));
+}
+function openPhraseHistory() {
+ const es=language()==='es';
+ const today=new Date();
+ const todayKey=phraseDateKey(today);
+ const history=phraseHistory(today,30);
+ const datePicker=h('input',{type:'date',min:PHRASE_ARCHIVE_START,max:todayKey,value:history[0]?.date||todayKey,'aria-label':es?'Seleccionar fecha':'Choose date'});
+ const detail=h('div',{class:'phrase-history-detail'});
+ function showKey(key) {
+  const date=phraseDateFromKey(key);
+  if(!date||key<PHRASE_ARCHIVE_START||key>todayKey)return;
+  datePicker.value=key;
+  replace(detail,createPhraseOfDay({date}));
+ }
+ datePicker.addEventListener('change',()=>showKey(datePicker.value));
+ const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>
+  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{},lesson.zh),h('span',{},lesson.de))));
+ const body=h('div',{class:'phrase-archive'},h('p',{class:'hint'},es?'Todas las frases desde el lanzamiento, incluso los días en que no abriste la aplicación.':'Every dated lesson since launch, including days when the app was closed.'),
+  h('label',{class:'phrase-date-picker'},es?'Ver fecha':'Jump to date',datePicker),detail,
+  h('h3',{},es?'Días anteriores':'Previous days'),history.length?recent:h('p',{class:'hint'},es?'El historial empieza mañana.':'Previous lessons will appear tomorrow.'));
+ showKey(datePicker.value);
+ return openSheet({title:es?'Historial de frases':'Phrase history',body,size:'normal'});
+}
+Object.assign(__exports, { LESSONS, PHRASE_ARCHIVE_START, PHRASE_EXPANSION_DATE, phraseDateKey, phraseDateFromKey, lessonForDate, phraseHistory, createPhraseOfDay, openPhraseHistory });
+});
 __define("js/ui/dom.js", function (__require, __exports) {
 "use strict";
 // Tiny DOM helpers: element builder, toasts, sheets (dialogs), confirmations.
@@ -1013,6 +1142,102 @@ function timeAgo(iso, now = Date.now()) {
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 Object.assign(__exports, { timeAgo, plural });
+});
+__define("js/ui/language.js", function (__require, __exports) {
+"use strict";
+// Interface language: Spanish uses Mexican vocabulary. No external translation service.
+const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
+const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
+const pairs = [
+ ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Lodo'],['Calendar','Calendario'],['Feed','Noticias'],
+ ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Current conditions','Condiciones actuales'],
+ ['Daily forecast','Pronóstico diario'],['Next six days','Próximos seis días'],['Feels like','Sensación térmica'],
+ ['Humidity','Humedad'],['Wind','Viento'],['Rain today','Lluvia de hoy'],['Today','Hoy'],['Tomorrow','Mañana'],
+ ['Sunny','Soleado'],['Clear sky','Cielo despejado'],['Partly cloudy','Parcialmente nublado'],
+ ['Cloudy','Nublado'],['Overcast','Cubierto'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
+ ['Snow','Nieve'],['Thunderstorm','Tormenta eléctrica'],['Fog','Niebla'],['Storms','Tormentas'],
+ ['Mud forecast','Pronóstico de lodo'],['MUD OUTLOOK','PRONÓSTICO DE LODO'],['LOCAL TIME','HORA LOCAL'],
+ ['Change place','Cambiar lugar'],['Choose a place','Elegir lugar'],['Refresh','Actualizar'],
+ ['Items','Objetos'],['Places','Lugares'],['Add an item','Agregar objeto'],['Add item','Agregar objeto'],
+ ['Clear filters','Borrar filtros'],['No items match these filters.','Ningún objeto coincide con estos filtros.'],
+ ['Your pack is empty. Add your first item, then note where it lives.','Tu mochila está vacía. Agrega un objeto y anota dónde está.'],
+ ['Where is it? Type an item name','¿Dónde está? Escribe el nombre del objeto'],
+ ['Grid view','Vista de cuadrícula'],['List view','Vista de lista'],['Sync now','Sincronizar ahora'],
+ ['Account and sync','Cuenta y sincronización'],['Sign out','Cerrar sesión'],['Mud forecast','Pronóstico de lodo'],
+ ['Overview clocks','Relojes de inicio'],['Save clocks','Guardar relojes'],['Layout','Diseño'],
+ ['Wallpaper','Fondo de pantalla'],['Wallpaper access','Acceso al fondo de pantalla'],
+ ['Rarity tiers','Niveles de rareza'],['Navigation order','Orden de navegación'],
+ ['Typography','Tipografía'],['Backup','Respaldo'],['Download backup','Descargar respaldo'],
+ ['Install on your phone','Instalar en tu teléfono'],['Language','Idioma'],
+ ['English','English'],['Español','Español'],['Save','Guardar'],['Cancel','Cancelar'],
+ ['Add','Agregar'],['Delete','Eliminar'],['Search','Buscar'],['Close','Cerrar'],
+ ['Synced','Sincronizado'],['Syncing','Sincronizando'],['Offline','Sin conexión'],['Ready','Listo'],
+ ['Coming up','Próximos eventos'],['Headlines','Titulares'],['Pack stats','Estadísticas'],
+ ['Clock and date','Reloj y fecha'],['Loot and lost quests','Hallazgos y objetos perdidos'],
+ ['Good morning','Buenos días'],['Good afternoon','Buenas tardes'],['Good evening','Buenas noches'],
+ ['Your dashboard at a glance','Tu resumen del día'],['Nothing planned this week.','No hay eventos esta semana.'],
+ ['No items yet. Add some in the Pack tab.','Aún no hay objetos. Agrega algunos en Mochila.'],
+ ['No feed sources yet. Add one in the Feed tab.','Aún no hay fuentes. Agrégalas en Noticias.'],
+ ['No headlines right now.','No hay titulares por ahora.'],['Loading headlines...','Cargando titulares...'],
+ ['Loading the forecast...','Cargando el pronóstico...'],['No place chosen yet.','Aún no has elegido un lugar.'],
+ ['High','Máxima'],['Low','Mínima'],['Dry','Seco'],['Tacky','Pegajoso'],['Muddy','Lodoso'],['Swamp','Pantano'],
+
+ ['Alerts','Avisos'],['Insights','Estadísticas'],['Task','Tarea'],['Note','Nota'],['Expense','Gasto'],
+ ['Items','Objetos'],['Events','Eventos'],['Your day','Tu día'],['Open personal hub','Abrir centro personal'],
+ ['Due date','Fecha límite'],['Due today','Para hoy'],['Task due today','Tarea para hoy'],['Overdue task','Tarea atrasada'],
+ ['Upcoming event','Próximo evento'],['Warranty ending soon','La garantía está por vencer'],
+ ['Category','Categoría'],['Purchase & warranty','Compra y garantía'],['Purchase date','Fecha de compra'],['Currency','Moneda'],
+ ['Date','Fecha'],['Amount','Importe'],['Details','Detalles'],['Title','Título'],['Content','Contenido'],
+ ['Add entry','Agregar registro'],['Edit entry','Editar registro'],['Delete entry?','¿Eliminar registro?'],
+ ['Nothing needs attention right now.','No hay avisos pendientes.'],
+ ['No entries yet. Select Add to create one.','Todavía no hay registros. Selecciona Agregar para crear uno.'],
+ ['No matching results.','No hay resultados.'],
+ ['Type to search your items, events, tasks, notes and expenses.','Escribe para buscar objetos, eventos, tareas, notas y gastos.'],
+ ['Items by category','Objetos por categoría'],['Inventory items','Objetos registrados'],['Tasks open','Tareas pendientes'],
+ ['Expenses tracked (MXN)','Gastos registrados (MXN)'],['Uncategorized','Sin categoría'],
+ ['Display','Pantalla'],['Accent color','Color de acento'],['Panel opacity','Opacidad de los paneles'],
+ ['Reduce animations','Reducir animaciones'],['Scanline effect','Efecto de líneas de pantalla'],
+ ['Open','Abrir'],['Edit','Editar'],['Complete task','Completar tarea'],
+ ['All fields currently inherit the category defaults.','Todos los campos usan la configuración de su categoría.'],
+ ['Category defaults saved','Se guardaron los valores predeterminados de la categoría'],
+ ['Local time','Hora local'],['Weather and mud','Clima y lodo'],['Tasks, personal notes, expense records, search, and notifications in one place.','Tareas, notas, gastos, búsqueda y avisos en un solo lugar.'],
+ ['Notes','Notas'],['Total','Total'],['New place','Nuevo lugar'],['Save tiers','Guardar niveles'],
+ ['Does not repeat','No se repite'],['Every 2 weeks','Cada 2 semanas'],
+ ['Every 2 weeks','Cada 2 semanas'],['Does not repeat','No se repite'],['Every day','Cada día'],['Every week','Cada semana'],['Every month','Cada mes'],['Every year','Cada año'],['Repeats','Se repite'],['Every','Cada'],['Stop repeating after (optional)','Dejar de repetir después de (opcional)'],['Condition','Estado'],['Expiration','Caducidad'],['Durability','Durabilidad'],['Quantity','Cantidad'],['Remaining','Restantes'],['Maximum quantity','Cantidad máxima'],['Low stock threshold','Avisar cuando queden'],['Use category defaults','Usar valores predeterminados de la categoría'],['Categories','Categorías'],['Category tracking defaults','Campos predeterminados por categoría'],['Needs attention','Requiere atención'],['Low stock','Pocas unidades'],['Expiring soon','Próximo a caducar'],['Expired','Caducado'],['Good','Bueno'],['Excellent','Excelente'],['Worn','Desgastado'],['Damaged','Dañado'],['Needs repair','Necesita reparación'],['Purchase price','Precio de compra'],['Warranty ends','Fin de garantía'],['Tasks','Tareas'],['Notes','Notas'],['Expenses','Gastos'],['Notification center','Centro de avisos'],['Personal hub','Centro personal'],['Search everything','Buscar en todo'],['Save changes','Guardar cambios'],['Remaining quantity','Cantidad restante'],['Inventory tracking','Seguimiento de objetos'],['Now','Ahora'],['Local','Local'],['MUD','LODO'],['Change','Cambiar'],['Edit','Editar']
+];
+const translations = new Map(pairs);
+const t = (value) => language() === 'es' ? translations.get(value) || value : value;
+let observer;
+function startTranslations(root = document.body) {
+  observer?.disconnect();
+  const visit = node => {
+    if (node.nodeType === 3) {
+      const original = node.__originalEnglish ?? node.nodeValue;
+      if (!node.__originalEnglish) node.__originalEnglish = original;
+      const trimmed = original.trim();
+      if (translations.has(trimmed)) node.nodeValue = original.replace(trimmed, t(trimmed));
+    } else if (node.nodeType === 1) {
+      if (['SCRIPT','STYLE','TEXTAREA'].includes(node.tagName)) return;
+      for (const attr of ['placeholder','aria-label','title']) {
+        const key = '__original_' + attr;
+        const original = node[key] || node.getAttribute(attr);
+        if (original && translations.has(original)) { node[key] = original; node.setAttribute(attr, t(original)); }
+      }
+      node.childNodes.forEach(visit);
+    }
+  };
+  visit(root);
+  observer = new MutationObserver(records => {
+    observer.disconnect();
+    for (const rec of records) {
+      if (rec.type === 'characterData') visit(rec.target);
+      else rec.addedNodes.forEach(visit);
+    }
+    observer.observe(root, { childList:true, subtree:true, characterData:true });
+  });
+  observer.observe(root, { childList:true, subtree:true, characterData:true });
+}
+Object.assign(__exports, { language, locale, t, startTranslations });
 });
 __define("js/ui/mud-format.js", function (__require, __exports) {
 "use strict";
@@ -2314,6 +2539,7 @@ const WIDGET_DEFS = {
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
   stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 2, route: 'inventory' },
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
+  phrase:   { title: 'Phrase of the day',     minW: 4, minH: 3, defaultW: 8, defaultH: 4, route: null },
 };
 const WIDGET_IDS = Object.keys(WIDGET_DEFS);
 
@@ -2454,6 +2680,7 @@ const { hash32 } = __require("js/ui/pixel-icon.js");
 const { timeAgo } = __require("js/ui/format.js");
 const { weatherGlyph, glyphSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation } = __require("js/weather/moon-phase.js");
+const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
 
 // Render now, and again (at most once per frame) whenever something it
 // depends on changes. `subscribe(run)` returns the unsubscribe functions.
@@ -2615,7 +2842,25 @@ function mountClock(el) {
   return { destroy() { clearInterval(timer); inst.destroy(); }, refresh: inst.refresh };
 }
 
-const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock };
+// Today's phrase is a real dashboard widget, not a fixed Overview panel.
+// Re-evaluate local calendar days at midnight, after sleep/wake, and when visible again.
+function mountPhrase(el, { store }) {
+  let previous = '';
+  const render = () => {
+    const now = new Date();
+    const key = phraseDateKey(now);
+    if (key === previous) return;
+    previous = key;
+    replace(el, createPhraseOfDay({ date: now, onHistory: store?.readOnly ? null : openPhraseHistory }));
+  };
+  render();
+  const timer = setInterval(render, 30_000);
+  const onVisible = () => { if (document.visibilityState !== 'hidden') render(); };
+  document.addEventListener('visibilitychange', onVisible);
+  return { destroy() { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); }, refresh: render };
+}
+
+const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase };
 
 function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];

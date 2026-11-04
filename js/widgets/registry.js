@@ -12,6 +12,7 @@ import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
 import { weatherGlyph, glyphSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation } from '../weather/moon-phase.js';
+import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily-phrases.js';
 
 // Render now, and again (at most once per frame) whenever something it
 // depends on changes. `subscribe(run)` returns the unsubscribe functions.
@@ -173,7 +174,25 @@ function mountClock(el) {
   return { destroy() { clearInterval(timer); inst.destroy(); }, refresh: inst.refresh };
 }
 
-const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock };
+// Today's phrase is a real dashboard widget, not a fixed Overview panel.
+// Re-evaluate local calendar days at midnight, after sleep/wake, and when visible again.
+function mountPhrase(el, { store }) {
+  let previous = '';
+  const render = () => {
+    const now = new Date();
+    const key = phraseDateKey(now);
+    if (key === previous) return;
+    previous = key;
+    replace(el, createPhraseOfDay({ date: now, onHistory: store?.readOnly ? null : openPhraseHistory }));
+  };
+  render();
+  const timer = setInterval(render, 30_000);
+  const onVisible = () => { if (document.visibilityState !== 'hidden') render(); };
+  document.addEventListener('visibilitychange', onVisible);
+  return { destroy() { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); }, refresh: render };
+}
+
+const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase };
 
 export function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];

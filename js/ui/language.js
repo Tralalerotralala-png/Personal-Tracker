@@ -2,7 +2,7 @@
 export const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 export const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
- ['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Lodo'],['Calendar','Calendario'],['Feed','Noticias'],
+ ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Lodo'],['Calendar','Calendario'],['Feed','Noticias'],
  ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Current conditions','Condiciones actuales'],
  ['Daily forecast','Pronóstico diario'],['Next six days','Próximos seis días'],['Feels like','Sensación térmica'],
  ['Humidity','Humedad'],['Wind','Viento'],['Rain today','Lluvia de hoy'],['Today','Hoy'],['Tomorrow','Mañana'],

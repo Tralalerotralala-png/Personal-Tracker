@@ -1,3 +1,11 @@
+# Updating an existing Personal Tracker installation
+
+The update ZIP contains the **project files at its top level**, not another nested project folder. Extract it once; copy those files into the existing GitHub repository root once; allow Windows to replace `index.html`, CSS and JavaScript files. **Do not delete, overwrite, or lose your existing `config.js`.** The update does not include it. Make a backup in Settings before uploading. On GitHub, use the repository's file tree to remove obsolete `*-UPGRADE.md` files if you want the clean structure shown in this release. GitHub Pages may cache the previous version briefly; refresh after the commit.
+
+For a fresh installation, follow the setup procedure below.
+
+---
+
 # Setting up Personal Tracker, start to finish
 
 Everything here is free. It takes about 45 minutes the first time. You will end up with:
@@ -16,9 +24,10 @@ bottom.
 
 ## Part 1. Unzip the project (1 minute)
 
-Unzip `personal-tracker.zip` somewhere you will find it again, for example your Documents
-folder. You will have a folder called `personal-tracker` containing `index.html`, `js`,
-`css`, `wallpaper`, `supabase` and other things.
+Extract the downloaded ZIP somewhere you can find it. The update ZIP has the app files
+**directly at its root** (`index.html`, `js`, `css`, `wallpaper`, `supabase`, etc.).
+For a new installation put them into one project folder. Do not create duplicate
+`Personal-Tracker-main` folders or copy the files twice.
 
 ---
 

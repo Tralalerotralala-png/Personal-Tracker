@@ -3,6 +3,7 @@
 import { h, replace, openSheet, confirmDialog, toast } from './dom.js';
 import { uuid } from '../data/util.js';
 import { language } from './language.js';
+import { glyphSvg } from './pixel-icon.js';
 import { JOURNAL_KEY, emptyJournal, validPin, encryptJournal, decryptJournal } from './private-journal-crypto.js';
 const DURATION=5*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
@@ -14,10 +15,24 @@ const safeText=(value,max=10000)=>String(value||'').slice(0,max);
 export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
  let session=null, timeout=null, sheet=null, failures=0, blockedUntil=0;
+ const dialogs=new Set();
  const L=()=>labels[language()];
  const clear=()=>{session=null;clearTimeout(timeout);timeout=null;};
- const touch=()=>{clearTimeout(timeout);timeout=setTimeout(()=>{if(sheet){sheet.close();sheet=null;}clear();toast(L().lock);},DURATION);};
- function landing(){replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing'},h('div',{class:'private-moon','aria-hidden':'true'},'☾'),h('p',{},L().intro),h('p',{class:'hint'},L().locked),h('button',{class:'btn primary',onclick:openLocked},L().open)));}
+ function closeDialogs(){
+  for(const dlg of [...dialogs]){if(dlg.el?.open)dlg.close();}
+  dialogs.clear();
+  if(sheet?.el?.open)sheet.close();sheet=null;
+ }
+ function landing(){replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing'},h('div',{class:'private-moon','aria-hidden':'true',html:glyphSvg('moon')}),h('p',{},L().intro),h('p',{class:'hint'},L().locked),h('button',{class:'btn primary',onclick:openLocked},L().open)));}
+ function lock(){
+  closeDialogs();clear();landing();
+ }
+ const touch=()=>{if(!session)return;clearTimeout(timeout);timeout=setTimeout(()=>{lock();toast(L().lock);},DURATION);};
+ // Editing happens in dialogs appended outside the view: activity there must also keep it unlocked.
+ document.addEventListener('pointerdown',()=>{if(session)touch();});
+ document.addEventListener('keydown',()=>{if(session)touch();});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden&&session)lock();});
+ function trackDialog(dialog){dialogs.add(dialog);dialog.el.addEventListener('close',()=>dialogs.delete(dialog),{once:true});return dialog;}
  async function openLocked(){
   if(sheet) sheet.close();clear();
   const record=await store.getSetting(JOURNAL_KEY,null);
@@ -35,6 +50,8 @@ export function createDreamDiaryView({store}) {
     failures=0;session={pin:pin.value,data};pin.value='';confirm.value='';dlg.close();openEntries();
    }catch(err){failures++;if(failures>=5){blockedUntil=Date.now()+60000;failures=0;}error.textContent=err.message||L().wrong;}
   }},first?L().setup:L().unlock)]});
+  sheet=dlg;
+  dlg.el.addEventListener('close',()=>{if(sheet===dlg)sheet=null;},{once:true});
   pin.focus();
  }
  async function persist(){if(!session) return;await store.setSetting(JOURNAL_KEY,await encryptJournal(session.pin,session.data));touch();}
@@ -63,7 +80,7 @@ export function createDreamDiaryView({store}) {
     type==='moods'?[h('label',{},L().mood),mood]:null,
     h('label',{},L().body),description,
     type==='dreams'?[h('label',{},L().illustration),file,entry?.art?h('img',{src:entry.art,alt:L().night,class:'journal-art'}):null]:null,error);
-   const editor=openSheet({title:entry?L().name:L().new,body:form,footer:[
+   const editor=trackDialog(openSheet({title:entry?L().name:L().new,body:form,footer:[
     entry?button(L().delete,async()=>{if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;session.data[type]=session.data[type].filter(x=>x.id!==entry.id);await persist();editor.close();draw();}):null,
     h('button',{class:'btn primary',onclick:async()=>{
       if(!title.value.trim()){error.textContent='Title required';return;}
@@ -75,7 +92,7 @@ export function createDreamDiaryView({store}) {
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
        await persist();editor.close();draw();
       }catch(err){error.textContent=L().saveFailed;}
-    }},L().save)]});
+    }},L().save)]}));
   }
   function draw(){
    if(!session)return;
@@ -101,16 +118,15 @@ export function createDreamDiaryView({store}) {
    const newPin=h('input',{type:'password',inputmode:'numeric',maxlength:4,autocomplete:'new-password'});
    const again=h('input',{type:'password',inputmode:'numeric',maxlength:4,autocomplete:'new-password'});
    const err=h('p',{class:'form-error'});
-   const dialog=openSheet({title:L().change,size:'small',body:h('div',{class:'form'},h('p',{class:'hint'},L().warning),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
+   const dialog=trackDialog(openSheet({title:L().change,size:'small',body:h('div',{class:'form'},h('p',{class:'hint'},L().warning),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
     if(!validPin(newPin.value)||newPin.value!==again.value){err.textContent=L().wrong;return;}
     try{await store.setSetting(JOURNAL_KEY,await encryptJournal(newPin.value,session.data));session.pin=newPin.value;dialog.close();touch();toast(L().save);}catch{err.textContent=L().saveFailed;}
-   }},L().save)]});
+   }},L().save)]}));
   };
-  wrap.append(h('div',{class:'journal-actions'},button(L().change,changePin),button(L().lock,()=>{sheet.close();sheet=null;clear();})),tabs,list);
-  sheet=openSheet({title:L().title,body:wrap,onClose:()=>{sheet=null;clear();}});
-  const reset=()=>touch();sheet.el.addEventListener('pointerdown',reset);sheet.el.addEventListener('keydown',reset);
+  wrap.append(h('div',{class:'journal-actions'},button(L().change,changePin),button(L().lock,lock)),tabs,list);
+  replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
   draw();touch();
  }
  landing();
- return {el,mount:async()=>landing(),show:()=>landing(),hide:()=>{if(sheet){sheet.close();sheet=null;}clear();}};
+ return {el,mount:async()=>landing(),show:()=>{if(!session)landing();},hide:lock};
 }
