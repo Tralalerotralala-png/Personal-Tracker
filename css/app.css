@@ -916,3 +916,25 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .widget-title-action{background:none;border:0;color:inherit;font:inherit;padding:0;cursor:pointer;text-align:left}
 .widget-title-action:hover,.widget-title-action:focus-visible,.w-headline-link:hover,.w-headline-link:focus-visible{text-decoration:underline;text-underline-offset:3px}
 .w-headline-link{color:inherit;text-decoration:none;display:block}
+
+/* Game entries are first-class pages; the optional dock is resizable. */
+.games-view .game-page-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.games-view .game-page-head h2{flex:1;min-width:160px;overflow-wrap:anywhere}
+.games-view .game-page-body{max-width:1100px;width:100%;min-width:0}
+.games-view .game-notes{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;max-height:none}
+.games-view .game-editor-layout{max-width:850px}
+.games-view .game-editor-form textarea{min-height:230px;resize:vertical}
+.games-view .game-editor-actions{display:flex;justify-content:flex-end;padding:14px 0}
+@media(min-width:850px){.games-view.game-side-mode .game-page-body{width:min(740px,80vw);min-width:340px;max-width:95%;resize:horizontal;overflow:auto;margin-left:auto;padding:14px;border:2px solid var(--edge);background:var(--panel)}.games-view.game-side-mode .game-page-head{justify-content:flex-end}}
+@media(max-width:849px){.games-view .game-page-body{width:100%}}
+
+/* Unified compact daily weather + ground cards. */
+.wx-unified{gap:7px;grid-template-columns:repeat(6,minmax(0,1fr))}
+.wx-unified-day{appearance:none;font:inherit;color:inherit;cursor:pointer;min-width:0;padding:8px 5px;display:flex;flex-direction:column;align-items:center;gap:5px;line-height:1.25;text-align:center}
+.wx-unified-day:hover,.wx-unified-day:focus-visible{border-color:var(--accent);outline-offset:2px}
+.wx-unified-day .wx-day-icon{margin:0}.wx-unified-day .mud-bar{width:100%;max-width:115px;height:6px;margin-top:2px}
+.wx-unified-day .wx-ground-label{font-size:.78rem}.wx-history{margin-top:10px}.wx-history>summary{cursor:pointer;padding:10px;border:1px solid var(--edge)}
+.wx-history .wx-past-days{padding-top:10px}
+@media(max-width:850px){.wx-unified{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:440px){.wx-unified{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.game-notes p{margin:0 0 .45em;white-space:pre-wrap}.game-notes h3{margin:1em 0 .5em}.game-task{display:flex;gap:9px;align-items:baseline;margin:3px 0}.game-task-mark{color:var(--accent);white-space:nowrap}

@@ -135,16 +135,18 @@ export function createMudView({ store, weather }) {
         stat('Humidity', number(current?.relative_humidity_2m, '%')),
         stat('Wind', number(current?.wind_speed_10m ?? raw.wind_max, ' km/h')),
         stat('Rain today', raw.precip === null ? '—' : `${fmt(raw.precip)} mm`)),
-      h('h4', { class: 'wx-outlook-title' }, 'Next six days'),
-      h('div', { class: 'wx-outlook' }, days.map((d) => {
+      h('h4', { class: 'wx-outlook-title' }, 'Weather and ground — next six days'),
+      h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
-        return h('div', { class: 'wx-day', title: icon.text },
-          h('span', {}, d.phase === 'today' ? 'Today' : dayShort(d.date)),
+        return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather), title: 'View weather and ground details' },
+          h('span', { class: 'wx-unified-date' }, d.phase === 'today' ? 'Today' : dayShort(d.date)),
           h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
-          h('span', { class: 'wx-day-description' }, localizedWeather(icon.text)),
           h('strong', {}, `${number(d.raw.tmax, '°')} / ${number(d.raw.tmin, '°')}`),
-          h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`));
+          h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`),
+          h('span', { class: `wx-ground-label ${mudClass(d.label)}` }, `${localizedMudLabel(d.label)} ${d.index}/100`),
+          mudBar(d));
       })));
+
   }
 
   function render(state) {
@@ -176,15 +178,18 @@ export function createMudView({ store, weather }) {
       placeHeader(state),
       banner(state),
       weatherPanel(state, today, future),
-      h('section', { class: 'ground-inline', 'aria-label': t('Ground conditions') },
-        h('div', { class: 'ground-inline-summary' },
-          h('b', {}, t('Ground conditions')),
-          s ? h('span', { class: mudClass(s.today.label) }, `${localizedMudLabel(s.today.label)} ${s.today.index}/100`) : null,
-          s ? mudBar(s.today) : null),
-        s ? h('p', { class: 'hint' }, summarySentence(s)) : null,
-        h('details', { class: 'ground-history' },
-          h('summary', {}, t('Daily ground details')),
-          h('div', { class: 'mud-list' }, [...past, ...(today ? [today] : []), ...future].map(row)))),
+      h('details', { class: 'ground-history wx-history' },
+        h('summary', {}, `Past weather and ground conditions (${past.length} available days)`),
+        h('div', { class: 'wx-outlook wx-unified wx-past-days' }, past.map((d) => {
+          const icon = weatherGlyph(d.raw.weather_code);
+          return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather) },
+            h('span', {}, `${dayShort(d.date)} ${dayMonth(d.date)}`),
+            h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
+            h('strong', {}, `${fmt(d.raw.tmax)}° / ${fmt(d.raw.tmin)}°`),
+            h('span', { class: 'hint' }, `${fmt(d.raw.precip)} mm`),
+            h('span', { class: `wx-ground-label ${mudClass(d.label)}` }, `${localizedMudLabel(d.label)} ${d.index}/100`),
+            mudBar(d));
+        }))),
       h('div', { class: 'mud-foot' },
         h('button', { class: 'btn small ghost', type: 'button', onclick: () => openHowScored({ weather, store }) }, 'How is this scored?'),
         h('button', { class: 'btn small ghost desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, 'Tune the model'),
