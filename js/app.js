@@ -4,7 +4,7 @@ import { startTranslations, t, locale } from './ui/language.js';
 document.documentElement.lang = locale();
 import { createPhotos } from './photos.js';
 import { h, toast, openSheet } from './ui/dom.js';
-import { glyphSvg } from './ui/pixel-icon.js';
+import { glyphSvg, weatherGlyph } from './ui/pixel-icon.js';
 import { createInventoryView } from './ui/inventory.js';
 import { createMudView } from './ui/mud.js';
 import { createCalendarView } from './ui/calendar.js';
@@ -14,7 +14,7 @@ import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createGamesView } from './ui/games.js';
-import { moonPhaseSvg } from './weather/moon-phase.js';
+import { moonPhaseSvg, isNightAtLocation } from './weather/moon-phase.js';
 import { loadHub, openPersonalHub } from './ui/personal-hub.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
@@ -131,7 +131,7 @@ const VIEWS = {
   games,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Dreams', 'moon'], ['games', 'Games', 'games'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Games', 'games'],
 ];
 
 const main = h('main', { id: 'main' });
@@ -158,6 +158,14 @@ const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href
 const moonNavIcon = navButtons.find(n => n.dataset.route === 'diary')?.querySelector('.slot-icon');
 function refreshMoonNav(){ if(moonNavIcon) moonNavIcon.innerHTML=moonPhaseSvg(); }
 refreshMoonNav(); setInterval(refreshMoonNav, 60*60*1000);
+const weatherNavIcon=navButtons.find(n=>n.dataset.route==='mud')?.querySelector('.slot-icon');
+function refreshWeatherNav(){
+  const current=weather.getState().current;
+  if(!weatherNavIcon || !current)return;
+  const code=Number(current.weather_code);
+  weatherNavIcon.innerHTML=isNightAtLocation(current) && [0,1,2].includes(code) ? moonPhaseSvg() : glyphSvg(weatherGlyph(code).glyph);
+}
+weather.subscribe(refreshWeatherNav);refreshWeatherNav();setInterval(refreshWeatherNav,60*60*1000);
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
 function saveNavOrder() { localStorage.setItem(NAV_KEY, JSON.stringify([...nav.children].map(n => n.dataset.route))); }
 function moveNav(from, to) {

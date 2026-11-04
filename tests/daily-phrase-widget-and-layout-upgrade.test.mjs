@@ -48,14 +48,16 @@ test('saved desktop and mobile layouts gain the phrase widget without losing pla
   assert.equal(await upgradeLayouts(store), true);
   const desktop = await loadLayout(store,'desktop');
   const mobile = await loadLayout(store,'mobile');
-  assert.deepEqual(desktop.filter(x=>x.id!=='phrase'), priorDesktop);
-  assert.deepEqual(mobile.filter(x=>x.id!=='phrase'), priorMobile);
+  assert.deepEqual(desktop.filter(x=>!['phrase','currency'].includes(x.id)), priorDesktop);
+  assert.deepEqual(mobile.filter(x=>!['phrase','currency'].includes(x.id)), priorMobile);
   assert.ok(desktop.some(x=>x.id==='phrase'));
   assert.ok(mobile.some(x=>x.id==='phrase'));
+  assert.ok(desktop.some(x=>x.id==='currency'));
+  assert.ok(mobile.some(x=>x.id==='currency'));
   assert.deepEqual(await loadLayout(store,'wallpaper'), priorWallpaper);
   for (const entries of [desktop,mobile]) for (let i=0;i<entries.length;i++) for (let j=i+1;j<entries.length;j++) assert.equal(overlaps(entries[i],entries[j]), false);
   assert.deepEqual(WIDGET_DEFS.phrase.route, null);
-  assert.equal(await store.getSetting('layout_version'), 4);
+  assert.equal(await store.getSetting('layout_version'), 5);
   // Removing the widget after migration stays removed.
   await store.upsert('widget_layout',{profile:'desktop',layout:priorDesktop});
   assert.equal(await upgradeLayouts(store), false);
@@ -67,5 +69,5 @@ test('legacy layout without version metadata is preserved rather than overwritte
   const custom = [{id:'clock',x:7,y:4,w:3,h:2}];
   await store.upsert('widget_layout',{profile:'desktop',layout:custom});
   assert.equal(await upgradeLayouts(store), true);
-  assert.deepEqual((await loadLayout(store,'desktop')).filter(x=>x.id!=='phrase'), custom);
+  assert.deepEqual((await loadLayout(store,'desktop')).filter(x=>!['phrase','currency'].includes(x.id)), custom);
 });

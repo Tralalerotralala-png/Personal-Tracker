@@ -2,7 +2,7 @@
 // forecast, the next two weeks as a list, and add / edit / import of events.
 import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
 import { t, locale } from './language.js';
-import { mudClass, dayLong, dayMonth, mudChip } from './mud-format.js';
+import { mudClass, dayLong, dayMonth, mudChip } from './mud-format-v2.js';
 import {
   groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts,
 } from '../calendar/recurrence.js';

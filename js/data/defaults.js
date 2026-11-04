@@ -48,6 +48,7 @@ export const DEFAULT_LAYOUTS = {
     { id: 'stats',    x: 4, y: 4, w: 4, h: 2 },
     { id: 'feed',     x: 8, y: 6, w: 4, h: 4 },
     { id: 'phrase',   x: 0, y: 10, w: 8, h: 4 },
+    { id: 'currency', x: 8, y: 10, w: 4, h: 4 },
   ],
   mobile: [
     { id: 'stats',    x: 0, y: 0,  w: 12, h: 2 },
@@ -56,6 +57,7 @@ export const DEFAULT_LAYOUTS = {
     { id: 'calendar', x: 0, y: 9,  w: 12, h: 5 },
     { id: 'feed',     x: 0, y: 14, w: 12, h: 5 },
     { id: 'phrase',   x: 0, y: 19, w: 12, h: 4 },
+    { id: 'currency', x: 0, y: 23, w: 12, h: 3 },
   ],
   wallpaper: [
     { id: 'mud',      x: 0, y: 0, w: 7, h: 4 },
@@ -66,7 +68,7 @@ export const DEFAULT_LAYOUTS = {
   ],
 };
 
-const LAYOUT_VERSION = 4;
+const LAYOUT_VERSION = 5;
 
 // Migrations only run after cloud sync. Existing widget positions and custom
 // layouts are preserved, and a newly introduced widget is added once. Removing
@@ -90,6 +92,18 @@ export async function upgradeLayouts(store) {
       if (basis.some(item=>item.id==='phrase')) continue;
       const upgraded = addItem(basis, 'phrase', WIDGET_DEFS.phrase, bounds);
       if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
+    }
+  }
+  if (version < 5) {
+    for (const profile of ['desktop','mobile']) {
+      const row = await store.get('widget_layout', profile);
+      const bounds = {cols: PROFILES[profile].cols, rows: PROFILES[profile].rows};
+      const current = normalizeLayout(row?.layout, WIDGET_DEFS, bounds);
+      const basis = current.length ? current : DEFAULT_LAYOUTS[profile];
+      if (!basis.some(item => item.id === 'currency')) {
+        const upgraded = addItem(basis, 'currency', WIDGET_DEFS.currency, bounds);
+        if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
+      }
     }
   }
   await store.setSetting('layout_version', LAYOUT_VERSION);

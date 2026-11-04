@@ -230,6 +230,7 @@ const DEFAULT_LAYOUTS = {
     { id: 'stats',    x: 4, y: 4, w: 4, h: 2 },
     { id: 'feed',     x: 8, y: 6, w: 4, h: 4 },
     { id: 'phrase',   x: 0, y: 10, w: 8, h: 4 },
+    { id: 'currency', x: 8, y: 10, w: 4, h: 4 },
   ],
   mobile: [
     { id: 'stats',    x: 0, y: 0,  w: 12, h: 2 },
@@ -238,6 +239,7 @@ const DEFAULT_LAYOUTS = {
     { id: 'calendar', x: 0, y: 9,  w: 12, h: 5 },
     { id: 'feed',     x: 0, y: 14, w: 12, h: 5 },
     { id: 'phrase',   x: 0, y: 19, w: 12, h: 4 },
+    { id: 'currency', x: 0, y: 23, w: 12, h: 3 },
   ],
   wallpaper: [
     { id: 'mud',      x: 0, y: 0, w: 7, h: 4 },
@@ -248,7 +250,7 @@ const DEFAULT_LAYOUTS = {
   ],
 };
 
-const LAYOUT_VERSION = 4;
+const LAYOUT_VERSION = 5;
 
 // Migrations only run after cloud sync. Existing widget positions and custom
 // layouts are preserved, and a newly introduced widget is added once. Removing
@@ -272,6 +274,18 @@ async function upgradeLayouts(store) {
       if (basis.some(item=>item.id==='phrase')) continue;
       const upgraded = addItem(basis, 'phrase', WIDGET_DEFS.phrase, bounds);
       if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
+    }
+  }
+  if (version < 5) {
+    for (const profile of ['desktop','mobile']) {
+      const row = await store.get('widget_layout', profile);
+      const bounds = {cols: PROFILES[profile].cols, rows: PROFILES[profile].rows};
+      const current = normalizeLayout(row?.layout, WIDGET_DEFS, bounds);
+      const basis = current.length ? current : DEFAULT_LAYOUTS[profile];
+      if (!basis.some(item => item.id === 'currency')) {
+        const upgraded = addItem(basis, 'currency', WIDGET_DEFS.currency, bounds);
+        if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
+      }
     }
   }
   await store.setSetting('layout_version', LAYOUT_VERSION);
@@ -1150,6 +1164,7 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Currency Converter','Conversor de divisas'],['Add pair','Agregar par'],['Remove','Quitar'],['Swap','Invertir'],['Amount','Cantidad'],['Cached','En caché'],['Rate unavailable','Tipo de cambio no disponible'],['Last updated','Última actualización'],['Choose a place in the Weather tab.','Elige una ubicación en Clima.'],['kinds','tipos'],['lost','perdidos'],['legendary','legendarios'],['Drizzle','Llovizna'],['No weather data','Sin datos del clima'],['Logs','Registros'],
  ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Clima'],['Calendar','Calendario'],['Feed','Noticias'],
  ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Games','Juegos'],['Game Library','Biblioteca de juegos'],['Clear','Despejado'],['Ground conditions','Condiciones del terreno'],['Mud conditions','Condiciones del terreno'],['Weather and mud','Clima y terreno'],['Tune the mud model','Ajustar el modelo del terreno'],['Observed','Observado'],['Forecast','Pronóstico'],['No big change expected.','No se esperan cambios importantes.'],['No rain over 3 days, soil is dry, drying well','Sin lluvia en los últimos 3 días; el suelo está seco y se está secando bien'],['Current conditions','Condiciones actuales'],
  ['Daily forecast','Pronóstico diario'],['Next six days','Próximos seis días'],['Feels like','Sensación térmica'],
@@ -1240,7 +1255,7 @@ function startTranslations(root = document.body) {
 }
 Object.assign(__exports, { language, locale, t, startTranslations });
 });
-__define("js/ui/mud-format.js", function (__require, __exports) {
+__define("js/ui/mud-format-v2.js", function (__require, __exports) {
 "use strict";
 // Pure helpers for showing mud scores: day names, colour classes, the label chip, the bar and
 // the one-sentence summary. Kept apart from the Mud tab so the wallpaper can use them without
@@ -2580,6 +2595,97 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
 }
 Object.assign(__exports, { createWeatherService });
 });
+__define("js/widgets/currency.js", function (__require, __exports) {
+"use strict";
+// Compact Overview converter: fiat via open.er-api.com and crypto via CoinGecko.
+// No credentials are stored; rates are explicitly timestamped and cached locally.
+const { h, replace } = __require("js/ui/dom.js");
+const { language, t } = __require("js/ui/language.js");
+
+const CRYPTO = { BTC: 'bitcoin', ETH: 'ethereum', LTC: 'litecoin', SOL: 'solana', DOGE: 'dogecoin' };
+const OPTIONS = ['MXN','USD','EUR','GBP','CAD','JPY','CNY','CHF','BRL','ARS','BTC','ETH','LTC','SOL','DOGE'];
+const DEFAULT_PAIRS = [{ from:'MXN', to:'USD', amount:1 },{ from:'BTC', to:'MXN', amount:1 }];
+const CACHE_PREFIX = 'tracker-rate-v1-';
+const isCrypto = code => Object.hasOwn(CRYPTO,code);
+const fmt = (n, code) => Number(n).toLocaleString(language()==='es'?'es-MX':'en-US',{maximumFractionDigits:isCrypto(code)?8: n<0.01?8:4});
+const cacheKey = (from,to) => CACHE_PREFIX+from+'-'+to;
+function readCache(from,to) {
+  try { const row=JSON.parse(localStorage.getItem(cacheKey(from,to))||'null'); return row && Number.isFinite(row.rate) ? row : null; } catch { return null; }
+}
+function writeCache(from,to,rate,change24h=null){
+ const row={rate, change24h, at:Date.now()};try{localStorage.setItem(cacheKey(from,to),JSON.stringify(row));}catch{}
+ return row;
+}
+async function fetchRate(from,to,{ force=false }={}) {
+ if(from===to)return {rate:1,at:Date.now()};
+ const old=readCache(from,to), maxAge=isCrypto(from)||isCrypto(to)?5*60_000:60*60_000;
+ if(!force && old && Date.now()-old.at<maxAge)return old;
+ try {
+  let rate, change24h=null;
+  if(isCrypto(from) || isCrypto(to)) {
+   if(isCrypto(from) && isCrypto(to)) {
+    const ids=[CRYPTO[from],CRYPTO[to]];
+    const r=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd&include_24hr_change=true`);
+    if(!r.ok)throw Error('Crypto provider unavailable');const json=await r.json();rate=json[ids[0]]?.usd/json[ids[1]]?.usd;
+    const a=json[ids[0]]?.usd_24h_change,b=json[ids[1]]?.usd_24h_change;
+    if(Number.isFinite(a)&&Number.isFinite(b))change24h=a-b;
+   } else {
+    const crypto=isCrypto(from)?from:to, fiat=isCrypto(from)?to:from;
+    const r=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${CRYPTO[crypto]}&vs_currencies=${fiat.toLowerCase()}&include_24hr_change=true`);
+    if(!r.ok)throw Error('Crypto provider unavailable');const json=await r.json();const price=json[CRYPTO[crypto]]?.[fiat.toLowerCase()];rate=isCrypto(from)?price:1/price;
+    const c=json[CRYPTO[crypto]]?.[`${fiat.toLowerCase()}_24h_change`];
+    if(Number.isFinite(c))change24h=isCrypto(from)?c:-c;
+   }
+  } else {
+   const r=await fetch(`https://open.er-api.com/v6/latest/${from}`);
+   if(!r.ok)throw Error('Fiat provider unavailable');const json=await r.json();rate=json?.rates?.[to];
+  }
+  if(!Number.isFinite(rate)||rate<=0)throw Error('Rate unavailable');
+  return writeCache(from,to,rate,change24h);
+ }catch(e){if(old)return {...old,stale:true};throw e;}
+}
+function mountCurrency(el,{store}) {
+ let dead=false, pairs=[], running=0;
+ const makeOption=(code,selected)=>h('option',{value:code,selected:code===selected},code);
+ const select=(value)=>h('select',{class:'currency-select'},...OPTIONS.map(c=>makeOption(c,value)));
+ async function save(){await store.setSetting('currency_pairs_v1',pairs);}
+ function draw(){
+   if(dead)return;
+   const heading=h('div',{class:'currency-actions'},h('button',{class:'btn small',onclick:()=>{
+     pairs.push({from:'USD',to:'MXN',amount:1});save();draw();
+   }},t('Add pair')),h('button',{class:'btn small',onclick:()=>update(true)},t('Refresh')));
+   const rows=pairs.map((pair,index)=>{
+     const from=select(pair.from),to=select(pair.to),amount=h('input',{type:'number',min:0,step:'any',value:pair.amount,'aria-label':t('Amount')});
+     const result=h('div',{class:'currency-result'},'…');
+     const refresh=()=>fetchRate(pair.from,pair.to).then(info=>{
+       if(dead||!result.isConnected)return;
+       result.replaceChildren(h('strong',{},`${fmt(pair.amount*info.rate,pair.to)} ${pair.to}`),
+         h('small',{},`${t('Last updated')}: ${new Date(info.at).toLocaleString()}${info.stale?' · '+t('Cached'):''}`));
+     }).catch(()=>{if(result.isConnected)result.textContent=t('Rate unavailable');});
+     const commit=()=>{pair.from=from.value;pair.to=to.value;pair.amount=Math.max(0,Number(amount.value)||0);save();refresh();};
+     from.addEventListener('change',commit);to.addEventListener('change',commit);amount.addEventListener('change',commit);
+     const row=h('div',{class:'currency-pair'},h('div',{class:'currency-inputs'},amount,from,
+       h('button',{class:'btn small',title:t('Swap'),'aria-label':t('Swap'),onclick:()=>{[pair.from,pair.to]=[pair.to,pair.from];save();draw();}},'⇄'),to,
+       h('button',{class:'btn small',title:t('Remove'),'aria-label':t('Remove'),onclick:()=>{pairs.splice(index,1);save();draw();}},'×')),result);
+     queueMicrotask(refresh);return row;
+   });
+   replace(el,heading,...rows,pairs.length?null:h('p',{class:'hint'},language()==='es'?'Agrega un par de monedas.':'Add a currency pair.'));
+ }
+ async function update(force=false){
+   const current=++running;
+   if(force){for(const pair of pairs){try{await fetchRate(pair.from,pair.to,{force:true});}catch{}}}
+   if(!dead&&current===running)draw();
+ }
+ store.getSetting('currency_pairs_v1').then(saved=>{
+   if(dead)return;
+   pairs=Array.isArray(saved)?saved.filter(p=>OPTIONS.includes(p.from)&&OPTIONS.includes(p.to)&&Number.isFinite(Number(p.amount))).map(p=>({...p,amount:Number(p.amount)})):DEFAULT_PAIRS.map(p=>({...p}));
+   draw();
+ }).catch(()=>{pairs=DEFAULT_PAIRS.map(p=>({...p}));draw();});
+ const timer=setInterval(()=>update(),5*60_000);
+ return {destroy(){dead=true;clearInterval(timer);},refresh:draw};
+}
+Object.assign(__exports, { mountCurrency });
+});
 __define("js/widgets/defs.js", function (__require, __exports) {
 "use strict";
 // Widget metadata (no DOM code, so tests and the wallpaper can read it).
@@ -2589,8 +2695,9 @@ const WIDGET_DEFS = {
   calendar: { title: 'Coming up',             minW: 3, minH: 3, defaultW: 4, defaultH: 4, route: 'calendar' },
   loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
-  stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 2, route: 'inventory' },
+  stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 1, route: 'inventory' },
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
+  currency: { title: 'Currency Converter', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: null },
   games:    { title: 'Currently playing', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'games' },
   phrase:   { title: 'Phrase of the day',     minW: 4, minH: 3, defaultW: 8, defaultH: 4, route: null },
 };
@@ -2726,14 +2833,15 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
 const { h, replace, todayKey, daysSince } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
-const { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format.js");
+const { mountCurrency } = __require("js/widgets/currency.js");
+const { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { hash32 } = __require("js/ui/pixel-icon.js");
 const { timeAgo } = __require("js/ui/format.js");
 const { weatherGlyph, glyphSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
-const { language } = __require("js/ui/language.js");
+const { language, t } = __require("js/ui/language.js");
 const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
 
 // Render now, and again (at most once per frame) whenever something it
@@ -2768,7 +2876,7 @@ function mountMud(el, { weather, store }) {
     const clock = (tz) => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz });
     const extra = ui?.extra_clock_timezone;
     const localClock = h('div', { class: 'w-weather-clock' },
-      h('div', { class: 'w-time-unit' }, h('span', {}, 'LOCAL TIME'), h('strong', {}, clock(undefined))),
+      h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
     const c = s.current;
     const night = isNightAtLocation(c, now);
@@ -2780,20 +2888,28 @@ function mountMud(el, { weather, store }) {
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
         h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
-    const forecast = !s.rows.length ? note(s.status === 'no-location' ? 'Choose a place in the Mud tab for weather and mud.' : 'Loading the forecast...') : (() => {
+    const forecast = !s.rows.length ? note(s.status === 'no-location' ? t('Choose a place in the Weather tab.') : t('Loading the forecast...')) : (() => {
       const sum = s.summary;
       return h('div', { class: 'w-mud-compact' },
         sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
           h('span', { class: 'w-mud-label' }, localizedMudLabel(sum.today.label)),
           h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
-        h('div', { class: 'w-strip' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) =>
-          h('div', { class: `w-cell ${mudClass(r.label)}${r.phase === 'today' ? ' today' : ''}`, title: `${dayLong(r.date)}: ${r.label} ${r.index}` },
-            h('b', {}, r.index), h('div', { class: 'w-bar', style: `--p:${r.index}%` }),
-            h('span', {}, r.phase === 'today' ? 'Now' : dayShort(r.date).slice(0, 2))))));
+        h('div', { class: 'w-forecast-cards' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) => {
+          const icon = weatherGlyph(r.raw?.weather_code);
+          const temperature = Number.isFinite(r.raw?.tmax) ? `${Math.round(r.raw.tmax)}°` : '—';
+          const precipitation = Number.isFinite(r.raw?.precip) ? `${Number(r.raw.precip).toFixed(1)} mm` : '—';
+          const title = `${dayLong(r.date)} · ${localizedWeather(icon.text)} · ${temperature} · ${precipitation} · ${localizedMudLabel(r.label)} ${r.index}/100`;
+          return h('div', { class: `w-forecast-day ${r.phase === 'today' ? 'today' : ''}`, title, 'aria-label': title },
+            h('span', { class: 'w-forecast-label' }, r.phase === 'today' ? t('Now') : dayShort(r.date)),
+            h('span', { class: 'w-forecast-icon', html: r.phase === 'today' && night && clearEnough ? moonPhaseSvg(now) : glyphSvg(icon.glyph) }),
+            h('strong', {}, temperature),
+            h('small', {}, precipitation),
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}`));
+        })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },
       h('div', { class: 'w-weather-top' }, localClock, wx),
-      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, 'MUD OUTLOOK'), forecast)));
+      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, t('MUD OUTLOOK')), forecast)));
   };
   let run = () => {};
   const inst = live(render, (trigger) => {
@@ -2858,11 +2974,10 @@ function mountStats(el, { store }) {
   const render = async () => {
     const items = await store.list('items');
     const labels = await store.getSetting('rarity_labels');
-    const pieces = items.reduce((n, i) => n + (i.quantity || 0), 0);
     const lost = items.filter((i) => i.is_lost).length;
     const top = items.filter((i) => i.rarity === 'legendary').length;
     const tile = (v, l, cls = '') => h('div', { class: `w-stat ${cls}` }, h('b', {}, v), h('span', {}, l));
-    replace(el, h('div', { class: 'w-stats' }, tile(items.length, 'kinds'), tile(pieces, 'pieces'), tile(lost, 'lost', lost ? 'warn' : ''), tile(top, (labels?.legendary?.label ?? 'legendary').toLowerCase(), 'gold')));
+    replace(el, h('div', { class: 'w-stats' }, tile(items.length, t('kinds')), tile(lost, t('lost'), lost ? 'warn' : ''), tile(top, labels?.legendary?.label ? (language()==='es' && labels.legendary.label.toLowerCase()==='legendary' ? 'legendarios' : labels.legendary.label.toLowerCase()) : t('legendary'), 'gold')));
   };
   return live(render, (run) => [storeTables(store, ['items', 'settings'], run)]);
 }
@@ -2922,7 +3037,7 @@ function mountGames(el,{store}){
  };
  return live(render,run=>[storeTables(store,['settings'],run)]);
 }
-const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
+const MOUNTS = { currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];

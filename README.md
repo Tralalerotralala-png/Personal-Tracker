@@ -77,3 +77,14 @@ Settings → Appearance / Display provides six editable color presets (Original 
 The Dreams icon follows the approximate current moon phase. The private diary now relocks after 40 minutes without interaction or when you manually lock it, and stays unlocked when switching tabs. Its four-digit PIN remains weak against offline guessing; don't store passwords in the diary.
 
 Weather is the navigation label for the former Mud tab. It retains the ground-drying model under Ground conditions and adds Spanish translations for common weather terms and ground explanations.
+
+
+## November 2026 compact widgets and Logs update
+
+- **Currency Converter** is an editable Overview widget. It starts with 1 MXN → USD and 1 BTC → MXN, allows adding/removing/swapping additional fiat and crypto pairs, and displays the rate timestamp. Amounts and pair choices sync in your user settings. Prices come from [open.er-api.com](https://open.er-api.com/) for fiat and [CoinGecko](https://www.coingecko.com/) for supported cryptocurrencies; their free/public endpoints may rate-limit or be unavailable. Locally cached prices are shown with their timestamp if requests fail. Rates are indicative, not trading quotes.
+- **Pack stats** now uses Kinds, Lost and Legendary only; item quantity data is unchanged.
+- **Weather** shows compact daily cards with forecast icons, high temperatures, rainfall amounts and ground-drying scores; live weather and moon phases appear in navigation.
+- **Logs / Registros** uses the same current moon-phase icon on its lock screen and keeps entry editing inside the main app view. It continues to auto-lock after 40 minutes of inactivity. Unsaved changes trigger a discard confirmation when using the editor's Back button.
+- English and Spanish widget labels have been expanded.
+
+This release also repairs legacy imports of the weather-format module and refreshes the app service-worker cache.

@@ -5,14 +5,15 @@
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
 import { h, replace, todayKey, daysSince } from '../ui/dom.js';
 import { WIDGET_DEFS } from './defs.js';
-import { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format.js';
+import { mountCurrency } from './currency.js';
+import { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
 import { locationPath } from '../data/inventory-logic.js';
 import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
 import { weatherGlyph, glyphSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } from '../weather/moon-phase.js';
-import { language } from '../ui/language.js';
+import { language, t } from '../ui/language.js';
 import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily-phrases.js';
 
 // Render now, and again (at most once per frame) whenever something it
@@ -47,7 +48,7 @@ function mountMud(el, { weather, store }) {
     const clock = (tz) => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz });
     const extra = ui?.extra_clock_timezone;
     const localClock = h('div', { class: 'w-weather-clock' },
-      h('div', { class: 'w-time-unit' }, h('span', {}, 'LOCAL TIME'), h('strong', {}, clock(undefined))),
+      h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
     const c = s.current;
     const night = isNightAtLocation(c, now);
@@ -59,20 +60,28 @@ function mountMud(el, { weather, store }) {
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
         h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
-    const forecast = !s.rows.length ? note(s.status === 'no-location' ? 'Choose a place in the Mud tab for weather and mud.' : 'Loading the forecast...') : (() => {
+    const forecast = !s.rows.length ? note(s.status === 'no-location' ? t('Choose a place in the Weather tab.') : t('Loading the forecast...')) : (() => {
       const sum = s.summary;
       return h('div', { class: 'w-mud-compact' },
         sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
           h('span', { class: 'w-mud-label' }, localizedMudLabel(sum.today.label)),
           h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
-        h('div', { class: 'w-strip' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) =>
-          h('div', { class: `w-cell ${mudClass(r.label)}${r.phase === 'today' ? ' today' : ''}`, title: `${dayLong(r.date)}: ${r.label} ${r.index}` },
-            h('b', {}, r.index), h('div', { class: 'w-bar', style: `--p:${r.index}%` }),
-            h('span', {}, r.phase === 'today' ? 'Now' : dayShort(r.date).slice(0, 2))))));
+        h('div', { class: 'w-forecast-cards' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) => {
+          const icon = weatherGlyph(r.raw?.weather_code);
+          const temperature = Number.isFinite(r.raw?.tmax) ? `${Math.round(r.raw.tmax)}°` : '—';
+          const precipitation = Number.isFinite(r.raw?.precip) ? `${Number(r.raw.precip).toFixed(1)} mm` : '—';
+          const title = `${dayLong(r.date)} · ${localizedWeather(icon.text)} · ${temperature} · ${precipitation} · ${localizedMudLabel(r.label)} ${r.index}/100`;
+          return h('div', { class: `w-forecast-day ${r.phase === 'today' ? 'today' : ''}`, title, 'aria-label': title },
+            h('span', { class: 'w-forecast-label' }, r.phase === 'today' ? t('Now') : dayShort(r.date)),
+            h('span', { class: 'w-forecast-icon', html: r.phase === 'today' && night && clearEnough ? moonPhaseSvg(now) : glyphSvg(icon.glyph) }),
+            h('strong', {}, temperature),
+            h('small', {}, precipitation),
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}`));
+        })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },
       h('div', { class: 'w-weather-top' }, localClock, wx),
-      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, 'MUD OUTLOOK'), forecast)));
+      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, t('MUD OUTLOOK')), forecast)));
   };
   let run = () => {};
   const inst = live(render, (trigger) => {
@@ -137,11 +146,10 @@ function mountStats(el, { store }) {
   const render = async () => {
     const items = await store.list('items');
     const labels = await store.getSetting('rarity_labels');
-    const pieces = items.reduce((n, i) => n + (i.quantity || 0), 0);
     const lost = items.filter((i) => i.is_lost).length;
     const top = items.filter((i) => i.rarity === 'legendary').length;
     const tile = (v, l, cls = '') => h('div', { class: `w-stat ${cls}` }, h('b', {}, v), h('span', {}, l));
-    replace(el, h('div', { class: 'w-stats' }, tile(items.length, 'kinds'), tile(pieces, 'pieces'), tile(lost, 'lost', lost ? 'warn' : ''), tile(top, (labels?.legendary?.label ?? 'legendary').toLowerCase(), 'gold')));
+    replace(el, h('div', { class: 'w-stats' }, tile(items.length, t('kinds')), tile(lost, t('lost'), lost ? 'warn' : ''), tile(top, labels?.legendary?.label ? (language()==='es' && labels.legendary.label.toLowerCase()==='legendary' ? 'legendarios' : labels.legendary.label.toLowerCase()) : t('legendary'), 'gold')));
   };
   return live(render, (run) => [storeTables(store, ['items', 'settings'], run)]);
 }
@@ -201,7 +209,7 @@ function mountGames(el,{store}){
  };
  return live(render,run=>[storeTables(store,['settings'],run)]);
 }
-const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
+const MOUNTS = { currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 export function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];

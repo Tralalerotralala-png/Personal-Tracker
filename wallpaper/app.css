@@ -860,3 +860,25 @@ html[data-layout-width="compact"] main{max-width:1100px}
 
 @media(max-width:899px){.hotbar{grid-template-columns:repeat(7,minmax(0,1fr))}}
 @media(max-width:480px){.hotbar .slot-label{font-size:.56rem}.hotbar .slot-icon svg{width:19px;height:19px}}
+
+/* Compact weather icons and currency conversion widget. */
+.w-stats{grid-template-columns:repeat(3,minmax(0,1fr));height:auto;min-height:64px}
+.w-forecast-cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;width:100%;min-height:0}
+.w-forecast-day{min-width:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;padding:9px 3px;background:var(--panel-2);border:1px solid var(--edge);text-align:center}
+.w-forecast-day.today{border-color:var(--accent)}.w-forecast-label{font-size:.8em;color:var(--ink-dim)}
+.w-forecast-icon{width:30px;height:30px;color:var(--accent);display:flex;align-items:center;justify-content:center}
+.w-forecast-icon svg{width:100%;height:100%}.w-forecast-day strong{font-size:1em}
+.w-forecast-day small{font-size:.7em;color:var(--ink-dim);white-space:nowrap}
+.w-forecast-ground{color:var(--accent)!important}
+.currency-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px;flex-wrap:wrap}
+.currency-pair{padding:9px;border:1px solid var(--edge);background:var(--panel-2);margin-bottom:7px;display:grid;gap:6px}
+.currency-inputs{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.currency-inputs input{width:85px;min-width:65px;flex:1 1 60px;padding:6px}
+.currency-select{width:72px;max-width:85px;padding:6px}
+.currency-inputs button{padding:5px 8px}.currency-result{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;align-items:center}
+.currency-result small{font-size:.7em;color:var(--ink-dim)}
+.journal-inline-editor{width:100%;max-width:100%;padding:20px;display:grid;gap:18px;background:var(--panel);border:2px solid var(--edge)}
+.journal-editor-head,.journal-editor-actions{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.journal-inline-editor .form{display:grid;gap:10px;width:min(100%,900px);margin-inline:auto}
+.journal-inline-editor textarea{min-height:190px;width:100%;resize:vertical}
+@media(max-width:700px){.w-forecast-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.w-forecast-day{padding:7px 2px}}

@@ -3,13 +3,13 @@
 import { h, replace, openSheet, confirmDialog, toast } from './dom.js';
 import { uuid } from '../data/util.js';
 import { language } from './language.js';
-import { glyphSvg } from './pixel-icon.js';
+import { moonPhaseSvg } from '../weather/moon-phase.js';
 import { JOURNAL_KEY, emptyJournal, validPin, encryptJournal, decryptJournal } from './private-journal-crypto.js';
 const DURATION=40*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const labels={
- en:{title:'Dream Diary',intro:'Your dreams and private reflections are locked separately from the rest of Personal Tracker.',open:'Open private journal',warning:'A four-digit PIN offers limited protection against determined attackers. Entries are encrypted before syncing, but a stolen encrypted backup could be brute-forced. There is no PIN recovery. Never reuse an important PIN.',pin:'Four-digit PIN',again:'Confirm PIN',setup:'Create PIN',unlock:'Unlock',lock:'Lock now',wrong:'Incorrect PIN or damaged journal.',wait:'Too many attempts. Try again later.',dreams:'Dreams',sleep:'Sleep',moods:'Mood',habits:'Habits',vault:'Private Vault',new:'New entry',empty:'No entries yet.',save:'Save',delete:'Delete',date:'Date',name:'Title',body:'Description',type:'Dream type',vivid:'Vividness',tags:'Tags (comma-separated)',quality:'Sleep quality',hours:'Hours slept',mood:'Mood',done:'Completed today',locked:'Your private entries never appear in global search or Wallpaper Engine.',change:'Change PIN',old:'Current PIN',newPin:'New PIN',repeat:'Repeat new PIN',forgot:'Lost PINs cannot be recovered.',art:'Illustration (optional, max 100 KB)',night:'Dream illustration',none:'None',saveFailed:'Could not save private journal. Try again.',illustration:'Attach illustration'},
- es:{title:'Diario de sueños',intro:'Tus sueños y reflexiones privadas tienen un bloqueo separado del resto de Personal Tracker.',open:'Abrir diario privado',warning:'Un PIN de cuatro dígitos ofrece protección limitada contra ataques deliberados. Las entradas se cifran antes de sincronizarse, pero una copia cifrada robada podría descifrarse por fuerza bruta. No hay recuperación de PIN. No reutilices un PIN importante.',pin:'PIN de cuatro dígitos',again:'Confirmar PIN',setup:'Crear PIN',unlock:'Desbloquear',lock:'Bloquear ahora',wrong:'PIN incorrecto o diario dañado.',wait:'Demasiados intentos. Inténtalo más tarde.',dreams:'Sueños',sleep:'Sueño',moods:'Estado de ánimo',habits:'Hábitos',vault:'Bóveda privada',new:'Nueva entrada',empty:'Todavía no hay entradas.',save:'Guardar',delete:'Eliminar',date:'Fecha',name:'Título',body:'Descripción',type:'Tipo de sueño',vivid:'Intensidad del recuerdo',tags:'Etiquetas (separadas por comas)',quality:'Calidad del sueño',hours:'Horas dormidas',mood:'Estado de ánimo',done:'Completado hoy',locked:'Tus entradas privadas nunca aparecen en la búsqueda global ni en Wallpaper Engine.',change:'Cambiar PIN',old:'PIN actual',newPin:'PIN nuevo',repeat:'Repetir PIN nuevo',forgot:'No es posible recuperar un PIN perdido.',art:'Ilustración (opcional, máximo 100 KB)',night:'Ilustración del sueño',none:'Ninguna',saveFailed:'No se pudo guardar el diario privado. Inténtalo de nuevo.',illustration:'Adjuntar ilustración'}
+ en:{title:'Logs',intro:'Your dreams and private reflections are locked separately from the rest of Personal Tracker.',open:'Open private journal',warning:'A four-digit PIN offers limited protection against determined attackers. Entries are encrypted before syncing, but a stolen encrypted backup could be brute-forced. There is no PIN recovery. Never reuse an important PIN.',pin:'Four-digit PIN',again:'Confirm PIN',setup:'Create PIN',unlock:'Unlock',lock:'Lock now',wrong:'Incorrect PIN or damaged journal.',wait:'Too many attempts. Try again later.',dreams:'Dreams',sleep:'Sleep',moods:'Mood',habits:'Habits',vault:'Private Vault',new:'New entry',empty:'No entries yet.',save:'Save',delete:'Delete',date:'Date',name:'Title',body:'Description',type:'Dream type',vivid:'Vividness',tags:'Tags (comma-separated)',quality:'Sleep quality',hours:'Hours slept',mood:'Mood',done:'Completed today',locked:'Your private entries never appear in global search or Wallpaper Engine.',change:'Change PIN',old:'Current PIN',newPin:'New PIN',repeat:'Repeat new PIN',forgot:'Lost PINs cannot be recovered.',art:'Illustration (optional, max 100 KB)',night:'Dream illustration',none:'None',saveFailed:'Could not save private journal. Try again.',illustration:'Attach illustration'},
+ es:{title:'Registros',intro:'Tus sueños y reflexiones privadas tienen un bloqueo separado del resto de Personal Tracker.',open:'Abrir diario privado',warning:'Un PIN de cuatro dígitos ofrece protección limitada contra ataques deliberados. Las entradas se cifran antes de sincronizarse, pero una copia cifrada robada podría descifrarse por fuerza bruta. No hay recuperación de PIN. No reutilices un PIN importante.',pin:'PIN de cuatro dígitos',again:'Confirmar PIN',setup:'Crear PIN',unlock:'Desbloquear',lock:'Bloquear ahora',wrong:'PIN incorrecto o diario dañado.',wait:'Demasiados intentos. Inténtalo más tarde.',dreams:'Sueños',sleep:'Sueño',moods:'Estado de ánimo',habits:'Hábitos',vault:'Bóveda privada',new:'Nueva entrada',empty:'Todavía no hay entradas.',save:'Guardar',delete:'Eliminar',date:'Fecha',name:'Título',body:'Descripción',type:'Tipo de sueño',vivid:'Intensidad del recuerdo',tags:'Etiquetas (separadas por comas)',quality:'Calidad del sueño',hours:'Horas dormidas',mood:'Estado de ánimo',done:'Completado hoy',locked:'Tus entradas privadas nunca aparecen en la búsqueda global ni en Wallpaper Engine.',change:'Cambiar PIN',old:'PIN actual',newPin:'PIN nuevo',repeat:'Repetir PIN nuevo',forgot:'No es posible recuperar un PIN perdido.',art:'Ilustración (opcional, máximo 100 KB)',night:'Ilustración del sueño',none:'Ninguna',saveFailed:'No se pudo guardar el diario privado. Inténtalo de nuevo.',illustration:'Adjuntar ilustración'}
 };
 const safeText=(value,max=10000)=>String(value||'').slice(0,max);
 export function createDreamDiaryView({store}) {
@@ -23,7 +23,7 @@ export function createDreamDiaryView({store}) {
   dialogs.clear();
   if(sheet?.el?.open)sheet.close();sheet=null;
  }
- function landing(){replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing'},h('div',{class:'private-moon','aria-hidden':'true',html:glyphSvg('moon')}),h('p',{},L().intro),h('p',{class:'hint'},L().locked),h('button',{class:'btn primary',onclick:openLocked},L().open)));}
+ function landing(){replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing'},h('div',{class:'private-moon','aria-hidden':'true',html:moonPhaseSvg()}),h('p',{},L().intro),h('p',{class:'hint'},L().locked),h('button',{class:'btn primary',onclick:openLocked},L().open)));}
  function lock(){
   closeDialogs();clear();landing();
  }
@@ -80,7 +80,9 @@ export function createDreamDiaryView({store}) {
     type==='moods'?[h('label',{},L().mood),mood]:null,
     h('label',{},L().body),description,
     type==='dreams'?[h('label',{},L().illustration),file,entry?.art?h('img',{src:entry.art,alt:L().night,class:'journal-art'}):null]:null,error);
-   const editor=trackDialog(openSheet({title:entry?L().name:L().new,body:form,footer:[
+   const closeEditor=()=>{replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();};
+   const editor={close:closeEditor};
+   const actions=[
     entry?button(L().delete,async()=>{if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;session.data[type]=session.data[type].filter(x=>x.id!==entry.id);await persist();editor.close();draw();}):null,
     h('button',{class:'btn primary',onclick:async()=>{
       if(!title.value.trim()){error.textContent='Title required';return;}
@@ -92,7 +94,13 @@ export function createDreamDiaryView({store}) {
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
        await persist();editor.close();draw();
       }catch(err){error.textContent=L().saveFailed;}
-    }},L().save)]}));
+    }},L().save)];
+   const page=h('section',{class:'journal-inline-editor'},
+     h('div',{class:'journal-editor-head'},h('h2',{},entry?L().name:L().new),button(language()==='es'?'Volver':'Back',()=>{
+       if((title.value!==(entry?.title||'') || description.value!==(entry?.body||'')) && !confirm(language()==='es'?'¿Descartar cambios sin guardar?':'Discard unsaved changes?'))return;
+       closeEditor();
+     })),form,h('div',{class:'journal-editor-actions'},actions));
+   replace(el,page);
   }
   function draw(){
    if(!session)return;
