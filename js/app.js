@@ -13,6 +13,8 @@ import { createFeedService } from './feed/service.js';
 import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
+import { createGamesView } from './ui/games.js';
+import { moonPhaseSvg } from './weather/moon-phase.js';
 import { loadHub, openPersonalHub } from './ui/personal-hub.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
@@ -51,6 +53,8 @@ async function applyDisplay() {
   const ui = await store.getSetting('ui');
   document.documentElement.classList.toggle('scanlines', Boolean(ui?.scanlines));
   const valid = s => /^#[0-9a-fA-F]{6}$/.test(s || '');
+  document.documentElement.dataset.theme = ui?.theme_preset || 'classic';
+  document.documentElement.dataset.layoutWidth = ui?.layout_width || 'adaptive';
   document.documentElement.style.setProperty('--accent', valid(ui?.accent_color) ? ui.accent_color : '#43b9ad');
   for (const [key, cssName, fallback] of [
     ['background_color','--bg','#17130f'], ['panel_color','--panel','#231c15'],
@@ -115,6 +119,7 @@ const calendar = createCalendarView({ store, weather });
 const feedView = createFeedView({ store, feed, proxySuggestion });
 const overview = createOverviewView({ store, ctx: { store, weather, feed } });
 const diary = createDreamDiaryView({ store });
+const games = createGamesView({ store });
 
 const VIEWS = {
   inventory,
@@ -123,9 +128,10 @@ const VIEWS = {
   feed: feedView,
   overview,
   diary,
+  games,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Mud', 'mud'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Dreams', 'moon'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Dreams', 'moon'], ['games', 'Games', 'games'],
 ];
 
 const main = h('main', { id: 'main' });
@@ -149,6 +155,9 @@ applyTypography();
 window.addEventListener('tracker-display-change', applyTypography);
 const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href: `#${key}`, 'data-route': key },
   h('span', { class: 'slot-icon', html: glyphSvg(glyph) }), h('span', { class: 'slot-label' }, label)));
+const moonNavIcon = navButtons.find(n => n.dataset.route === 'diary')?.querySelector('.slot-icon');
+function refreshMoonNav(){ if(moonNavIcon) moonNavIcon.innerHTML=moonPhaseSvg(); }
+refreshMoonNav(); setInterval(refreshMoonNav, 60*60*1000);
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
 function saveNavOrder() { localStorage.setItem(NAV_KEY, JSON.stringify([...nav.children].map(n => n.dataset.route))); }
 function moveNav(from, to) {

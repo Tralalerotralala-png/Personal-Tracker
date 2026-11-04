@@ -1,7 +1,7 @@
 // The Mud tab: today's answer first, then five observed days, today, and five
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
-import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence } from './mud-format.js';
+import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format.js';
 import { glyphSvg, weatherGlyph } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
 import { describeModel, COMPONENTS } from '../weather/mud.js';
@@ -36,9 +36,9 @@ export function openDayDetail(row, weather) {
   openSheet({
     title: `${dayLong(row.date)} ${dayMonth(row.date)}`,
     body: [
-      h('div', { class: 'detail-head' }, mudChip(row), h('span', { class: 'detail-wx', html: glyphSvg(g.glyph) }), h('span', {}, g.text)),
+      h('div', { class: 'detail-head' }, mudChip(row), h('span', { class: 'detail-wx', html: glyphSvg(g.glyph) }), h('span', {}, localizedWeather(g.text))),
       mudBar(row),
-      h('p', { class: 'prose' }, `${row.why}.`),
+      h('p', { class: 'prose' }, `${localizedMudWhy(row.why)}.`),
       h('p', { class: 'hint' }, row.phase === 'past' ? 'Observed: weather that already happened.' : row.phase === 'today' ? 'Today: part observed, part forecast.' : 'Forecast: expected weather, which can change.'),
       h('h3', { class: 'detail-h' }, 'How the score was built'),
       h('table', { class: 'detail-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Factor'), h('th', {}, 'Score'), h('th', {}, 'Adds'))), h('tbody', {}, factors)),
@@ -101,10 +101,10 @@ export function createMudView({ store, weather }) {
     },
     h('span', { class: 'mud-date' }, h('b', {}, r.phase === 'today' ? 'Today' : dayShort(r.date)), h('span', {}, dayMonth(r.date))),
     h('span', { class: 'mud-icon', title: g.text, html: glyphSvg(g.glyph) }),
-    h('span', { class: 'mud-label' }, h('b', {}, r.label), ` ${r.index}`),
+    h('span', { class: 'mud-label' }, h('b', {}, localizedMudLabel(r.label)), ` ${r.index}`),
     h('span', { class: 'mud-rain' }, r.raw.precip === null ? '-' : `${fmt(r.raw.precip)} mm`),
     mudBar(r),
-    h('span', { class: 'mud-why' }, r.why));
+    h('span', { class: 'mud-why' }, localizedMudWhy(r.why)));
   }
 
   // Current conditions share the existing forecast request and offline cache.
@@ -127,7 +127,7 @@ export function createMudView({ store, weather }) {
           h('span', { class: 'wx-particles' }, Array.from({length: 8}, (_, i) => h('i', { class: 'wx-particle', style: `--i:${i}` })))),
         h('div', { class: 'wx-main' },
           h('strong', { class: 'wx-temperature' }, typeof temp === 'number' ? `${Math.round(temp)}°C` : `${number(raw.tmax, '°')} / ${number(raw.tmin, '°')}C`),
-          h('span', { class: 'wx-condition' }, g.text),
+          h('span', { class: 'wx-condition' }, localizedWeather(g.text)),
           h('span', { class: 'hint' }, `High ${number(raw.tmax, '°')} · Low ${number(raw.tmin, '°')}`))),
       h('div', { class: 'wx-stats' },
         stat('Feels like', number(current?.apparent_temperature, '°C')),
@@ -140,7 +140,7 @@ export function createMudView({ store, weather }) {
         return h('div', { class: 'wx-day', title: icon.text },
           h('span', {}, d.phase === 'today' ? 'Today' : dayShort(d.date)),
           h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
-          h('span', { class: 'wx-day-description' }, icon.text),
+          h('span', { class: 'wx-day-description' }, localizedWeather(icon.text)),
           h('strong', {}, `${number(d.raw.tmax, '°')} / ${number(d.raw.tmin, '°')}`),
           h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`));
       })));
@@ -175,10 +175,10 @@ export function createMudView({ store, weather }) {
       placeHeader(state),
       banner(state),
       weatherPanel(state, today, future),
-      h('h3', { class: 'group' }, 'Mud conditions'),
+      h('h3', { class: 'group' }, 'Ground conditions'),
       s ? h('section', { class: `mud-summary ${mudClass(s.today.label)}`, 'aria-label': 'Today at a glance' },
-        h('div', { class: 'mud-big' }, h('span', { class: 'mud-big-label' }, s.today.label), h('span', { class: 'mud-big-num' }, `${s.today.index}/100`)),
-        h('p', {}, `${s.today.why}.`),
+        h('div', { class: 'mud-big' }, h('span', { class: 'mud-big-label' }, localizedMudLabel(s.today.label)), h('span', { class: 'mud-big-num' }, `${s.today.index}/100`)),
+        h('p', {}, `${localizedMudWhy(s.today.why)}.`),
         h('p', { class: 'mud-trend' }, summarySentence(s))) : null,
       h('section', { 'aria-label': 'Observed days' }, h('h3', { class: 'group' }, 'Observed'), h('div', { class: 'mud-list' }, past.map(row))),
       today ? h('section', { 'aria-label': 'Today' }, h('div', { class: 'mud-list' }, row(today))) : null,
