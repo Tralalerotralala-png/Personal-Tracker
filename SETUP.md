@@ -266,3 +266,9 @@ If you do not deploy the function, the AI button shows an explanatory error and 
 ## Upgrading safely
 
 Upload this release's contents to the repository root, **except `config.js`**, which is intentionally absent and must be preserved. Remove the obsolete `stage1-check.html` and `js/ui/mud-format.js` if present on GitHub. Keep the root `index.html` and `wallpaper/index.html` in their respective folders. No database schema changes are needed for the Media Library, saved themes, daily lessons, or encrypted journal drafts.
+
+## Expenses and Personal Hub
+
+Personal Hub and Expenses are separate tabs. Expense records continue using your existing `hub_expense:<id>` settings entries; no additional Supabase tables, functions, or migrations are required.
+
+Expenses includes monthly/category budgets, reports, manual income and expense entries, a tip/tax/split calculator, and CSV import/export. CSV files are not encrypted; do not publish them to GitHub or share them casually. Recurrence fields describe planned repeating payments; the app does not automatically record or charge them. It never aggregates different currency amounts into one balance.

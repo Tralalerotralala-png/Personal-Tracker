@@ -160,7 +160,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const personalHub = h('section', { class:'set-block' },
     h('h3', {}, t('Personal hub')),
     h('p', { class:'hint' }, 'Tasks, personal notes, expense records, search, and notifications in one place.'),
-    h('button', { class:'btn', type:'button', onclick: () => openPersonalHub({ store }) }, 'Open personal hub'));
+    h('button', { class:'btn', type:'button', onclick: () => { location.hash='#hub'; } }, 'Open personal hub'));
 
   // -- display
   const scan = h('input', { type: 'checkbox', id: 'st-scan', checked: Boolean(ui?.scanlines),

@@ -39,12 +39,12 @@ export async function collectAlerts(store, hub) {
   for (const e of events) if (!e.rrule && e.starts_at?.slice(0,10) >= today && e.starts_at?.slice(0,10) <= inWeek) alerts.push({type:'event',label:e.title,reason:'Upcoming event'});
   return {alerts, items, categories:catMap, events};
 }
-export function openPersonalHub({store}) {
+function buildPersonalHub({store, host}) {
   const wrap=h('div',{class:'hub'}), tabs=h('div',{class:'hub-tabs'}), panel=h('div',{class:'hub-panel'});
   wrap.append(tabs,panel);
   let active='alerts'; let hub, context;
-  const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',expenses:'Expenses',search:'Search',insights:'Insights'};
-  const sheet=openSheet({title:t('Personal hub'),body:wrap});
+  const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',search:'Search',insights:'Insights'};
+  host.append(wrap);
   async function reload() { hub=await loadHub(store); context=await collectAlerts(store,hub); draw(); }
   const button=(label,onclick,style='')=>h('button',{class:`btn small ${style}`,type:'button',onclick},label);
   const empty=msg=>h('p',{class:'hint'},msg);
@@ -120,5 +120,14 @@ export function openPersonalHub({store}) {
   }
   function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():drawEntries(active)));}
   reload().catch(error=>replace(panel,h('p',{class:'form-error'},error.message)));
-  return sheet;
+  return {refresh:reload};
 }
+
+// Standalone full-window hub. The former side drawer now redirects here.
+export function createPersonalHubView({store}) {
+  const el=h('section',{class:'view hub-view'});
+  let controller=null;
+  return {el,async mount(){if(!controller) controller=buildPersonalHub({store,host:el});},async show(){await controller?.refresh();}};
+}
+export function openPersonalHub() { location.hash='#hub'; }
+

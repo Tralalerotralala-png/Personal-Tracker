@@ -3,7 +3,7 @@
 //  - Fonts and the Supabase script (CDN) are cached the same way.
 //  - Requests to Supabase itself are never touched (sync handles those).
 // Bump VERSION whenever you deploy, so installed copies notice the update.
-const VERSION = 'v21';
+const VERSION = 'v22';
 const SHELL = `tracker-shell-${VERSION}`;
 const RUNTIME = `tracker-runtime-${VERSION}`;
 
@@ -53,6 +53,7 @@ const PRECACHE = [
   './js/ui/media-library.js',
   './js/weather/sky-events.js',
   './js/ui/personal-hub.js',
+  './js/ui/expenses.js',
   './js/ui/pixel-icon.js',
   './js/ui/place-search.js',
   './js/ui/places.js',

@@ -105,3 +105,13 @@ The Overview daily status and Daily Loot refresh when the local calendar day cha
 ### AI privacy and cost
 
 Generating an AI icon sends the prompt you write to your deployed Supabase function, which sends it to the image provider. Do not include sensitive personal information in icon prompts. API generation is billable, depends on the provider's account access and quotas, and requires a separately deployed server-side function. The app reduces resulting art to a 16×16 PNG with at most eight colors (seven opaque plus transparency); results still need user review.
+
+## November 2026 Personal Hub and Expenses update
+
+- **Personal Hub** is now a dedicated main-window tab for tasks, notes, alerts, search, and insights. Overview's **Open personal hub** button routes directly there instead of opening a sidebar. The old Expenses section is moved out of Personal Hub (existing entries are not deleted).
+- **Expenses** is its own tab, with expense and income entries, descriptions, dates, categories, payment methods, optional recurring labels, notes, editable monthly/category budgets, category charts, month/currency filters, and CSV import/export. All expenses remain in the existing `hub_expense:<id>` synced settings records; budgets use `hub_finance_budgets` and the preferred currency uses `hub_finance_preferences`. No database migration.
+- **Bill calculator** estimates sales tax, tip, a total, and each person's share. Calculations do not automatically save a transaction. Recurring labels are planning-only and do not automatically create future charges.
+- **Privacy:** Expenses are not linked to banks, card accounts, or any external provider. Avoid importing statements containing sensitive account numbers. The CSV export is an unencrypted file, so handle it carefully. Different currencies are never silently summed or converted.
+- **Weather icon alignment:** The shared pixel-art icon renderer centers each condition's visible artwork in its canvas, and the current-weather tile is centered across all themes.
+
+Finance features are original implementations informed by the feature sets of [Actual Budget](https://actualbudget.org/docs/) and [Firefly III](https://github.com/firefly-iii/firefly-iii), not copies of their source code.

@@ -33,7 +33,7 @@ export function createOverviewView({ store, ctx }) {
     const {alerts,items} = await collectAlerts(store,hub);
     const todayTasks = hub.task.filter(x=>x.due===day);
     const dayStatus = h('section', {class:'ov-status', 'aria-label':'Daily status'},
-      h('div',{class:'ov-status-head'},h('h3',{},'Your day'),h('button',{class:'btn small',type:'button',onclick:()=>openPersonalHub({store})},'Open personal hub')),
+      h('div',{class:'ov-status-head'},h('h3',{},'Your day'),h('a',{class:'btn small',href:'#hub'},t('Open personal hub'))),
       h('div',{class:'ov-status-cards'},
         ...[['Events',upcoming],['Items',items.length],['Tasks',todayTasks.length],['Alerts',alerts.length]].map(([label,value])=>h('div',{class:'ov-status-card'},h('b',{},value),h('span',{},label)))),
       ...alerts.slice(0,3).map(a=>h('p',{class:'ov-alert'},`${t(a.reason)}: ${a.label}`))

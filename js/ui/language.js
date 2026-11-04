@@ -2,6 +2,8 @@
 export const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 export const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Informes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
+
  ['Library','Biblioteca'],['Books','Libros'],['Films','Películas'],['Albums','Álbumes'],['Recently played','Jugados recientemente'],['Currently playing','Jugando ahora'],
  ['Sky events','Eventos astronómicos'],['Upcoming sky events','Próximos eventos astronómicos'],['Selected location','Ubicación seleccionada'],
  ['Dates are approximate. Check local visibility and the weather.','Las fechas son aproximadas. Comprueba la visibilidad local y el clima.'],

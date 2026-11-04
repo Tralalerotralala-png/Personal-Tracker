@@ -974,3 +974,54 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .wx-sky-event a,.w-sky-event a {color:var(--accent);text-decoration:underline;}
 .theme-saved-choice{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .journal-draft-reminder{padding:8px;border:1px dashed var(--edge-hi);color:var(--ink-dim);}
+
+/* Dedicated Personal Hub / Expenses workspace (responsive, no extra drawers). */
+.hub-view, .expense-view {padding: 12px 16px; width:100%;min-width:0;max-width:100%;}
+.hub-view .hub {padding-top:12px;}
+.hub-view .hub-panel {border:2px solid var(--edge);padding:12px;background:var(--panel);}
+.expense-view {display:grid;align-content:start;gap:14px;}
+.expense-view[hidden],.hub-view[hidden] {display:none;}
+.expense-controls, .expense-filter-row, .expense-actions {display:flex;align-items:end;flex-wrap:wrap;gap:9px;}
+.expense-controls {background:var(--panel);border:2px solid var(--edge);padding:12px;}
+.expense-controls .btn {min-height:40px;}
+.expense-field {display:grid;gap:5px;font-size:.85rem;color:var(--ink-dim);min-width:0;}
+.expense-field input,.expense-field select,.expense-field textarea {width:100%;min-width:0;color:var(--ink);}
+.expense-controls .expense-field {flex:1 1 160px;}
+.expense-summary {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+.expense-summary .hub-stat b {font-size:clamp(1rem,1.7vw,1.35rem);overflow-wrap:anywhere;}
+.expense-tabs {padding-bottom:8px;border-bottom:2px solid var(--edge);}
+.expense-content,.expense-editor {border:2px solid var(--edge);background:var(--panel);padding:12px;display:grid;gap:14px;min-width:0;}
+.expense-filter-row {align-items:center;}
+.expense-filter-row input[type=search] {flex:1 1 200px;min-width:120px;}
+.expense-filter-row select {max-width:170px;}
+.expense-checkbox {display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.expense-list {display:grid;gap:5px;max-width:100%;}
+.expense-row {width:100%;display:grid;grid-template-columns:minmax(82px,0.7fr) minmax(140px,2.5fr) minmax(80px,1fr);gap:12px;align-items:center;padding:12px;border:1px solid var(--edge);background:var(--panel-2);color:var(--ink);text-align:left;font:inherit;cursor:pointer;}
+.expense-row:hover,.expense-row:focus-visible {border-color:var(--accent);}
+.expense-row-title {display:grid;gap:3px;min-width:0;overflow-wrap:anywhere;}
+.expense-row-title small {font-size:.76rem;color:var(--ink-dim);}
+.expense-row strong {text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.expense-positive {color:#83c8a1;}.expense-negative {color:var(--ink);}
+.expense-form-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;}
+.expense-editor > .expense-field {max-width:100%;}
+.expense-budget-list {display:grid;gap:8px;}
+.expense-budget-row {display:grid;grid-template-columns:minmax(130px,1fr) minmax(100px,2fr) 110px auto;align-items:center;gap:10px;border:1px solid var(--edge);padding:8px;background:var(--panel-2);}
+.expense-budget-row>div:first-child {display:grid;gap:4px;overflow-wrap:anywhere;}
+.expense-budget-meter,.expense-report-bar {height:12px;background:var(--edge);overflow:hidden;}
+.expense-budget-meter span,.expense-report-bar span {display:block;background:var(--accent);height:100%;}
+.expense-budget-meter span.over {background:#d88a68;}
+.expense-budget-row input {width:100%;}
+.expense-report-row {display:grid;grid-template-columns:minmax(100px,1fr) 2fr minmax(100px,1fr);align-items:center;gap:10px;}
+.expense-report-row strong {text-align:right;}
+.expense-calculator-result {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;}
+/* Center the icon viewport in the fixed weather tile, avoiding offset fog art. */
+.wx-scene-glyph {left:50%;top:50%;transform:translate(-50%,-50%);animation:none;}
+.wx-scene-glyph svg,.wx-day-icon svg,.w-weather-glyph svg {display:block;overflow:visible;}
+@media(max-width:700px) {.expense-summary,.expense-calculator-result {grid-template-columns:repeat(2,minmax(0,1fr));}.expense-budget-row {grid-template-columns:1fr 1fr;}.expense-row {grid-template-columns:75px minmax(100px,1fr);}.expense-row strong {grid-column:2;text-align:left;}}
+@media(max-width:430px) {.expense-controls {align-items:stretch}.expense-view,.hub-view {padding:8px;}}
+/* Nine navigation destinations stay one compact swipeable row on phones. */
+@media(max-width:899px) {
+  .hotbar {display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;scrollbar-width:thin;}
+  .hotbar .slot {flex:0 0 clamp(67px,12vw,94px);scroll-snap-align:start;}
+  .hotbar .sidebar-resize-grip {display:none;}
+}

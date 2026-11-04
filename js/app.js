@@ -15,7 +15,8 @@ import { createOverviewView } from './ui/overview.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createMediaLibraryView } from './ui/media-library.js';
 import { moonPhaseSvg, isNightAtLocation } from './weather/moon-phase.js';
-import { loadHub, openPersonalHub } from './ui/personal-hub.js';
+import { loadHub, openPersonalHub, createPersonalHubView } from './ui/personal-hub.js';
+import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
 
@@ -120,6 +121,8 @@ const feedView = createFeedView({ store, feed, proxySuggestion });
 const overview = createOverviewView({ store, ctx: { store, weather, feed } });
 const diary = createDreamDiaryView({ store });
 const games = createMediaLibraryView({ store });
+const hubView = createPersonalHubView({ store });
+const expensesView = createExpensesView({ store });
 
 const VIEWS = {
   inventory,
@@ -129,9 +132,11 @@ const VIEWS = {
   overview,
   diary,
   games,
+  hub: hubView,
+  expenses: expensesView,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'board'], ['expenses', 'Expenses', 'pack'],
 ];
 
 const main = h('main', { id: 'main' });
@@ -245,7 +250,7 @@ async function renderGlobalSearch() {
     ...places.map(x => ({ type: t('Places'), title: x.name, detail: x.notes || '', target: 'inventory' })),
     ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', hub: true })),
     ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', hub: true })),
-    ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', hub: true })),
+    ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', target: 'expenses' })),
   ];
   const found = entries.filter(x => `${x.title || ''} ${x.detail} ${x.type}`.toLocaleLowerCase().includes(query)).slice(0, 12);
   searchResults.replaceChildren(...(found.length ? found.map(entry => h('button', { class: 'global-search-result', type: 'button', role: 'option', onclick: () => {

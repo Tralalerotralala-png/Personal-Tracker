@@ -365,5 +365,20 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
   else if (kind==='storm') content=cloud+storm+drizzle;
   else if (kind==='snow') content=cloud+[0,1,2].map(i=>px(13+i*6,21,2,2,'#eff8ff')).join('');
   else content=rays;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 26" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${content}</svg>`;
+  // All symbols share one 32x26 artboard. Center the *visible* rectangles,
+  // not just the SVG element: clouds, fog, sun and rain have different bounds.
+  // Moon contains its own SVG and already uses the 16px coordinate system.
+  const bounds = {
+    sun: [0, 0, night ? 16 : 14, night ? 16 : 16],
+    partly: [0, 0, 28, 19],
+    cloud: [8, 5, 28, 19],
+    fog: [5, 8, 27, 18],
+    rain: [8, 5, 28, 24],
+    storm: [8, 5, 28, 24],
+    snow: [8, 5, 28, 23]
+  };
+  const [left, top, right, bottom] = bounds[kind] || bounds.cloud;
+  const dx = Math.round(16 - (left + right)/2);
+  const dy = Math.round(13 - (top + bottom)/2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 26" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><g transform="translate(${dx} ${dy})">${content}</g></svg>`;
 }
