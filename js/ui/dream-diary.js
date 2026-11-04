@@ -41,17 +41,17 @@ export function createDreamDiaryView({store}) {
   const confirm=h('input',{type:'password',inputmode:'numeric',pattern:'[0-9]{4}',minlength:4,maxlength:4,autocomplete:'off','aria-label':L().again});
   const error=h('p',{class:'form-error',role:'alert'});
   const body=h('div',{class:'form'},h('p',{},first?L().warning:L().intro),h('label',{},L().pin),pin,first?h('label',{},L().again):null,first?confirm:null,error);
-  const dlg=openSheet({title:first?L().setup:L().unlock,size:'small',body,footer:[h('button',{class:'btn primary',onclick:async()=>{
+  const submit=h('button',{class:'btn primary',type:'button',onclick:async()=>{
    if(Date.now()<blockedUntil){error.textContent=L().wait;return;}
    if(!validPin(pin.value) || (first&&pin.value!==confirm.value)){error.textContent=first?'Enter matching four-digit PINs.':L().wrong;return;}
    try{
     const data=first?emptyJournal():await decryptJournal(pin.value,record);
     if(first) await store.setSetting(JOURNAL_KEY,await encryptJournal(pin.value,data));
-    failures=0;session={pin:pin.value,data};pin.value='';confirm.value='';dlg.close();openEntries();
+    failures=0;session={pin:pin.value,data};pin.value='';confirm.value='';openEntries();
    }catch(err){failures++;if(failures>=5){blockedUntil=Date.now()+60000;failures=0;}error.textContent=err.message||L().wrong;}
-  }},first?L().setup:L().unlock)]});
-  sheet=dlg;
-  dlg.el.addEventListener('close',()=>{if(sheet===dlg)sheet=null;},{once:true});
+  }},first?L().setup:L().unlock);
+  const form=h('form',{class:'journal-unlock-form',onsubmit:e=>{e.preventDefault();submit.click();}},body,submit);
+  replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing journal-unlock'},form));
   pin.focus();
  }
  async function persist(){if(!session) return;await store.setSetting(JOURNAL_KEY,await encryptJournal(session.pin,session.data));touch();}

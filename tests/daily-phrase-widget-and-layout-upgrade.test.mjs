@@ -55,7 +55,7 @@ test('saved desktop and mobile layouts gain the phrase widget without losing pla
   assert.deepEqual(await loadLayout(store,'wallpaper'), priorWallpaper);
   for (const entries of [desktop,mobile]) for (let i=0;i<entries.length;i++) for (let j=i+1;j<entries.length;j++) assert.equal(overlaps(entries[i],entries[j]), false);
   assert.deepEqual(WIDGET_DEFS.phrase.route, null);
-  assert.equal(await store.getSetting('layout_version'), 3);
+  assert.equal(await store.getSetting('layout_version'), 4);
   // Removing the widget after migration stays removed.
   await store.upsert('widget_layout',{profile:'desktop',layout:priorDesktop});
   assert.equal(await upgradeLayouts(store), false);

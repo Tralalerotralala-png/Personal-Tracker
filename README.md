@@ -61,3 +61,8 @@ node scripts/build-wallpaper.mjs
 For local browser testing, run `python -m http.server 8080` in the project root and visit `http://localhost:8080`. Without a configured `config.js`, the app runs in local/demo mode. The site uses native ES modules, so don't run `index.html` directly from `file://`.
 
 The phrase catalog and offline widget behavior are testable locally. Tests do not replace an end-to-end live GitHub Pages / Supabase / Wallpaper Engine check. If a blank screen occurs after deploying, use your browser developer console and confirm that the service worker has refreshed the app files.
+
+
+### November 2026 interface fix
+
+The Phrase of the Day is a dashboard widget. On desktop open Overview > Edit layout to move or resize it; older saved layouts receive it once during migration. The Dreams tab shows PIN entry and unlocked journal in the main content area; entry editors remain dialogs. Existing config.js and synced records are preserved during installation.

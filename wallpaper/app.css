@@ -824,3 +824,8 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .private-journal-view .journal-list>.journal-entry{height:100%;min-height:100px;align-self:start}
 .private-journal-view .journal-list>.journal-entry:focus-visible{border-color:var(--accent)}
 @media(max-width:650px){.private-journal-view .journal-shell{padding:12px;gap:12px}.phrase-history-row{grid-template-columns:1fr 1fr}.phrase-history-row span:last-child{grid-column:1/-1}}
+
+/* PIN entry stays in the Dreams page instead of opening a drawer. */
+.private-journal-view .journal-unlock{width:100%;max-width:100%;min-height:55vh;display:flex;align-items:center;justify-content:center}
+.private-journal-view .journal-unlock-form{width:min(100%,420px);display:grid;gap:16px;padding:24px;background:var(--panel);border:2px solid var(--edge)}
+.private-journal-view .journal-unlock-form .form{display:grid;gap:10px}

@@ -229,6 +229,7 @@ const DEFAULT_LAYOUTS = {
     { id: 'loot',     x: 0, y: 4, w: 4, h: 3 },
     { id: 'stats',    x: 4, y: 4, w: 4, h: 2 },
     { id: 'feed',     x: 8, y: 6, w: 4, h: 4 },
+    { id: 'phrase',   x: 0, y: 10, w: 8, h: 4 },
   ],
   mobile: [
     { id: 'stats',    x: 0, y: 0,  w: 12, h: 2 },
@@ -247,7 +248,7 @@ const DEFAULT_LAYOUTS = {
   ],
 };
 
-const LAYOUT_VERSION = 3;
+const LAYOUT_VERSION = 4;
 
 // Migrations only run after cloud sync. Existing widget positions and custom
 // layouts are preserved, and a newly introduced widget is added once. Removing
@@ -262,7 +263,7 @@ async function upgradeLayouts(store) {
       if (!(await store.get('widget_layout', profile))) await store.upsert('widget_layout', { profile, layout });
     }
   }
-  if (version < 3) {
+  if (version < 4) {
     for (const profile of ['desktop','mobile']) {
       const row = await store.get('widget_layout', profile);
       const bounds = {cols: PROFILES[profile].cols, rows: PROFILES[profile].rows};
