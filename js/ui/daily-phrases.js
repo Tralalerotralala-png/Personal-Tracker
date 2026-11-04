@@ -54,7 +54,9 @@ export function lessonForDate(date=new Date()) {
  // Preserve the exact daily selections shown by the first release.
  if (key < PHRASE_EXPANSION_DATE) return LESSONS[((days % originalCount)+originalCount)%originalCount];
  const start = Math.floor(Date.UTC(2026,10,4)/86400000);
- return LESSONS[((days-start)%LESSONS.length+LESSONS.length)%LESSONS.length];
+ // Keep the older archive intact, but never repeat Nov 3 on Nov 4.
+ const previousIndex = (((start-1)%originalCount)+originalCount)%originalCount;
+ return LESSONS[((days-start+previousIndex+1)%LESSONS.length+LESSONS.length)%LESSONS.length];
 }
 // Calendar history is deterministic: older lessons remain accessible even if the app was closed.
 // No personal journal data or history needs to be uploaded to Supabase.

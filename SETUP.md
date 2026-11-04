@@ -250,3 +250,19 @@ exact error message is all I need to fix it.
 ## Updating the app
 
 The update archive contains project files at its root. Upload them to the GitHub repository root, replacing matching files. Keep your existing `config.js` and do not publish Supabase secret/service-role keys. GitHub's web uploader does not delete old files automatically. The only required top-level Markdown documentation is `README.md` and `SETUP.md`; old upgrade-note Markdown files may be removed. Existing Supabase records and widget layouts are not reset.
+
+
+## Optional real AI pixel-art generator
+
+This feature requires a separate paid API service; the offline geometric-sprite generator is still available without it. The GitHub Pages app **must never** hold the secret provider key.
+
+1. In your Supabase project, deploy the supplied Edge Function (requires Supabase CLI authentication): `supabase functions deploy pixel-icon-ai --no-verify-jwt`. The function checks the signed-in user's token on every request.
+2. Set the provider secret on Supabase, never in GitHub or `config.js`: `supabase secrets set OPENAI_API_KEY=...` (enter your own key).
+3. Open an inventory item, enter a description, choose **Generate with AI**, review the 16×16 preview, then save the item to apply.
+4. Generation incurs OpenAI API charges. The Edge Function includes a best-effort per-worker request budget but this is **not** a durable account-wide quota; set your provider's usage budget.
+
+If you do not deploy the function, the AI button shows an explanatory error and other features continue working normally. An uploaded PNG or an offline generated sprite is still supported. The function calls an image model and converts its output to a transparent, limited-color 16×16 icon on your device. Do not send private information in prompts.
+
+## Upgrading safely
+
+Upload this release's contents to the repository root, **except `config.js`**, which is intentionally absent and must be preserved. Remove the obsolete `stage1-check.html` and `js/ui/mud-format.js` if present on GitHub. Keep the root `index.html` and `wallpaper/index.html` in their respective folders. No database schema changes are needed for the Media Library, saved themes, daily lessons, or encrypted journal drafts.

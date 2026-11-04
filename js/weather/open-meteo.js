@@ -12,7 +12,7 @@ const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 // Ten days of history gives the first displayed day (5 days back) a few days of
 // "what fell before" to remember. Six forecast days = today plus five ahead.
-export const PAST_DAYS = 10;
+export const PAST_DAYS = 34;
 export const FORECAST_DAYS = 6;
 
 export const DAILY_VARS = [
@@ -37,6 +37,7 @@ export function buildForecastUrl({ lat, lon }, kind) {
     forecast_days: String(FORECAST_DAYS),
   });
   if (kind === 'soil') p.set('hourly', SOIL_VARS.join(','));
+  else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
   else {
     p.set('daily', DAILY_VARS.join(','));
     p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m');
@@ -103,6 +104,18 @@ export function parseDaily(json) {
   }));
 }
 
+
+// Hourly rain timing uses the same Open-Meteo response as the daily forecast.
+// Timestamps are local to the requested location (timezone=auto).
+export function parseHourly(json) {
+  const data = json?.hourly;
+  return Array.isArray(data?.time) ? data.time.map((time,i)=>({
+    time, probability: typeof data.precipitation_probability?.[i] === 'number' ? data.precipitation_probability[i] : null,
+    precipitation: typeof data.precipitation?.[i] === 'number' ? data.precipitation[i] : null,
+    weather_code: data.weather_code?.[i] ?? null,
+  })) : [];
+}
+
 // date -> mean soil moisture (m3/m3) across the three top layers and all hours.
 export function parseSoil(json) {
   const h = json?.hourly;
@@ -123,6 +136,10 @@ export function parseSoil(json) {
   return out;
 }
 
+export async function fetchRainHours(place, opts = {}) {
+ return parseHourly(await getJson(buildForecastUrl(place, 'rain'), opts));
+}
+
 // Fetch everything for a place. Soil data is optional.
 export async function fetchWeather({ lat, lon }, opts = {}) {
   const [dailyRes, soilRes] = await Promise.allSettled([
@@ -140,6 +157,7 @@ export async function fetchWeather({ lat, lon }, opts = {}) {
     elevation_m: typeof dailyRes.value.elevation === 'number' ? dailyRes.value.elevation : null,
     soilAvailable: days.some((d) => d.soil_moisture !== null),
     current: dailyRes.value.current ?? null,
+    hourly: parseHourly(dailyRes.value),
     days,
     fetchedAt: new Date().toISOString(),
   };

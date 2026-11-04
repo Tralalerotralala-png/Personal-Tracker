@@ -3,7 +3,7 @@
 //  - Fonts and the Supabase script (CDN) are cached the same way.
 //  - Requests to Supabase itself are never touched (sync handles those).
 // Bump VERSION whenever you deploy, so installed copies notice the update.
-const VERSION = 'v20';
+const VERSION = 'v21';
 const SHELL = `tracker-shell-${VERSION}`;
 const RUNTIME = `tracker-runtime-${VERSION}`;
 
@@ -50,6 +50,8 @@ const PRECACHE = [
   './js/ui/dream-diary.js', './js/ui/games.js',
   './js/ui/private-journal-crypto.js',
   './js/ui/daily-phrases.js',
+  './js/ui/media-library.js',
+  './js/weather/sky-events.js',
   './js/ui/personal-hub.js',
   './js/ui/pixel-icon.js',
   './js/ui/place-search.js',
@@ -101,7 +103,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
   if (!sameOrigin && !CDN_HOSTS.has(url.hostname)) return; // Supabase and everything else: untouched
-  event.respondWith(staleWhileRevalidate(event, req, sameOrigin));
+  const critical = sameOrigin && (req.mode === 'navigate' || /\.(?:m?js|css|html)$/.test(url.pathname));
+  event.respondWith(critical ? networkFirst(event, req) : staleWhileRevalidate(event, req, sameOrigin));
 });
 
 async function staleWhileRevalidate(event, req, sameOrigin) {
@@ -125,5 +128,19 @@ async function staleWhileRevalidate(event, req, sameOrigin) {
     const shell = await cache.match('./index.html');
     if (shell) return shell;
   }
+  return Response.error();
+}
+
+// Avoid mixing older cached JavaScript modules with a newly deployed app.
+// Fallback to the matching cached file when genuinely offline.
+async function networkFirst(event, req) {
+  const cache=await caches.open(SHELL);
+  try {
+    const response=await fetch(req,{cache:'no-cache'});
+    if(response?.ok){event.waitUntil(cache.put(req,response.clone()));return response;}
+  } catch {}
+  const cached=await cache.match(req,{ignoreSearch:true});
+  if(cached)return cached;
+  if(req.mode==='navigate')return await cache.match('./index.html')||Response.error();
   return Response.error();
 }

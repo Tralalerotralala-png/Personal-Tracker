@@ -1,5 +1,5 @@
 // Settings sheet: account, sync, rarity meanings, categories, display, backup.
-import { h, toast, openSheet, confirmDialog } from './dom.js';
+import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
 import { language, t } from './language.js';
 import { TRACK_FIELDS, TRACK_LABELS, categoryFields } from '../data/tracking.js';
 import { openPersonalHub } from './personal-hub.js';
@@ -191,11 +191,36 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     }},preset.name,h('span',{class:'theme-swatch'},[preset.background_color,preset.panel_color,preset.accent_color,preset.text_color].map(color=>h('i',{style:`background:${color}`}))));
     presetChoices.append(b);
   }
+  // Personal palettes are stored with UI preferences; never require separate files.
+  const savedThemes=h('div',{class:'theme-presets theme-saved-presets'});
+  const paletteKeys=['accent_color',...paletteColors.map(row=>row[1])];
+  function drawSavedThemes(saved=[]) {
+    replace(savedThemes,...saved.map((palette,index)=>h('div',{class:'theme-saved-choice'},
+      h('button',{class:'btn small',onclick:async()=>{const value=await store.getSetting('ui')||{};
+        await store.setSetting('ui',{...value,...palette.colors,theme_preset:`saved-${index}`});
+        accentColor.value=palette.colors.accent_color||'#43b9ad';
+        customColors.forEach((field,i)=>{field.querySelector('input').value=palette.colors[paletteColors[i][1]];});
+        window.dispatchEvent(new Event('tracker-theme-refresh'));updateChoices('none');
+      }},palette.name),
+      h('button',{class:'btn small ghost',title:language()==='es'?'Eliminar tema':'Delete theme',onclick:async()=>{
+        const value=await store.getSetting('ui')||{};const list=(value.custom_theme_presets||[]).filter((_,i)=>i!==index);
+        await store.setSetting('ui',{...value,custom_theme_presets:list});drawSavedThemes(list);
+      }},language()==='es'?'Eliminar':'Delete'))));
+  }
+  drawSavedThemes(ui?.custom_theme_presets||[]);
+  const saveTheme=h('button',{class:'btn',type:'button',onclick:async()=>{
+    const name=prompt(language()==='es'?'Nombre del nuevo tema':'Name your new theme');if(!name?.trim())return;
+    const value=await store.getSetting('ui')||{};const palettes=[...(value.custom_theme_presets||[])];
+    if(palettes.length>=12){toast(language()==='es'?'Máximo de 12 temas':'Maximum 12 saved themes');return;}
+    const colors=Object.fromEntries(paletteKeys.map(key=>[key,value[key]||presets.classic[key]]));
+    palettes.push({name:name.trim().slice(0,42),colors});
+    await store.setSetting('ui',{...value,custom_theme_presets:palettes});drawSavedThemes(palettes);toast(t('Save'));
+  }},language()==='es'?'Guardar como tema nuevo':'Save current palette as theme');
   const layoutWidth=h('select',{'aria-label':'Layout width',onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),layout_width:e.target.value});window.dispatchEvent(new Event('tracker-theme-refresh'));}},
     [['adaptive','Adaptive (recommended)'],['compact','Compact'],['wide','Full width']].map(([value,label])=>h('option',{value,selected:(ui?.layout_width||'adaptive')===value},label)));
   const display = h('section', { class: 'set-block' },
     h('h3', {}, 'Display'),
-    h('label', {}, 'Theme presets'), presetChoices, presetName,
+    h('label', {}, t('Theme presets')), presetChoices, presetName, h('h4',{},language()==='es'?'Mis temas':'My saved themes'),savedThemes,saveTheme,
     h('label', {}, 'Desktop layout width'), layoutWidth,
     h('label', {}, 'Accent color'), accentColor,
     h('p', { class: 'hint' }, 'Customize each part of the palette. Changes sync with your account.'), ...customColors,
@@ -218,7 +243,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const typography = h('section', { class: 'set-block' }, h('h3', {}, 'Typography'),
     h('p', { class: 'hint' }, 'Choose a sharper font and a comfortable text size. Saved on this device.'),
     h('label', {}, 'Font'), fontSelect, h('label', {}, 'Text size'), sizeSelect);
-  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Weather', calendar: 'Calendar', feed: 'Feed', diary: 'Dreams', games: 'Games' };
+  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Weather', calendar: 'Calendar', feed: 'Feed', diary: 'Logs', games: 'Library' };
   const navOrder = h('div');
   function renderNavOrder() {
     const order = (() => { try { return JSON.parse(localStorage.getItem('tracker-nav-order-v1') || 'null'); } catch { return null; } })();

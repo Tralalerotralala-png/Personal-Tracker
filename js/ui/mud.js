@@ -1,9 +1,11 @@
 // The Mud tab: today's answer first, then five observed days, today, and five
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
-import { t } from './language.js';
+import { t, language } from './language.js';
+import { isNightAtLocation } from '../weather/moon-phase.js';
+import { upcomingSkyEvents } from '../weather/sky-events.js';
 import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
-import { glyphSvg, weatherGlyph } from './pixel-icon.js';
+import { glyphSvg, weatherGlyph, weatherIconSvg } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
 import { describeModel, COMPONENTS } from '../weather/mud.js';
 import { openMudSettings } from './mud-settings.js';
@@ -57,14 +59,14 @@ export function openHowScored({ weather, store }) {
     const model = describeModel(params, weights);
     const t = { tacky: 20, muddy: 45, swamp: 70, ...(params?.thresholds ?? {}) };
     openSheet({
-      title: 'How is this scored?',
+      title: language()==='es'?'¿Cómo se calcula el índice?':'How is this scored?',
       body: [
         h('p', { class: 'prose' }, 'Mud needs water in the ground and not enough drying to get rid of it. Each day gets four scores from 0 to 100%, combined using the weights below.'),
         h('ul', { class: 'how' }, model.map((m) => h('li', {}, h('b', {}, `${m.name}, ${m.weight}`), h('span', {}, m.text)))),
         h('p', { class: 'prose' }, 'When there is almost no water about, the total fades towards zero, so a cold, dull, dry week does not count as muddy. Ground frozen solid scores low because it stays firm.'),
         h('p', { class: 'prose' }, `Labels: Dry below ${t.tacky}, Tacky ${t.tacky} to ${t.muddy - 1}, Muddy ${t.muddy} to ${t.swamp - 1}, Swamp ${t.swamp} and above.`),
         h('p', { class: 'hint' }, 'Days before today come from observed and analysed weather, days after from the forecast.'),
-        h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, 'Tune the model'),
+        h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, language()==='es'?'Ajustar el modelo':'Tune the model'),
       ],
     });
   });
@@ -121,26 +123,26 @@ export function createMudView({ store, weather }) {
     const stat = (label, value) => h('div', { class: 'wx-stat' }, h('span', { class: 'wx-stat-label' }, label), h('strong', {}, value));
     const days = [today, ...future].slice(0, 6);
     return h('section', { class: 'wx-panel', 'aria-label': 'Weather conditions and six day outlook' },
-      h('div', { class: 'wx-heading' }, h('h3', {}, 'Weather'), h('span', { class: 'hint' }, current ? 'Current conditions' : 'Daily forecast')),
+      h('div', { class: 'wx-heading' }, h('h3', {}, t('Weather')), h('span', { class: 'hint' }, current ? 'Current conditions' : 'Daily forecast')),
       h('div', { class: 'wx-hero' },
         h('div', { class: `wx-scene wx-${kind}`, 'aria-hidden': 'true' },
-          h('span', { class: 'wx-scene-glyph', html: glyphSvg(g.glyph) }),
+          h('span', { class: 'wx-scene-glyph', html: weatherIconSvg(code, { night: isNightAtLocation(current) }) }),
           h('span', { class: 'wx-particles' }, Array.from({length: 8}, (_, i) => h('i', { class: 'wx-particle', style: `--i:${i}` })))),
         h('div', { class: 'wx-main' },
           h('strong', { class: 'wx-temperature' }, typeof temp === 'number' ? `${Math.round(temp)}°C` : `${number(raw.tmax, '°')} / ${number(raw.tmin, '°')}C`),
           h('span', { class: 'wx-condition' }, localizedWeather(g.text)),
-          h('span', { class: 'hint' }, `High ${number(raw.tmax, '°')} · Low ${number(raw.tmin, '°')}`))),
+          h('span', { class: 'hint' }, `${t('High')} ${number(raw.tmax, '°')} · ${t('Low')} ${number(raw.tmin, '°')}`))),
       h('div', { class: 'wx-stats' },
         stat('Feels like', number(current?.apparent_temperature, '°C')),
         stat('Humidity', number(current?.relative_humidity_2m, '%')),
         stat('Wind', number(current?.wind_speed_10m ?? raw.wind_max, ' km/h')),
         stat('Rain today', raw.precip === null ? '—' : `${fmt(raw.precip)} mm`)),
-      h('h4', { class: 'wx-outlook-title' }, 'Weather and ground — next six days'),
+      h('h4', { class: 'wx-outlook-title' }, t('Weather and ground — next six days')),
       h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
         return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather), title: 'View weather and ground details' },
           h('span', { class: 'wx-unified-date' }, d.phase === 'today' ? 'Today' : dayShort(d.date)),
-          h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
+          h('span', { class: 'wx-day-icon', html: weatherIconSvg(d.raw.weather_code, { night: d.phase === 'today' && isNightAtLocation(current) }) }),
           h('strong', {}, `${number(d.raw.tmax, '°')} / ${number(d.raw.tmin, '°')}`),
           h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`),
           h('span', { class: `wx-ground-label ${mudClass(d.label)}` }, `${localizedMudLabel(d.label)} ${d.index}/100`),
@@ -149,12 +151,35 @@ export function createMudView({ store, weather }) {
 
   }
 
+  let historyDays = 7;
+  let historyExpanded = false;
+  function hourlyRain(state) {
+    const hours = state.hourly || [];
+    if (!hours.length) return h('p',{class:'wx-hourly-tip'}, t('Hourly rain data unavailable; refresh Weather to try again.'));
+    let local = new Date().toISOString().slice(0,13);
+    try {
+      local = new Intl.DateTimeFormat('sv-SE',{timeZone:state.place?.timezone||undefined,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).format(new Date()).replace(' ','T').slice(0,13);
+    } catch {}
+    const upcoming = hours.filter(x => x.time.slice(0,13)>=local).slice(0,24).filter((x,i)=>i%2===0);
+    return h('details',{class:'wx-hourly'},h('summary',{},t('Hourly rain timeline')+' — '+t('next 24 hours')),
+      upcoming.length?h('div',{class:'wx-hourly-grid'},upcoming.map(x=>h('div',{class:'wx-hour',title:`${x.time}: ${x.precipitation??'—'} mm, ${x.probability??'—'}%`},
+        h('span',{},x.time.slice(11,16)),h('b',{},x.probability===null?'—':`${x.probability}%`),
+        h('div',{class:'wx-rain-fill',style:`width:${Math.max(3,Math.min(100,x.probability||0))}%`}),
+        h('small',{},x.precipitation===null?'—':`${x.precipitation} mm`)))):h('p',{},t('No hourly forecast for the coming day.')));
+  }
+  function skyPanel(state) {
+    const events=upcomingSkyEvents(new Date(),6);
+    return h('details',{class:'wx-sky-events'},h('summary',{},t('Upcoming sky events')+` (${events.length})`),
+      h('p',{class:'wx-history-note'},t('Dates are approximate. Visibility at your location is not guaranteed; check the source before planning.')),
+      ...events.map(event=>h('p',{class:'wx-sky-event'},h('strong',{},event.date+' · '+(language()==='es'?event.es:event.en)+' '),
+        h('a',{href:event.url,target:'_blank',rel:'noopener noreferrer'},t('Details and visibility')))));
+  }
   function render(state) {
     if (state.status === 'no-location' || (!state.place && state.status === 'idle')) {
       const search = createPlaceSearch({ weather, autofocus: false });
       replace(el, h('div', { class: 'mud-empty' },
-        h('h2', {}, 'Where do you need the mud forecast?'),
-        h('p', { class: 'prose' }, 'Type the nearest town or city. You will get a mud score for the five days before today, today, and the five days ahead.'),
+        h('h2', {}, language()==='es'?'¿De qué lugar deseas el pronóstico?':'Where do you need the weather forecast?'),
+        h('p', { class: 'prose' }, language()==='es'?'Escribe tu ciudad. Obtendrás un pronóstico del clima y del estado del terreno.':'Enter a town or city to see weather and ground conditions.'),
         search.el));
       return;
     }
@@ -169,7 +194,7 @@ export function createMudView({ store, weather }) {
       return;
     }
 
-    const past = state.rows.filter((r) => r.phase === 'past');
+    const past = state.history?.length ? state.history : state.rows.filter((r) => r.phase === 'past').reverse();
     const today = state.rows.find((r) => r.phase === 'today');
     const future = state.rows.filter((r) => r.phase === 'future');
     const s = state.summary;
@@ -178,28 +203,33 @@ export function createMudView({ store, weather }) {
       placeHeader(state),
       banner(state),
       weatherPanel(state, today, future),
-      h('details', { class: 'ground-history wx-history' },
-        h('summary', {}, `Past weather and ground conditions (${past.length} available days)`),
-        h('div', { class: 'wx-outlook wx-unified wx-past-days' }, past.map((d) => {
+      hourlyRain(state),
+      skyPanel(state),
+      h('details', { class: 'ground-history wx-history', open: historyExpanded ? true : null, ontoggle: e=>{if(e.target.isConnected)historyExpanded=e.target.open;} },
+        h('summary', {}, t('Past weather and ground conditions')+` (${past.length})`),
+        h('div',{class:'wx-history-picker'}, h('label',{},t('History range')),h('select',{onchange:e=>{historyDays=Number(e.target.value); historyExpanded=true;render(weather.getState());}},
+         [7,14,30].map(n=>h('option',{value:n,selected:historyDays===n},`${n} ${t('days')}`)))),
+        h('p',{class:'wx-history-note'},t('Past days use weather model data, not measurements at your address.')),
+        h('div', { class: 'wx-outlook wx-unified wx-past-days' }, past.slice(0,historyDays).map((d) => {
           const icon = weatherGlyph(d.raw.weather_code);
           return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather) },
             h('span', {}, `${dayShort(d.date)} ${dayMonth(d.date)}`),
-            h('span', { class: 'wx-day-icon', html: glyphSvg(icon.glyph) }),
+            h('span', { class: 'wx-day-icon', html: weatherIconSvg(d.raw.weather_code, { night: d.phase === 'today' && isNightAtLocation(current) }) }),
             h('strong', {}, `${fmt(d.raw.tmax)}° / ${fmt(d.raw.tmin)}°`),
             h('span', { class: 'hint' }, `${fmt(d.raw.precip)} mm`),
             h('span', { class: `wx-ground-label ${mudClass(d.label)}` }, `${localizedMudLabel(d.label)} ${d.index}/100`),
             mudBar(d));
         }))),
       h('div', { class: 'mud-foot' },
-        h('button', { class: 'btn small ghost', type: 'button', onclick: () => openHowScored({ weather, store }) }, 'How is this scored?'),
-        h('button', { class: 'btn small ghost desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, 'Tune the model'),
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => openHowScored({ weather, store }) }, language()==='es'?'¿Cómo se calcula el índice?':'How is this scored?'),
+        h('button', { class: 'btn small ghost desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, language()==='es'?'Ajustar el modelo':'Tune the model'),
         h('span', { class: 'hint' }, 'Weather data by ', h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener' }, 'Open-Meteo.com'))));
   }
 
   weather.subscribe(render);
   return {
     el,
-    async mount() { render(weather.getState()); weather.refresh(); },
-    show() { render(weather.getState()); },
+    async mount() { render(weather.getState()); await weather.refresh(); weather.loadHourly?.(); },
+    show() { render(weather.getState()); weather.loadHourly?.(); },
   };
 }

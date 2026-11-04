@@ -19,7 +19,7 @@ const methotrexateIcon = './icons/inventory/methotrexate-16.png';
 const isMethotrexate = name => /^methotrexate(?:\b|$)/i.test((name || '').trim());
 
 
-export function createInventoryView({ store, photos }) {
+export function createInventoryView({ store, photos, auth = null, config = {} }) {
   const state = {
     pane: 'items', // 'items' | 'places'
     q: '',
@@ -393,6 +393,38 @@ export function createInventoryView({ store, photos }) {
         } finally { URL.revokeObjectURL(url); }
       } catch (err) { toast(err.message || 'Icon creation failed'); }
     } }, t('Generate 16×16 icon'));
+    // Real AI image generation uses an authenticated Supabase Edge Function.
+    // Never put an image provider's secret key in browser code or config.js.
+    const aiButton = h('button',{class:'btn small',type:'button',onclick:async()=>{
+      const description=(desc.value.trim() || name.value.trim()).slice(0,300);
+      if(!description){toast(t('Enter a description first.'));return;}
+      if(!auth || !config?.SUPABASE_URL || /YOUR-/i.test(config.SUPABASE_URL)){toast(t('AI icons need Supabase and an installed Edge Function.'));return;}
+      aiButton.disabled=true;const old=aiButton.textContent;aiButton.textContent=t('Generating with AI...');
+      try {
+        const session=await auth.getSession();if(!session?.access_token)throw new Error(t('Please sign in first.'));
+        const response=await fetch(config.SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/pixel-icon-ai',{
+          method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':config.SUPABASE_ANON_KEY},
+          body:JSON.stringify({description})});
+        if(!response.ok){if(response.status===404)throw new Error('AI icon service is not deployed. See SETUP.md.');
+          const message=await response.text();throw new Error(message.slice(0,220)||'AI image service unavailable.');}
+        const json=await response.json();if(!/^[A-Za-z0-9+/=]+$/.test(json.image||'')||json.image.length>4000000)throw new Error('Invalid generated image.');
+        const bytes=Uint8Array.from(atob(json.image),c=>c.charCodeAt(0));
+        const raw=new Blob([bytes],{type:'image/png'});const url=URL.createObjectURL(raw);
+        const img=new Image();try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});
+          const cv=document.createElement('canvas');cv.width=cv.height=16;const context=cv.getContext('2d');context.imageSmoothingEnabled=true;context.drawImage(img,0,0,16,16);
+          const pixels=context.getImageData(0,0,16,16);const paletteCounts=new Map();
+          for(let i=0;i<pixels.data.length;i+=4){if(pixels.data[i+3]<110)continue;const key=[0,1,2].map(n=>Math.floor(pixels.data[i+n]/32)*32+16).join(',');paletteCounts.set(key,(paletteCounts.get(key)||0)+1);}
+          const palette=[...paletteCounts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,7).map(([key])=>key.split(',').map(Number));
+          for(let i=0;i<pixels.data.length;i+=4){if(pixels.data[i+3]<110){pixels.data[i+3]=0;continue;}
+            const color=[pixels.data[i],pixels.data[i+1],pixels.data[i+2]];const nearest=palette.reduce((best,c)=>{const dist=c.reduce((sum,v,n)=>sum+(v-color[n])**2,0);return dist<best.dist?{c,dist}:best;},{c:color,dist:Infinity}).c;
+            for(let n=0;n<3;n++)pixels.data[i+n]=nearest[n];pixels.data[i+3]=255;}
+          context.putImageData(pixels,0,0);
+          const result=await new Promise(resolve=>cv.toBlob(resolve,'image/png'));if(!result)throw new Error('PNG conversion failed.');
+          draft.photoFile=new File([result],'ai-pixel-icon.png',{type:'image/png'});draft.removePhoto=false;renderPhoto(URL.createObjectURL(result));
+          toast(t('AI icon ready. Save this item to apply it.'));
+        }finally{URL.revokeObjectURL(url);}
+      }catch(err){toast(err.message||'AI image generation failed.');}finally{aiButton.disabled=false;aiButton.textContent=old;}
+    }},t('Generate with AI'));
     const desc = h('textarea', { id: 'it-desc', rows: 3, placeholder: 'e.g. 16x16 pixel art icon of an orange headlamp, 8 colours, transparent background' }, existing?.pixel_description ?? '');
     const suggest = () => {
       const nm = name.value.trim() || 'the item';
@@ -491,7 +523,7 @@ export function createInventoryView({ store, photos }) {
             onSaved: async (row) => { await load(); place.replaceChildren(...placeOptions(data.locations)); place.value = row.id; },
           }) }, 'New place')),
         h('label', {}, 'Photo / pixel icon'), photoBox, fileInput,
-        h('div', { class: 'inline-actions' }, generateIcon),
+        h('div', { class: 'inline-actions' }, generateIcon, aiButton),
         advanced,
         error,
         h('button', { type: 'submit', class: 'visually-hidden' }, 'Save')),

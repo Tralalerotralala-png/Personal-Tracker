@@ -15,9 +15,11 @@ const safeText=(value,max=10000)=>String(value||'').slice(0,max);
 export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
  let session=null, timeout=null, sheet=null, failures=0, blockedUntil=0;
+ let activeDraftTimer=null, editorDirty=false;
+ let writeChain=Promise.resolve();
  const dialogs=new Set();
  const L=()=>labels[language()];
- const clear=()=>{session=null;clearTimeout(timeout);timeout=null;};
+ const clear=()=>{session=null;clearTimeout(timeout);clearTimeout(activeDraftTimer);timeout=null;activeDraftTimer=null;editorDirty=false;};
  function closeDialogs(){
   for(const dlg of [...dialogs]){if(dlg.el?.open)dlg.close();}
   dialogs.clear();
@@ -54,7 +56,13 @@ export function createDreamDiaryView({store}) {
   replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing journal-unlock'},form));
   pin.focus();
  }
- async function persist(){if(!session) return;await store.setSetting(JOURNAL_KEY,await encryptJournal(session.pin,session.data));touch();}
+ async function persist(){
+  if(!session)return;
+  const pin=session.pin, snapshot=structuredClone(session.data);
+  // Serialize encrypted updates so an older draft cannot overwrite a newer save.
+  writeChain=writeChain.catch(()=>{}).then(async()=>{await store.setSetting(JOURNAL_KEY,await encryptJournal(pin,snapshot));});
+  await writeChain;touch();
+ }
  function openEntries(){
   if(!session)return;
   const wrap=h('div',{class:'journal-shell'}),tabs=h('div',{class:'hub-tabs'}),list=h('div',{class:'journal-list'});
@@ -63,6 +71,11 @@ export function createDreamDiaryView({store}) {
   const dateDisplay=d=>d||today();
   const button=(txt,fn)=>h('button',{class:'btn small',type:'button',onclick:fn},txt);
   async function edit(type,entry=null){
+   const draftKey=`${type}:${entry?.id||'new'}`;
+   const draft=session.data.drafts?.[draftKey] || null;
+   const original=entry;
+   if (draft) entry={...entry,...draft};
+   editorDirty=false;
    const title=h('input',{type:'text',maxlength:140,value:entry?.title||''});
    const date=h('input',{type:'date',value:entry?.date||today()});
    const description=h('textarea',{rows:6,maxlength:10000},entry?.body||'');
@@ -80,24 +93,33 @@ export function createDreamDiaryView({store}) {
     type==='moods'?[h('label',{},L().mood),mood]:null,
     h('label',{},L().body),description,
     type==='dreams'?[h('label',{},L().illustration),file,entry?.art?h('img',{src:entry.art,alt:L().night,class:'journal-art'}):null]:null,error);
-   const closeEditor=()=>{replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();};
+   const captureDraft=()=>({title:title.value,date:date.value,body:description.value,dreamType:dreamType.value,vivid:Number(vivid.value),
+      tags:tags.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value});
+   const persistDraft=async()=>{if(!session)return;session.data.drafts ||= {};session.data.drafts[draftKey]=captureDraft();await persist();};
+   form.addEventListener('input',()=>{editorDirty=true;clearTimeout(activeDraftTimer);activeDraftTimer=setTimeout(()=>persistDraft().catch(()=>{}),1800);});
+   const closeEditor=async()=>{
+     if(editorDirty&&!confirm(language()==='es'?'¿Salir del editor? Se conservará un borrador cifrado.':'Leave the editor? An encrypted draft will be kept.'))return;
+     clearTimeout(activeDraftTimer);activeDraftTimer=null;
+     if(editorDirty)try{await persistDraft();}catch{toast(L().saveFailed);return;}
+     editorDirty=false;replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();
+   };
    const editor={close:closeEditor};
    const actions=[
-    entry?button(L().delete,async()=>{if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;session.data[type]=session.data[type].filter(x=>x.id!==entry.id);await persist();editor.close();draw();}):null,
+    original?button(L().delete,async()=>{if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;session.data[type]=session.data[type].filter(x=>x.id!==original.id);delete session.data.drafts?.[draftKey];editorDirty=false;await persist();editor.close();draw();}):null,
     h('button',{class:'btn primary',onclick:async()=>{
       if(!title.value.trim()){error.textContent='Title required';return;}
       try{
        let art=entry?.art||null;
        if(file.files?.length){const f=file.files[0];if(f.size>100*1024||!['image/png','image/jpeg','image/webp'].includes(f.type)){error.textContent=L().art;return;}
         art=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(f);});}
-       const updated={...entry,id:entry?.id||uuid(),title:safeText(title.value,140),date:date.value||today(),body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art};
+       const updated={...entry,id:original?.id||uuid(),title:safeText(title.value,140),date:date.value||today(),body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art};
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
+       delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;editorDirty=false;
        await persist();editor.close();draw();
       }catch(err){error.textContent=L().saveFailed;}
     }},L().save)];
    const page=h('section',{class:'journal-inline-editor'},
      h('div',{class:'journal-editor-head'},h('h2',{},entry?L().name:L().new),button(language()==='es'?'Volver':'Back',()=>{
-       if((title.value!==(entry?.title||'') || description.value!==(entry?.body||'')) && !confirm(language()==='es'?'¿Descartar cambios sin guardar?':'Discard unsaved changes?'))return;
        closeEditor();
      })),form,h('div',{class:'journal-editor-actions'},actions));
    replace(el,page);
@@ -119,7 +141,9 @@ export function createDreamDiaryView({store}) {
         entry.completedDates=[...dates].sort();await persist();draw();
        }),h('span',{},`${(entry.completedDates||[]).length} ${language()==='es'?'días registrados':'days logged'}`))
      :h('button',{class:'journal-entry',onclick:()=>edit(active,entry)},h('strong',{},entry.title),h('small',{},dateDisplay(entry.date)),h('span',{},safeText(entry.body,110))));
-   replace(list,h('div',{class:'journal-list-head'},h('h3',{},L()[active]),button(L().new,()=>edit(active))),dreamStats,
+   const drafts=Object.keys(session.data.drafts||{}).filter(k=>k.startsWith(active+':'));
+   replace(list,h('div',{class:'journal-list-head'},h('h3',{},L()[active]),button(L().new,()=>edit(active))),
+    drafts.length?h('p',{class:'journal-draft-reminder'},language()==='es'?'Borradores cifrados: ':'Encrypted drafts: ',...drafts.map(key=>button(language()==='es'?'Continuar borrador':'Resume draft',()=>{const id=key.split(':')[1];edit(active,session.data[active].find(x=>x.id===id)||null);}))) : null, dreamStats,
     entries.length?cards:h('p',{class:'hint'},L().empty));
   }
   const changePin=async()=>{
@@ -128,13 +152,14 @@ export function createDreamDiaryView({store}) {
    const err=h('p',{class:'form-error'});
    const dialog=trackDialog(openSheet({title:L().change,size:'small',body:h('div',{class:'form'},h('p',{class:'hint'},L().warning),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
     if(!validPin(newPin.value)||newPin.value!==again.value){err.textContent=L().wrong;return;}
-    try{await store.setSetting(JOURNAL_KEY,await encryptJournal(newPin.value,session.data));session.pin=newPin.value;dialog.close();touch();toast(L().save);}catch{err.textContent=L().saveFailed;}
+    try{await writeChain;await store.setSetting(JOURNAL_KEY,await encryptJournal(newPin.value,session.data));session.pin=newPin.value;dialog.close();touch();toast(L().save);}catch{err.textContent=L().saveFailed;}
    }},L().save)]}));
   };
   wrap.append(h('div',{class:'journal-actions'},button(L().change,changePin),button(L().lock,lock)),tabs,list);
   replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
   draw();touch();
  }
+ window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});
  landing();
  return {el,mount:async()=>landing(),show:()=>{if(!session)landing();},hide:()=>{}};
 }

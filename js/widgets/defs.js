@@ -9,6 +9,8 @@ export const WIDGET_DEFS = {
   // The clock is integrated into Weather on the dashboard; legacy wallpaper layouts retain it.
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
   currency: { title: 'Currency Converter', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: null },
+  sky:      { title:'Sky events', minW:3,minH:2,defaultW:4,defaultH:3, route:'mud' },
+  recent:   { title: 'Recently played', minW:3, minH:2, defaultW:4, defaultH:3, route:'games' },
   games:    { title: 'Currently playing', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'games' },
   phrase:   { title: 'Phrase of the day',     minW: 4, minH: 3, defaultW: 8, defaultH: 4, route: null },
 };

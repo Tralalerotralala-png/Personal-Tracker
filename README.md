@@ -21,12 +21,12 @@ No new Supabase SQL migration is required for this release. The widget-layout mi
 
 - **Overview:** Resizable widgets (mud weather, events, inventory, feeds, statistics, clock, and **Phrase of the Day**) and a daily status summary. Use **Overview > Edit layout** to move/resize them. Desktop, mobile, and wallpaper layouts are configured separately.
 - **Phrase of the Day:** Mandarin Hanzi with tone-marked Pinyin, German with IPA, English meaning, and per-character Mandarin/per-word German literal explanations on hover, focus, or tap. The daily phrase changes at **local midnight**, even if the page remains open. **History** lets you revisit lessons from their calendar dates since **2026-11-03**: the last 30 days are listed, and the date picker reaches older lessons. The 30-phrase offline catalog cycles after 30 days. Earlier dates from the first release preserve their previous selection. Since dates deterministically select lessons, no learning-history data is uploaded.
-- **Dream Diary:** An encrypted four-digit-PIN journal. Unlock via the **Dreams** tab; the journal then occupies the **main page**, not a side drawer. Its sections include dreams, sleep, moods, habits, and Private Vault. A dream supports tags, vividness, dream type, and optional small illustration. There is **no voice recorder**. It locks when leaving the tab, hiding the app, or after five minutes without activity. The PIN cannot be recovered.
+- **Dream Diary:** An encrypted four-digit-PIN journal. Unlock via the **Logs** tab; the journal then occupies the **main page**, not a side drawer. Its sections include dreams, sleep, moods, habits, and Private Vault. Writing in the full-page editor automatically saves a **PIN-encrypted draft**, with an unsaved-change warning when leaving. A dream supports tags, vividness, dream type, and optional small illustration. There is **no voice recorder**. It stays unlocked across tabs and locks after 40 minutes of inactivity, or whenever you press Lock now. The PIN cannot be recovered.
 - **Pack:** Inventory and places, custom sprites/photos, rarity, quantity, loss/expiry/tracking information, and a general procedural 16×16 pixel-icon generator. No dedicated Methotrexate button.
-- **Mud:** Weather/mud estimates, with moon phases for clear nighttime conditions.
+- **Weather:** Shared colored pixel-art weather icons, short-term hourly rain timing, six-day forecast with ground estimates, 7/14/30-day expandable past data, and an upcoming astronomical-events watch. Sky-event dates are approximate; the app does not calculate eclipse visibility at your exact location.
 - **Calendar:** Events, recurring dates, and `.ics` import.
 - **Feed:** Bluesky, Mastodon, RSS/Atom (subject to browser CORS or optional proxy).
-- **Settings:** Theme palettes, typography, language, backup, sync, wallpaper access, widget layouts.
+- **Settings:** Six theme palettes plus user-saved named palettes, typography, language, backup, sync, wallpaper access, widget layouts.
 - **Wallpaper Engine:** Separate `wallpaper/` folder, with its own fixed-layout read-only bundle.
 
 ## Security and privacy
@@ -91,3 +91,17 @@ This release also repairs legacy imports of the weather-format module and refres
 
 ### Daily widgets and navigation (November 2026)
 The Overview daily status and Daily Loot refresh when the local calendar day changes (and after returning to the tab). Daily Loot uses the local date and avoids repeating the prior day when more than one item is available. Headlines open their source articles in a new tab; widget titles link to their full sections when one exists. The Phrase of the Day title opens its history.
+
+## November 2026 consolidated media, sky, and journal update
+
+- The **Library** tab contains **Games, Books, Films, and Albums**. Existing game records remain at the original `game_library_v1` setting. Books/films/albums are saved separately under `other_media_library_v1`; no database migration is required. Each entry has a cover, creator/platform, status, rating, notes, and dated journal entries.
+- Add **Recently played** and **Sky events** under **Overview → Edit layout** if you want those optional widgets. Recently played means *recently opened in Personal Tracker*, not automatically detected PC playtime.
+- The Weather tab can expand a **24-hour rain timeline** and choose **7, 14, or 30 days** of available ground/weather history. Weather history uses model-derived weather estimates rather than a sensor at your home. Sky event dates are curated from NASA's eclipse calendar and the American Meteor Society's meteor shower calendar; visibility and event times need separate location-specific verification.
+- Phrases follow the **local calendar date**; the November 3–4 rotation collision is corrected. Previous lesson history remains deterministic and offline.
+- More clearly styled daytime sun / partly cloudy sprites and optional rain animation honor reduced-motion settings.
+- The inventory editor includes an **optional genuine AI image** button backed by a **Supabase Edge Function** (`supabase/functions/pixel-icon-ai/`). It is not active until you deploy that function and configure your own server-side OpenAI API key; see SETUP.md. The existing offline procedural icon generator remains available. **Never put your provider API key in config.js.**
+- Removed `stage1-check.html` and the obsolete `js/ui/mud-format.js`. If they exist in your GitHub repo from older releases, delete them. Keep all other app files and directories.
+
+### AI privacy and cost
+
+Generating an AI icon sends the prompt you write to your deployed Supabase function, which sends it to the image provider. Do not include sensitive personal information in icon prompts. API generation is billable, depends on the provider's account access and quotas, and requires a separately deployed server-side function. The app reduces resulting art to a 16×16 PNG with at most eight colors (seven opaque plus transparency); results still need user review.

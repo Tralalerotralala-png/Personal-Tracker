@@ -4,7 +4,7 @@ import { startTranslations, t, locale } from './ui/language.js';
 document.documentElement.lang = locale();
 import { createPhotos } from './photos.js';
 import { h, toast, openSheet } from './ui/dom.js';
-import { glyphSvg, weatherGlyph } from './ui/pixel-icon.js';
+import { glyphSvg, weatherGlyph, weatherIconSvg } from './ui/pixel-icon.js';
 import { createInventoryView } from './ui/inventory.js';
 import { createMudView } from './ui/mud.js';
 import { createCalendarView } from './ui/calendar.js';
@@ -13,7 +13,7 @@ import { createFeedService } from './feed/service.js';
 import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
-import { createGamesView } from './ui/games.js';
+import { createMediaLibraryView } from './ui/media-library.js';
 import { moonPhaseSvg, isNightAtLocation } from './weather/moon-phase.js';
 import { loadHub, openPersonalHub } from './ui/personal-hub.js';
 import { createLogin } from './ui/login.js';
@@ -113,13 +113,13 @@ store.subscribe((e) => {
 window.addEventListener('online', () => photos.flushQueue());
 
 // ---- views -----------------------------------------------------------------------------
-const inventory = createInventoryView({ store, photos });
+const inventory = createInventoryView({ store, photos, auth, config: ctx.config });
 const mud = createMudView({ store, weather });
 const calendar = createCalendarView({ store, weather });
 const feedView = createFeedView({ store, feed, proxySuggestion });
 const overview = createOverviewView({ store, ctx: { store, weather, feed } });
 const diary = createDreamDiaryView({ store });
-const games = createGamesView({ store });
+const games = createMediaLibraryView({ store });
 
 const VIEWS = {
   inventory,
@@ -131,7 +131,7 @@ const VIEWS = {
   games,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Games', 'games'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'],
 ];
 
 const main = h('main', { id: 'main' });
@@ -163,7 +163,7 @@ function refreshWeatherNav(){
   const current=weather.getState().current;
   if(!weatherNavIcon || !current)return;
   const code=Number(current.weather_code);
-  weatherNavIcon.innerHTML=isNightAtLocation(current) && [0,1,2].includes(code) ? moonPhaseSvg() : glyphSvg(weatherGlyph(code).glyph);
+  weatherNavIcon.innerHTML=weatherIconSvg(code,{night:isNightAtLocation(current)});
 }
 weather.subscribe(refreshWeatherNav);refreshWeatherNav();setInterval(refreshWeatherNav,60*60*1000);
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);

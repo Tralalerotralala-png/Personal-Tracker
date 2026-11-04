@@ -32,9 +32,15 @@ export function createGamesView({store}){
   }));
  }
  function detail(game){
+  if (!game.lastOpened || Date.now()-Date.parse(game.lastOpened)>1500) { game.lastOpened=new Date().toISOString();store.setSetting(KEY,state).catch(()=>{}); }
   const edit=h('button',{class:'btn primary',onclick:()=>editor(game)},L().edit);
   const remove=h('button',{class:'btn small danger',onclick:async()=>{if(!await confirmDialog({title:L().delete,message:`Delete ${game.title}?`,confirmLabel:L().delete,danger:true}))return;state.games=state.games.filter(g=>g.id!==game.id);page=null;sideMode=false;await save();}},L().delete);
-  showPage(h('div',{class:'game-detail'},cover(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),h('div',{class:'inline-actions'},edit,remove))),game.title);
+  const journalText=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Anota tu progreso...':'Record your progress...'});
+  const journalEntries=(game.journal||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const journalPanel=h('section',{class:'game-journal'},h('h3',{},language()==='es'?'Diario de juego':'Game journal'),
+    journalText,h('button',{class:'btn small',onclick:async()=>{if(!journalText.value.trim())return;game.journal=[{id:uuid(),date:new Date().toISOString(),text:journalText.value.trim().slice(0,5000)},...(game.journal||[])];await store.setSetting(KEY,state);detail(game);}},language()==='es'?'Agregar nota':'Add journal note'),
+    ...journalEntries.map(x=>h('div',{class:'game-journal-entry'},h('small',{},new Date(x.date).toLocaleDateString()),h('p',{},x.text))));
+  showPage(h('div',{class:'game-detail'},cover(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),journalPanel,h('div',{class:'inline-actions'},edit,remove))),game.title);
  }
  async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:existing?.rating||''});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||'Backlog')===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
  const form=h('div',{class:'form game-editor-form'},h('label',{},L().name),title,h('label',{},L().platform),platform,h('label',{},L().shelf),shelf,h('label',{},L().status),status,h('label',{},L().rating),rating,h('label',{},L().cover),coverUrl,h('button',{class:'btn small',onclick:async()=>{
@@ -47,7 +53,7 @@ export function createGamesView({store}){
  if(coverUrl.value.trim()){image=safeUrl(coverUrl.value.trim());if(!image){feedback.textContent='Cover URL must start with HTTPS.';return;}}
  if(upload.files?.length){const file=upload.files[0];if(file.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(file.type)){feedback.textContent='Choose a PNG, JPEG or WebP smaller than 120 KB.';return;}
  image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});}
- const item={id:existing?.id||uuid(),title:clean(title.value,120),platform:clean(platform.value,100),notes:clean(notes.value,10000),cover:image,shelf:shelf.value,status:status.value,rating:rating.value?Number(rating.value):null};
+ const item={id:existing?.id||uuid(),title:clean(title.value,120),platform:clean(platform.value,100),notes:clean(notes.value,10000),cover:image,shelf:shelf.value,status:status.value,rating:rating.value?Number(rating.value):null,journal:existing?.journal||[],lastOpened:existing?.lastOpened||null};
  const ix=state.games.findIndex(g=>g.id===item.id);if(ix>=0)state.games[ix]=item;else state.games.push(item);
  try{dirty=false;await save();detail(item);toast(L().save);}catch{dirty=true;feedback.textContent='Could not save. Try a smaller cover image.';}
  }},L().save);

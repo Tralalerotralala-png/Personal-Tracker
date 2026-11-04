@@ -8,8 +8,9 @@ test('Dream Diary retains unlocked session across tabs for 40 minutes of inactiv
  assert.match(s,/hide:\(\)=>\{\}/);
 });
 test('Game Library is a routed main view and its optional widget is registered',()=>{
- assert.match(file('js/app.js'),/createGamesView/);
- assert.match(file('js/app.js'),/\['games', 'Games'/);
+ assert.match(file('js/app.js'),/createMediaLibraryView/);
+ assert.match(file('js/ui/media-library.js'),/createGamesView/);
+ assert.match(file('js/app.js'),/\['games', 'Library'/);
  assert.match(file('js/widgets/defs.js'),/games:\s*\{/);
  assert.match(file('js/widgets/registry.js'),/games: mountGames/);
 });

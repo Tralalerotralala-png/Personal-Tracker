@@ -994,7 +994,9 @@ function lessonForDate(date=new Date()) {
  // Preserve the exact daily selections shown by the first release.
  if (key < PHRASE_EXPANSION_DATE) return LESSONS[((days % originalCount)+originalCount)%originalCount];
  const start = Math.floor(Date.UTC(2026,10,4)/86400000);
- return LESSONS[((days-start)%LESSONS.length+LESSONS.length)%LESSONS.length];
+ // Keep the older archive intact, but never repeat Nov 3 on Nov 4.
+ const previousIndex = (((start-1)%originalCount)+originalCount)%originalCount;
+ return LESSONS[((days-start+previousIndex+1)%LESSONS.length+LESSONS.length)%LESSONS.length];
 }
 // Calendar history is deterministic: older lessons remain accessible even if the app was closed.
 // No personal journal data or history needs to be uploaded to Supabase.
@@ -1164,6 +1166,21 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Library','Biblioteca'],['Books','Libros'],['Films','Películas'],['Albums','Álbumes'],['Recently played','Jugados recientemente'],['Currently playing','Jugando ahora'],
+ ['Sky events','Eventos astronómicos'],['Upcoming sky events','Próximos eventos astronómicos'],['Selected location','Ubicación seleccionada'],
+ ['Dates are approximate. Check local visibility and the weather.','Las fechas son aproximadas. Comprueba la visibilidad local y el clima.'],
+ ['Dates are approximate. Visibility at your location is not guaranteed; check the source before planning.','Las fechas son aproximadas. No se garantiza la visibilidad en tu ubicación; consulta la fuente antes de planear.'],
+ ['Details and visibility','Detalles y visibilidad'],['Hourly rain timeline','Lluvia por hora'],['next 24 hours','próximas 24 horas'],
+ ['Hourly rain data unavailable; refresh Weather to try again.','No hay datos de lluvia por hora; actualiza Clima para intentarlo de nuevo.'],
+ ['No hourly forecast for the coming day.','No hay pronóstico por hora para el próximo día.'],
+ ['History range','Rango del historial'],['days','días'],['Past weather and ground conditions','Clima y condiciones anteriores'],
+ ['Past days use weather model data, not measurements at your address.','Los días anteriores usan datos de modelos meteorológicos, no mediciones en tu domicilio.'],
+ ['Enter a description first.','Escribe una descripción primero.'],['AI icons need Supabase and an installed Edge Function.','Los iconos IA requieren Supabase y una función Edge instalada.'],
+ ['Generating with AI...','Generando con IA...'],['Generate with AI','Generar con IA'],['Please sign in first.','Primero inicia sesión.'],
+ ['AI icon ready. Save this item to apply it.','Icono de IA listo. Guarda el objeto para aplicarlo.'],
+ ['Open a game in your library to see it here.','Abre un juego en tu biblioteca para verlo aquí.'],
+ ['Theme presets','Temas predefinidos'],
+
  ['Currency Converter','Conversor de divisas'],['Add pair','Agregar par'],['Remove','Quitar'],['Swap','Invertir'],['Amount','Cantidad'],['Cached','En caché'],['Rate unavailable','Tipo de cambio no disponible'],['Last updated','Última actualización'],['Choose a place in the Weather tab.','Elige una ubicación en Clima.'],['kinds','tipos'],['lost','perdidos'],['legendary','legendarios'],['Drizzle','Llovizna'],['No weather data','Sin datos del clima'],['Logs','Registros'],
  ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Clima'],['Calendar','Calendario'],['Feed','Noticias'],
  ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Games','Juegos'],['Game Library','Biblioteca de juegos'],['Clear','Despejado'],['Ground conditions','Condiciones del terreno'],['Mud conditions','Condiciones del terreno'],['Weather and mud','Clima y terreno'],['Tune the mud model','Ajustar el modelo del terreno'],['Observed','Observado'],['Forecast','Pronóstico'],['No big change expected.','No se esperan cambios importantes.'],['No rain over 3 days, soil is dry, drying well','Sin lluvia en los últimos 3 días; el suelo está seco y se está secando bien'],['Current conditions','Condiciones actuales'],
@@ -1314,6 +1331,7 @@ Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, locali
 });
 __define("js/ui/pixel-icon.js", function (__require, __exports) {
 "use strict";
+const { moonPhaseSvg } = __require("js/weather/moon-phase.js");
 // Pixel art generated in code: a unique little sprite per item (from its id),
 // and the small glyphs used in the navigation. Pure functions, no DOM.
 
@@ -1657,7 +1675,32 @@ function glyphSvg(name) {
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${rects.join('')}</svg>`;
 }
-Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, glyphSvg });
+
+// Shared multicolor, pixel-aligned weather art for the dashboard and Weather tab.
+// The colored sun/cloud layers and animated rain are inline SVG: no image assets.
+function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
+  const kind = weatherGlyph(code).glyph;
+  const px = (x,y,w,h,color,cls='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"${cls?` class="${cls}"`:''}/>`;
+  const sun = [px(5,1,4,3,'#ffc75b'),px(3,5,8,7,'#ffd875'),px(0,7,2,2,'#ffb446'),px(5,14,4,2,'#ffb446'),px(12,7,2,2,'#ffb446'),px(6,0,2,1,'#ffb446')].join('');
+  const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="16" height="16" ');
+  const cloud = [px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('');
+  const drizzle = [0,1,2].map((i)=>px(12+i*6,20+(i%2),2,3,'#6fb9e9','wx-rain-drop')).join('');
+  const storm = px(17,17,4,3,'#ffe183')+px(15,20,3,4,'#ffd15b');
+  const rays = [px(5,1,4,3,'#ffd166'),px(3,5,8,7,'#ffe08d'),px(1,7,2,2,'#f9a442'),px(13,7,2,2,'#f9a442'),px(6,15,2,2,'#f9a442')].join('');
+  const fog = [8,12,16].map(y=>px(5,y,22,2,'#abaed5')).join('');
+  const bg = night ? moon : sun;
+  let content = '';
+  if (kind==='sun') content=bg;
+  else if (kind==='partly') content=bg+cloud;
+  else if (kind==='cloud') content=cloud;
+  else if (kind==='fog') content=fog;
+  else if (kind==='rain') content=cloud+drizzle;
+  else if (kind==='storm') content=cloud+storm+drizzle;
+  else if (kind==='snow') content=cloud+[0,1,2].map(i=>px(13+i*6,21,2,2,'#eff8ff')).join('');
+  else content=rays;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 26" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${content}</svg>`;
+}
+Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, glyphSvg, weatherIconSvg });
 });
 __define("js/wallpaper/config.js", function (__require, __exports) {
 "use strict";
@@ -2343,7 +2386,7 @@ const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 // Ten days of history gives the first displayed day (5 days back) a few days of
 // "what fell before" to remember. Six forecast days = today plus five ahead.
-const PAST_DAYS = 10;
+const PAST_DAYS = 34;
 const FORECAST_DAYS = 6;
 
 const DAILY_VARS = [
@@ -2368,6 +2411,7 @@ function buildForecastUrl({ lat, lon }, kind) {
     forecast_days: String(FORECAST_DAYS),
   });
   if (kind === 'soil') p.set('hourly', SOIL_VARS.join(','));
+  else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
   else {
     p.set('daily', DAILY_VARS.join(','));
     p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m');
@@ -2434,6 +2478,18 @@ function parseDaily(json) {
   }));
 }
 
+
+// Hourly rain timing uses the same Open-Meteo response as the daily forecast.
+// Timestamps are local to the requested location (timezone=auto).
+function parseHourly(json) {
+  const data = json?.hourly;
+  return Array.isArray(data?.time) ? data.time.map((time,i)=>({
+    time, probability: typeof data.precipitation_probability?.[i] === 'number' ? data.precipitation_probability[i] : null,
+    precipitation: typeof data.precipitation?.[i] === 'number' ? data.precipitation[i] : null,
+    weather_code: data.weather_code?.[i] ?? null,
+  })) : [];
+}
+
 // date -> mean soil moisture (m3/m3) across the three top layers and all hours.
 function parseSoil(json) {
   const h = json?.hourly;
@@ -2454,6 +2510,10 @@ function parseSoil(json) {
   return out;
 }
 
+async function fetchRainHours(place, opts = {}) {
+ return parseHourly(await getJson(buildForecastUrl(place, 'rain'), opts));
+}
+
 // Fetch everything for a place. Soil data is optional.
 async function fetchWeather({ lat, lon }, opts = {}) {
   const [dailyRes, soilRes] = await Promise.allSettled([
@@ -2471,6 +2531,7 @@ async function fetchWeather({ lat, lon }, opts = {}) {
     elevation_m: typeof dailyRes.value.elevation === 'number' ? dailyRes.value.elevation : null,
     soilAvailable: days.some((d) => d.soil_moisture !== null),
     current: dailyRes.value.current ?? null,
+    hourly: parseHourly(dailyRes.value),
     days,
     fetchedAt: new Date().toISOString(),
   };
@@ -2484,20 +2545,20 @@ function todayInTimezone(timezone, now = new Date()) {
     return now.toISOString().slice(0, 10);
   }
 }
-Object.assign(__exports, { PAST_DAYS, FORECAST_DAYS, DAILY_VARS, SOIL_VARS, WeatherError, buildForecastUrl, buildGeocodeUrl, searchPlaces, parseDaily, parseSoil, fetchWeather, todayInTimezone });
+Object.assign(__exports, { PAST_DAYS, FORECAST_DAYS, DAILY_VARS, SOIL_VARS, WeatherError, buildForecastUrl, buildGeocodeUrl, searchPlaces, parseDaily, parseHourly, parseSoil, fetchRainHours, fetchWeather, todayInTimezone });
 });
 __define("js/weather/service.js", function (__require, __exports) {
 "use strict";
 // Keeps the latest mud forecast ready for every screen (Mud tab, calendar dots,
 // and later the wallpaper). Fetches from Open-Meteo, caches on this device so
 // it works offline, and recomputes instantly when you retune the model.
-const { fetchWeather, todayInTimezone } = __require("js/weather/open-meteo.js");
+const { fetchWeather, fetchRainHours, todayInTimezone } = __require("js/weather/open-meteo.js");
 const { computeMud, displayWindow, summarize } = __require("js/weather/mud.js");
 
 const CACHE_KEY = 'weather-cache';
 
 function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () => new Date() }) {
-  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null };
+  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null, hourly: [], history: [] };
   const listeners = new Set();
   let running = null;
 
@@ -2516,14 +2577,15 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
     const today = todayInTimezone(raw.timezone, now());
     const results = computeMud(raw.days, { params, weights });
     const rows = displayWindow(results, today);
-    return { rows, summary: summarize(rows), todayFound: rows.length > 0 };
+    const history = results.filter(r => r.date < today).slice(-30).reverse();
+    return { rows, history, summary: summarize(rows), todayFound: rows.length > 0 };
   }
 
   async function refresh({ force = false } = {}) {
     if (running) return running;
     running = (async () => {
       const place = await loadPlace();
-      if (!place) { set({ status: 'no-location', place: null, rows: [], summary: null, current: null, error: null }); return state; }
+      if (!place) { set({ status: 'no-location', place: null, rows: [], history: [], hourly: [], summary: null, current: null, error: null }); return state; }
 
       const interval = ((await store.getSetting('refresh_minutes'))?.weather ?? 60) * 60_000;
       const cached = (await store.meta.get(CACHE_KEY)) ?? null;
@@ -2533,8 +2595,8 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       // Show what we have straight away.
       if (sameplace) {
         const c = await compute(cached.raw);
-        if (c.todayFound) set({ place, ...c, fetchedAt: cached.raw.fetchedAt, soilAvailable: cached.raw.soilAvailable, current: cached.raw.current ?? null, status: age < interval ? 'ok' : 'stale', error: null });
-      } else set({ place, rows: [], summary: null, current: null, status: 'loading', error: null });
+        if (c.todayFound) set({ place, ...c, fetchedAt: cached.raw.fetchedAt, soilAvailable: cached.raw.soilAvailable, current: cached.raw.current ?? null, hourly: cached.raw.hourly?.length ? cached.raw.hourly : state.hourly, status: age < interval ? 'ok' : 'stale', error: null });
+      } else set({ place, rows: [], history: [], hourly: [], summary: null, current: null, status: 'loading', error: null });
 
       if (!force && sameplace && age < interval && state.rows.length) return state;
 
@@ -2544,7 +2606,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);
-        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, status: c.todayFound ? 'ok' : 'error', error: c.todayFound ? null : 'The weather data did not include today.' });
+        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, hourly: raw.hourly?.length ? raw.hourly : state.hourly, status: c.todayFound ? 'ok' : 'error', error: c.todayFound ? null : 'The weather data did not include today.' });
       } catch (err) {
         set({ place, status: state.rows.length ? 'stale' : 'error', error: err.message });
       }
@@ -2556,6 +2618,18 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
   }
 
   // Re-score from the cached data (after retuning, or when the date rolls over).
+  // Load short-term rain separately so existing daily/soil refresh remains reliable.
+  let hourlyAt = 0;
+  async function loadHourly({ force = false } = {}) {
+    const place = await loadPlace();
+    if (!place) return [];
+    if (!force && state.hourly.length && Date.now() - hourlyAt < 20 * 60_000) return state.hourly;
+    try {
+      const hourly = await fetchRainHours(place, { fetchImpl });
+      hourlyAt = Date.now(); set({ hourly });
+      return hourly;
+    } catch { return state.hourly; }
+  }
   async function recompute() {
     const place = await loadPlace();
     const cached = await store.meta.get(CACHE_KEY);
@@ -2589,12 +2663,48 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
   });
 
   return {
-    refresh, recompute, setPlace, preview,
+    refresh, recompute, loadHourly, setPlace, preview,
     getState: () => ({ ...state }),
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }
 Object.assign(__exports, { createWeatherService });
+});
+__define("js/weather/sky-events.js", function (__require, __exports) {
+"use strict";
+// Curated astronomical event dates; not a location-specific visibility predictor.
+// Eclipse dates: NASA https://science.nasa.gov/eclipses/future-eclipses/
+// Meteor shower peaks: American Meteor Society https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/
+const { moonPhase } = __require("js/weather/moon-phase.js");
+const CALENDAR = [
+ ['2026-11-04','Southern Taurids peak','Máximo de las Táuridas del Sur','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2026-11-17','Leonids peak','Máximo de las Leónidas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2026-12-14','Geminids peak','Máximo de las Gemínidas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2026-12-22','Ursids peak','Máximo de las Úrsidas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2027-01-04','Quadrantids peak','Máximo de las Cuadrántidas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2027-02-06','Annular solar eclipse (location varies)','Eclipse solar anular (según ubicación)','https://science.nasa.gov/eclipses/future-eclipses/'],
+ ['2027-02-20','Penumbral lunar eclipse','Eclipse lunar penumbral','https://science.nasa.gov/eclipses/future-eclipses/'],
+ ['2027-04-22','Lyrids peak','Máximo de las Líridas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2027-05-06','Eta Aquariids peak','Máximo de las Eta Acuáridas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2027-08-02','Total solar eclipse (location varies)','Eclipse solar total (según ubicación)','https://science.nasa.gov/eclipses/future-eclipses/'],
+ ['2027-08-13','Perseids peak','Máximo de las Perseidas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
+ ['2027-08-17','Penumbral lunar eclipse','Eclipse lunar penumbral','https://science.nasa.gov/eclipses/future-eclipses/'],
+];
+const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function upcomingSkyEvents(date=new Date(), limit=5) {
+ const today=key(date);
+ const events=CALENDAR.filter(([d])=>d>=today).map(([d,en,es,url])=>({date:d,en,es,url,kind:'calendar'}));
+ // The synodic approximation is not an eclipse ephemeris. Show new/full moons as approximate.
+ const phases=[]; let last='';
+ for(let step=0;step<65;step++){const d=new Date(date.getFullYear(),date.getMonth(),date.getDate()+step);
+  const phase=moonPhase(d).label;
+  if((phase==='New moon'||phase==='Full moon')&&phase!==last){
+   phases.push({date:key(d),en:`${phase} (approx.)`,es:phase==='New moon'?'Luna nueva (aprox.)':'Luna llena (aprox.)',url:'https://science.nasa.gov/moon/moon-phases/',kind:'moon'});}
+  last=phase;
+ }
+ return [...events,...phases].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,Math.max(0,limit));
+}
+Object.assign(__exports, { upcomingSkyEvents });
 });
 __define("js/widgets/currency.js", function (__require, __exports) {
 "use strict";
@@ -2700,6 +2810,8 @@ const WIDGET_DEFS = {
   // The clock is integrated into Weather on the dashboard; legacy wallpaper layouts retain it.
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
   currency: { title: 'Currency Converter', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: null },
+  sky:      { title:'Sky events', minW:3,minH:2,defaultW:4,defaultH:3, route:'mud' },
+  recent:   { title: 'Recently played', minW:3, minH:2, defaultW:4, defaultH:3, route:'games' },
   games:    { title: 'Currently playing', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'games' },
   phrase:   { title: 'Phrase of the day',     minW: 4, minH: 3, defaultW: 8, defaultH: 4, route: null },
 };
@@ -2841,8 +2953,9 @@ const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurre
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { hash32 } = __require("js/ui/pixel-icon.js");
 const { timeAgo } = __require("js/ui/format.js");
-const { weatherGlyph, glyphSvg } = __require("js/ui/pixel-icon.js");
+const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
+const { upcomingSkyEvents } = __require("js/weather/sky-events.js");
 const { language, t } = __require("js/ui/language.js");
 const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
 
@@ -2897,7 +3010,7 @@ function mountMud(el, { weather, store }) {
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
-      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: night && clearEnough ? moonPhaseSvg(now) : glyphSvg(weatherGlyph(code).glyph) }),
+      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
         h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
@@ -2914,7 +3027,7 @@ function mountMud(el, { weather, store }) {
           const title = `${dayLong(r.date)} · ${localizedWeather(icon.text)} · ${temperature} · ${precipitation} · ${localizedMudLabel(r.label)} ${r.index}/100`;
           return h('div', { class: `w-forecast-day ${r.phase === 'today' ? 'today' : ''}`, title, 'aria-label': title },
             h('span', { class: 'w-forecast-label' }, r.phase === 'today' ? t('Now') : dayShort(r.date)),
-            h('span', { class: 'w-forecast-icon', html: r.phase === 'today' && night && clearEnough ? moonPhaseSvg(now) : glyphSvg(icon.glyph) }),
+            h('span', { class: 'w-forecast-icon', html: weatherIconSvg(r.raw?.weather_code,{night:r.phase === 'today' && night,date:now}) }),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
             h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}`));
@@ -3061,7 +3174,25 @@ function mountGames(el,{store}){
  };
  return live(render,run=>[storeTables(store,['settings'],run)]);
 }
-const MOUNTS = { currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
+function mountRecentlyPlayed(el,{store}) {
+  const render=async()=>{const saved=await store.getSetting('game_library_v1');
+    const games=(saved?.games||[]).filter(x=>x.lastOpened).sort((a,b)=>String(b.lastOpened).localeCompare(String(a.lastOpened))).slice(0,5);
+    replace(el,games.length?h('div',{class:'game-cover-grid'},games.map(g=>h('a',{class:'game-book',href:'#games'},g.cover&&(/^(https:\/\/|data:image\/)/.test(g.cover))?h('img',{src:g.cover,alt:g.title,loading:'lazy'}):h('span',{class:'game-placeholder'},'G'),h('span',{},g.title)))):note(t('Open a game in your library to see it here.')));
+  };
+  return live(render,run=>[storeTables(store,['settings'],run)]);
+}
+function mountSky(el,{weather}) {
+ const render=()=>{const events=upcomingSkyEvents(new Date(),4);const place=weather?.getState().place?.name;
+  replace(el,h('div',{class:'w-sky'},
+    h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
+    ...events.map(e=>h('p',{class:'w-sky-event'},h('span',{},e.date+' · '),
+      h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},language()==='es'?e.es:e.en))),
+    place?h('small',{},`${t('Selected location')}: ${place}`):null));
+ };
+ const inst=live(render,run=>[weather.subscribe(run)]);const timer=setInterval(()=>inst.refresh(),60*60_000);
+ return {destroy(){clearInterval(timer);inst.destroy();},refresh:inst.refresh};
+}
+const MOUNTS = { sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];

@@ -11,8 +11,9 @@ import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js
 import { locationPath } from '../data/inventory-logic.js';
 import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
-import { weatherGlyph, glyphSvg } from '../ui/pixel-icon.js';
+import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } from '../weather/moon-phase.js';
+import { upcomingSkyEvents } from '../weather/sky-events.js';
 import { language, t } from '../ui/language.js';
 import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily-phrases.js';
 
@@ -67,7 +68,7 @@ function mountMud(el, { weather, store }) {
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
-      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: night && clearEnough ? moonPhaseSvg(now) : glyphSvg(weatherGlyph(code).glyph) }),
+      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
         h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
@@ -84,7 +85,7 @@ function mountMud(el, { weather, store }) {
           const title = `${dayLong(r.date)} · ${localizedWeather(icon.text)} · ${temperature} · ${precipitation} · ${localizedMudLabel(r.label)} ${r.index}/100`;
           return h('div', { class: `w-forecast-day ${r.phase === 'today' ? 'today' : ''}`, title, 'aria-label': title },
             h('span', { class: 'w-forecast-label' }, r.phase === 'today' ? t('Now') : dayShort(r.date)),
-            h('span', { class: 'w-forecast-icon', html: r.phase === 'today' && night && clearEnough ? moonPhaseSvg(now) : glyphSvg(icon.glyph) }),
+            h('span', { class: 'w-forecast-icon', html: weatherIconSvg(r.raw?.weather_code,{night:r.phase === 'today' && night,date:now}) }),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
             h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}`));
@@ -231,7 +232,25 @@ function mountGames(el,{store}){
  };
  return live(render,run=>[storeTables(store,['settings'],run)]);
 }
-const MOUNTS = { currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
+function mountRecentlyPlayed(el,{store}) {
+  const render=async()=>{const saved=await store.getSetting('game_library_v1');
+    const games=(saved?.games||[]).filter(x=>x.lastOpened).sort((a,b)=>String(b.lastOpened).localeCompare(String(a.lastOpened))).slice(0,5);
+    replace(el,games.length?h('div',{class:'game-cover-grid'},games.map(g=>h('a',{class:'game-book',href:'#games'},g.cover&&(/^(https:\/\/|data:image\/)/.test(g.cover))?h('img',{src:g.cover,alt:g.title,loading:'lazy'}):h('span',{class:'game-placeholder'},'G'),h('span',{},g.title)))):note(t('Open a game in your library to see it here.')));
+  };
+  return live(render,run=>[storeTables(store,['settings'],run)]);
+}
+function mountSky(el,{weather}) {
+ const render=()=>{const events=upcomingSkyEvents(new Date(),4);const place=weather?.getState().place?.name;
+  replace(el,h('div',{class:'w-sky'},
+    h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
+    ...events.map(e=>h('p',{class:'w-sky-event'},h('span',{},e.date+' · '),
+      h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},language()==='es'?e.es:e.en))),
+    place?h('small',{},`${t('Selected location')}: ${place}`):null));
+ };
+ const inst=live(render,run=>[weather.subscribe(run)]);const timer=setInterval(()=>inst.refresh(),60*60_000);
+ return {destroy(){clearInterval(timer);inst.destroy();},refresh:inst.refresh};
+}
+const MOUNTS = { sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 export function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];
