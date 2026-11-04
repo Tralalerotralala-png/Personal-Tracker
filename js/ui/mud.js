@@ -1,7 +1,7 @@
 // The Mud tab: today's answer first, then five observed days, today, and five
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
-import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format.js';
+import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
 import { glyphSvg, weatherGlyph } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
 import { describeModel, COMPONENTS } from '../weather/mud.js';
