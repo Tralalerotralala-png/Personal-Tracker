@@ -1150,21 +1150,21 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
- ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Lodo'],['Calendar','Calendario'],['Feed','Noticias'],
- ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Current conditions','Condiciones actuales'],
+ ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Clima'],['Calendar','Calendario'],['Feed','Noticias'],
+ ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Games','Juegos'],['Game Library','Biblioteca de juegos'],['Clear','Despejado'],['Ground conditions','Condiciones del terreno'],['Mud conditions','Condiciones del terreno'],['Weather and mud','Clima y terreno'],['Tune the mud model','Ajustar el modelo del terreno'],['Observed','Observado'],['Forecast','Pronóstico'],['No big change expected.','No se esperan cambios importantes.'],['No rain over 3 days, soil is dry, drying well','Sin lluvia en los últimos 3 días; el suelo está seco y se está secando bien'],['Current conditions','Condiciones actuales'],
  ['Daily forecast','Pronóstico diario'],['Next six days','Próximos seis días'],['Feels like','Sensación térmica'],
  ['Humidity','Humedad'],['Wind','Viento'],['Rain today','Lluvia de hoy'],['Today','Hoy'],['Tomorrow','Mañana'],
  ['Sunny','Soleado'],['Clear sky','Cielo despejado'],['Partly cloudy','Parcialmente nublado'],
  ['Cloudy','Nublado'],['Overcast','Cubierto'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
  ['Snow','Nieve'],['Thunderstorm','Tormenta eléctrica'],['Fog','Niebla'],['Storms','Tormentas'],
- ['Mud forecast','Pronóstico de lodo'],['MUD OUTLOOK','PRONÓSTICO DE LODO'],['LOCAL TIME','HORA LOCAL'],
+ ['Mud forecast','Pronóstico del terreno'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['LOCAL TIME','HORA LOCAL'],
  ['Change place','Cambiar lugar'],['Choose a place','Elegir lugar'],['Refresh','Actualizar'],
  ['Items','Objetos'],['Places','Lugares'],['Add an item','Agregar objeto'],['Add item','Agregar objeto'],
  ['Clear filters','Borrar filtros'],['No items match these filters.','Ningún objeto coincide con estos filtros.'],
  ['Your pack is empty. Add your first item, then note where it lives.','Tu mochila está vacía. Agrega un objeto y anota dónde está.'],
  ['Where is it? Type an item name','¿Dónde está? Escribe el nombre del objeto'],
  ['Grid view','Vista de cuadrícula'],['List view','Vista de lista'],['Sync now','Sincronizar ahora'],
- ['Account and sync','Cuenta y sincronización'],['Sign out','Cerrar sesión'],['Mud forecast','Pronóstico de lodo'],
+ ['Account and sync','Cuenta y sincronización'],['Sign out','Cerrar sesión'],['Mud forecast','Pronóstico del terreno'],
  ['Overview clocks','Relojes de inicio'],['Save clocks','Guardar relojes'],['Layout','Diseño'],
  ['Wallpaper','Fondo de pantalla'],['Wallpaper access','Acceso al fondo de pantalla'],
  ['Rarity tiers','Niveles de rareza'],['Navigation order','Orden de navegación'],
@@ -1246,15 +1246,16 @@ __define("js/ui/mud-format.js", function (__require, __exports) {
 // the one-sentence summary. Kept apart from the Mud tab so the wallpaper can use them without
 // pulling in any dialogs or forms.
 const { h } = __require("js/ui/dom.js");
+const { language } = __require("js/ui/language.js");
 
 const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
 const DAY_LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' });
 const DAY_MONTH = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const atNoon = (key) => new Date(`${key}T12:00:00Z`);
 
-const dayShort = (key) => DAY.format(atNoon(key));
-const dayLong = (key) => DAY_LONG.format(atNoon(key));
-const dayMonth = (key) => DAY_MONTH.format(atNoon(key));
+const dayShort = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{weekday:'short',timeZone:'UTC'}):DAY).format(atNoon(key));
+const dayLong = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{weekday:'long',timeZone:'UTC'}):DAY_LONG).format(atNoon(key));
+const dayMonth = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',timeZone:'UTC'}):DAY_MONTH).format(atNoon(key));
 const mudClass = (label) => `m-${label.toLowerCase()}`;
 
 // Ten pixel blocks, filled in proportion to the index (text label always accompanies it).
@@ -1264,19 +1265,36 @@ function mudBar(row) {
     Array.from({ length: 10 }, (_, i) => h('span', { class: i < filled ? 'blk on' : 'blk' })));
 }
 
+const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
+
 function mudChip(row) {
-  return h('span', { class: `mud-chip ${mudClass(row.label)}` }, row.label, h('b', {}, row.index));
+  return h('span', { class: `mud-chip ${mudClass(row.label)}` }, localizedMudLabel(row.label), h('b', {}, row.index));
 }
 
 // "Today is Muddy (62). Getting muddier, peaking Thursday at Swamp (81)."
 function summarySentence(s) {
+  if(language()==='es'){if(s.trend==='worsening')return 'Se espera que el terreno esté más húmedo.';if(s.trend==='improving')return 'El terreno se está secando.';return 'No se esperan cambios importantes.';}
   const bits = [];
   if (s.trend === 'worsening') bits.push(s.peak ? `Getting muddier, peaking on ${dayLong(s.peak.date)} at ${s.peak.label} (${s.peak.index}).` : 'Getting muddier.');
   else if (s.trend === 'improving') bits.push(s.driest ? `Drying out, best on ${dayLong(s.driest.date)} at ${s.driest.label} (${s.driest.index}).` : 'Drying out.');
   else bits.push(s.peak ? `Mostly steady, with a bump on ${dayLong(s.peak.date)} (${s.peak.label}, ${s.peak.index}).` : 'No big change expected.');
   return bits.join(' ');
 }
-Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence });
+
+// Translate the model's composed explanations without changing the numeric model.
+function localizedMudWhy(why){
+ if(language()!=='es')return why;
+ return String(why||'').replace(/([\d.]+) mm of rain over 3 days/gi,'$1 mm de lluvia en los últimos 3 días')
+ .replace(/no rain over 3 days/gi,'sin lluvia en los últimos 3 días')
+ .replace(/soil is saturated/gi,'el suelo está saturado')
+ .replace(/soil is wet/gi,'el suelo está húmedo')
+ .replace(/soil is dry/gi,'el suelo está seco')
+ .replace(/drying well/gi,'se seca rápidamente')
+ .replace(/drying slowly/gi,'se seca lentamente')
+ .replace(/little drying/gi,'se seca muy poco');
+}
+const localizedWeather = text => language()==='es' ? ({Clear:'Despejado',Sunny:'Soleado','Partly cloudy':'Parcialmente nublado',Cloudy:'Nublado',Overcast:'Cubierto','Light rain':'Lluvia ligera',Rain:'Lluvia',Snow:'Nieve',Fog:'Niebla',Thunderstorm:'Tormenta eléctrica'}[text]||text) : text;
+Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, localizedMudLabel, mudChip, summarySentence, localizedMudWhy, localizedWeather });
 });
 __define("js/ui/pixel-icon.js", function (__require, __exports) {
 "use strict";
@@ -1379,6 +1397,34 @@ const GLYPHS = {
     '.##########.',
     '.##########.',
     '..########..',
+  ],
+  games: [
+    '............',
+    '..########..',
+    '.##########.',
+    '###..##..###',
+    '###..##..###',
+    '############',
+    '############',
+    '##..####..##',
+    '##..####..##',
+    '.##......##.',
+    '..##....##..',
+    '............',
+  ],
+  weather: [
+    '...####.....',
+    '..######....',
+    '.##.##.##...',
+    '###.##.###..',
+    '.##.##.##...',
+    '..######....',
+    '...#######..',
+    '.....#######',
+    '....########',
+    '.....######.',
+    '......####..',
+    '............',
   ],
   mud: [
     '.....##.....',
@@ -2018,7 +2064,12 @@ function isNightAtLocation(current, date = new Date()) {
   if (current?.is_day === 1) return false;
   return date.getHours() < 6 || date.getHours() >= 19;
 }
-Object.assign(__exports, { moonPhase, moonPhaseSvg, isNightAtLocation });
+
+function localizedMoonPhase(label,language='en') {
+ if(language!=='es')return label;
+ return ({'New moon':'Luna nueva','Waxing crescent':'Luna creciente','First quarter':'Cuarto creciente','Waxing gibbous':'Gibosa creciente','Full moon':'Luna llena','Waning gibbous':'Gibosa menguante','Last quarter':'Cuarto menguante','Waning crescent':'Luna menguante'})[label]||label;
+}
+Object.assign(__exports, { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase });
 });
 __define("js/weather/mud.js", function (__require, __exports) {
 "use strict";
@@ -2534,12 +2585,13 @@ __define("js/widgets/defs.js", function (__require, __exports) {
 // Widget metadata (no DOM code, so tests and the wallpaper can read it).
 // Sizes are in grid cells on the 12-column layout.
 const WIDGET_DEFS = {
-  mud:      { title: 'Mud forecast',          minW: 3, minH: 2, defaultW: 6, defaultH: 3, route: 'mud' },
+  mud:      { title: 'Weather',          minW: 3, minH: 2, defaultW: 6, defaultH: 3, route: 'mud' },
   calendar: { title: 'Coming up',             minW: 3, minH: 3, defaultW: 4, defaultH: 4, route: 'calendar' },
   loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
   stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 2, route: 'inventory' },
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
+  games:    { title: 'Currently playing', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'games' },
   phrase:   { title: 'Phrase of the day',     minW: 4, minH: 3, defaultW: 8, defaultH: 4, route: null },
 };
 const WIDGET_IDS = Object.keys(WIDGET_DEFS);
@@ -2674,13 +2726,14 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
 const { h, replace, todayKey, daysSince } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
-const { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence } = __require("js/ui/mud-format.js");
+const { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { hash32 } = __require("js/ui/pixel-icon.js");
 const { timeAgo } = __require("js/ui/format.js");
 const { weatherGlyph, glyphSvg } = __require("js/ui/pixel-icon.js");
-const { moonPhase, moonPhaseSvg, isNightAtLocation } = __require("js/weather/moon-phase.js");
+const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
+const { language } = __require("js/ui/language.js");
 const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
 
 // Render now, and again (at most once per frame) whenever something it
@@ -2723,15 +2776,15 @@ function mountMud(el, { weather, store }) {
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
-      h('span', { class: 'w-weather-glyph', title: night ? moon.label : weatherGlyph(code).text, html: night && clearEnough ? moonPhaseSvg(now) : glyphSvg(weatherGlyph(code).glyph) }),
+      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: night && clearEnough ? moonPhaseSvg(now) : glyphSvg(weatherGlyph(code).glyph) }),
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
-        h('span', {}, night && clearEnough ? `${weatherGlyph(code).text} · ${moon.label}` : weatherGlyph(code).text)),
+        h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
     const forecast = !s.rows.length ? note(s.status === 'no-location' ? 'Choose a place in the Mud tab for weather and mud.' : 'Loading the forecast...') : (() => {
       const sum = s.summary;
       return h('div', { class: 'w-mud-compact' },
         sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
-          h('span', { class: 'w-mud-label' }, sum.today.label),
+          h('span', { class: 'w-mud-label' }, localizedMudLabel(sum.today.label)),
           h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
         h('div', { class: 'w-strip' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) =>
           h('div', { class: `w-cell ${mudClass(r.label)}${r.phase === 'today' ? ' today' : ''}`, title: `${dayLong(r.date)}: ${r.label} ${r.index}` },
@@ -2861,7 +2914,15 @@ function mountPhrase(el, { store }) {
   return { destroy() { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); }, refresh: render };
 }
 
-const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase };
+function mountGames(el,{store}){
+ const render=async()=>{
+  const saved=await store.getSetting('game_library_v1');
+  const games=(saved?.games||[]).filter(g=>g.status==='Playing').slice(0,5);
+  replace(el,games.length?h('div',{class:'game-cover-grid'},games.map(g=>h('a',{class:'game-book',href:'#games'},g.cover&&(/^(https:\/\/|data:image\/)/.test(g.cover))?h('img',{src:g.cover,alt:g.title,loading:'lazy'}):h('span',{class:'game-placeholder'},'G'),h('span',{},g.title)))):note('No games marked Playing yet. Open Game Library to add one.'));
+ };
+ return live(render,run=>[storeTables(store,['settings'],run)]);
+}
+const MOUNTS = { mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];

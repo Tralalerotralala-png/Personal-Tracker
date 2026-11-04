@@ -66,3 +66,14 @@ The phrase catalog and offline widget behavior are testable locally. Tests do no
 ### November 2026 interface fix
 
 The Phrase of the Day is a dashboard widget. On desktop open Overview > Edit layout to move or resize it; older saved layouts receive it once during migration. The Dreams tab shows PIN entry and unlocked journal in the main content area; entry editors remain dialogs. Existing config.js and synced records are preserved during installation.
+
+
+## Game Library and appearance (2026 update)
+
+The **Games** tab is a personal bookshelf or cover grid. Add games with a title, optional cover image (HTTPS URL or upload up to 120 KB), platform, shelf, status, rating and notes. **Look up cover** searches Wikipedia and may return an unrelated image; always verify the result. Game metadata is saved through the existing synced settings store. No new Supabase tables are required. The optional **Currently playing** widget can be added using Overview → Edit layout.
+
+Settings → Appearance / Display provides six editable color presets (Original / Classic, Vault Terminal, Amber CRT, Midnight Observatory, Deep Ocean and Paper Archive) and Compact / Adaptive / Full width desktop layout modes. Changing individual colors preserves your choices as a custom palette.
+
+The Dreams icon follows the approximate current moon phase. The private diary now relocks after 40 minutes without interaction or when you manually lock it, and stays unlocked when switching tabs. Its four-digit PIN remains weak against offline guessing; don't store passwords in the diary.
+
+Weather is the navigation label for the former Mud tab. It retains the ground-drying model under Ground conditions and adds Spanish translations for common weather terms and ground explanations.

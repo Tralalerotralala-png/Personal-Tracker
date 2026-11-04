@@ -165,13 +165,38 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   // -- display
   const scan = h('input', { type: 'checkbox', id: 'st-scan', checked: Boolean(ui?.scanlines),
     onchange: async (e) => { await store.setSetting('ui', { ...(await store.getSetting('ui')), scanlines: e.target.checked }); } });
-  const accentColor = h('input',{type:'color',value: /^#[0-9a-f]{6}$/i.test(ui?.accent_color||'')?ui.accent_color:'#43b9ad', onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),accent_color:e.target.value}); window.dispatchEvent(new Event('tracker-theme-refresh'));}});
+  const accentColor = h('input',{type:'color',value: /^#[0-9a-f]{6}$/i.test(ui?.accent_color||'')?ui.accent_color:'#43b9ad', onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),accent_color:e.target.value,theme_preset:'custom'}); updateChoices('custom'); window.dispatchEvent(new Event('tracker-theme-refresh'));}});
   const paletteColors = [ ['Background', 'background_color', '#17130f'], ['Panels', 'panel_color', '#231c15'], ['Secondary panels', 'panel_secondary_color', '#2e251c'], ['Text', 'text_color', '#eadfc4'], ['Muted text', 'muted_color', '#a39475'], ['Borders', 'border_color', '#4a3b2a'] ];
-  const customColors = paletteColors.map(([label,key,def]) => h('label', { class: 'theme-color-field' }, h('span', {}, label), h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(ui?.[key] || '') ? ui[key] : def, onchange: async e => { await store.setSetting('ui', { ...(await store.getSetting('ui')), [key]:e.target.value }); window.dispatchEvent(new Event('tracker-theme-refresh')); } })));
+  const customColors = paletteColors.map(([label,key,def]) => h('label', { class: 'theme-color-field' }, h('span', {}, label), h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(ui?.[key] || '') ? ui[key] : def, onchange: async e => { await store.setSetting('ui', { ...(await store.getSetting('ui')), [key]:e.target.value,theme_preset:'custom' }); updateChoices('custom'); window.dispatchEvent(new Event('tracker-theme-refresh')); } })));
   const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100})});
   const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked})});
+  const presets = {
+    classic: { name:'Original / Classic', accent_color:'#43b9ad', background_color:'#17130f', panel_color:'#231c15', panel_secondary_color:'#2e251c', text_color:'#eadfc4', muted_color:'#a39475', border_color:'#4a3b2a' },
+    pipboy: { name:'Vault Terminal', accent_color:'#65ff7c', background_color:'#07120a', panel_color:'#0c1c10', panel_secondary_color:'#142a19', text_color:'#a4ffad', muted_color:'#64ae70', border_color:'#2d7540' },
+    amber: { name:'Amber CRT', accent_color:'#ffb347', background_color:'#180e08', panel_color:'#29190e', panel_secondary_color:'#362414', text_color:'#ffda99', muted_color:'#b38a55', border_color:'#79512a' },
+    midnight: { name:'Midnight Observatory', accent_color:'#b7a5ff', background_color:'#0c0e1e', panel_color:'#171b31', panel_secondary_color:'#222843', text_color:'#e6e8ff', muted_color:'#9da6ca', border_color:'#4b537d' },
+    ocean: { name:'Deep Ocean', accent_color:'#5de4e1', background_color:'#06191e', panel_color:'#0c2930', panel_secondary_color:'#16404a', text_color:'#d7f7f5', muted_color:'#8cbfc5', border_color:'#356775' },
+    parchment: { name:'Paper Archive', accent_color:'#7b5c3d', background_color:'#ede2ca', panel_color:'#fff7e7', panel_secondary_color:'#e4d5b9', text_color:'#30261e', muted_color:'#746453', border_color:'#bba787' },
+  };
+  const presetChoices = h('div',{class:'theme-presets'});
+  const presetName = h('p',{class:'hint'},'Every preset can be edited using the individual color controls below.');
+  async function saveColor(key,value){await store.setSetting('ui',{...(await store.getSetting('ui')),[key]:value,theme_preset:'custom'});window.dispatchEvent(new Event('tracker-theme-refresh'));updateChoices('custom');}
+  function updateChoices(selected){for(const b of presetChoices.children)b.setAttribute('aria-pressed',String(b.dataset.preset===selected));}
+  for(const [id,preset] of Object.entries(presets)){
+    const b=h('button',{class:'theme-choice',type:'button','data-preset':id,'aria-pressed':String((ui?.theme_preset||'classic')===id),onclick:async()=>{
+      await store.setSetting('ui',{...(await store.getSetting('ui')),...Object.fromEntries(Object.entries(preset).filter(([key])=>key!=='name')),theme_preset:id});
+      accentColor.value=preset.accent_color;
+      customColors.forEach((field,i)=>{field.querySelector('input').value=preset[paletteColors[i][1]];});
+      window.dispatchEvent(new Event('tracker-theme-refresh'));updateChoices(id);
+    }},preset.name,h('span',{class:'theme-swatch'},[preset.background_color,preset.panel_color,preset.accent_color,preset.text_color].map(color=>h('i',{style:`background:${color}`}))));
+    presetChoices.append(b);
+  }
+  const layoutWidth=h('select',{'aria-label':'Layout width',onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),layout_width:e.target.value});window.dispatchEvent(new Event('tracker-theme-refresh'));}},
+    [['adaptive','Adaptive (recommended)'],['compact','Compact'],['wide','Full width']].map(([value,label])=>h('option',{value,selected:(ui?.layout_width||'adaptive')===value},label)));
   const display = h('section', { class: 'set-block' },
     h('h3', {}, 'Display'),
+    h('label', {}, 'Theme presets'), presetChoices, presetName,
+    h('label', {}, 'Desktop layout width'), layoutWidth,
     h('label', {}, 'Accent color'), accentColor,
     h('p', { class: 'hint' }, 'Customize each part of the palette. Changes sync with your account.'), ...customColors,
     h('label', {}, 'Panel opacity'), panelOpacity,
@@ -193,11 +218,11 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const typography = h('section', { class: 'set-block' }, h('h3', {}, 'Typography'),
     h('p', { class: 'hint' }, 'Choose a sharper font and a comfortable text size. Saved on this device.'),
     h('label', {}, 'Font'), fontSelect, h('label', {}, 'Text size'), sizeSelect);
-  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Mud', calendar: 'Calendar', feed: 'Feed' };
+  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Weather', calendar: 'Calendar', feed: 'Feed', diary: 'Dreams', games: 'Games' };
   const navOrder = h('div');
   function renderNavOrder() {
     const order = (() => { try { return JSON.parse(localStorage.getItem('tracker-nav-order-v1') || 'null'); } catch { return null; } })();
-    const keys = Array.isArray(order) && order.length === 5 ? order : Object.keys(navNames);
+    const keys = Array.isArray(order) ? [...order.filter(k=>k in navNames),...Object.keys(navNames).filter(k=>!order.includes(k))] : Object.keys(navNames);
     navOrder.replaceChildren(...keys.map((key, i) => h('div', { class: 'nav-order-row' },
       h('span', {}, navNames[key]), h('div', { class: 'inline-actions' },
         h('button', { class: 'btn small', type: 'button', disabled: i === 0, 'aria-label': `Move ${navNames[key]} earlier`, onclick: () => { window.dispatchEvent(new CustomEvent('tracker-nav-change', { detail: { from: key, to: keys[i-1] } })); renderNavOrder(); } }, 'Up'),

@@ -245,3 +245,8 @@ uses, rebuild it first with `node scripts/build-wallpaper.mjs`.
 fake Supabase, and no Wallpaper Engine. So the *first time* you do Parts 2, 6 and 10 are
 the real tests. If anything fails, it will most likely be one of those three, and the
 exact error message is all I need to fix it.
+
+
+## Updating the app
+
+The update archive contains project files at its root. Upload them to the GitHub repository root, replacing matching files. Keep your existing `config.js` and do not publish Supabase secret/service-role keys. GitHub's web uploader does not delete old files automatically. The only required top-level Markdown documentation is `README.md` and `SETUP.md`; old upgrade-note Markdown files may be removed. Existing Supabase records and widget layouts are not reset.

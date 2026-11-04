@@ -26,3 +26,8 @@ export function isNightAtLocation(current, date = new Date()) {
   if (current?.is_day === 1) return false;
   return date.getHours() < 6 || date.getHours() >= 19;
 }
+
+export function localizedMoonPhase(label,language='en') {
+ if(language!=='es')return label;
+ return ({'New moon':'Luna nueva','Waxing crescent':'Luna creciente','First quarter':'Cuarto creciente','Waxing gibbous':'Gibosa creciente','Full moon':'Luna llena','Waning gibbous':'Gibosa menguante','Last quarter':'Cuarto menguante','Waning crescent':'Luna menguante'})[label]||label;
+}

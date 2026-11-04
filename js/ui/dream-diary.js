@@ -5,7 +5,7 @@ import { uuid } from '../data/util.js';
 import { language } from './language.js';
 import { glyphSvg } from './pixel-icon.js';
 import { JOURNAL_KEY, emptyJournal, validPin, encryptJournal, decryptJournal } from './private-journal-crypto.js';
-const DURATION=5*60*1000;
+const DURATION=40*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const labels={
  en:{title:'Dream Diary',intro:'Your dreams and private reflections are locked separately from the rest of Personal Tracker.',open:'Open private journal',warning:'A four-digit PIN offers limited protection against determined attackers. Entries are encrypted before syncing, but a stolen encrypted backup could be brute-forced. There is no PIN recovery. Never reuse an important PIN.',pin:'Four-digit PIN',again:'Confirm PIN',setup:'Create PIN',unlock:'Unlock',lock:'Lock now',wrong:'Incorrect PIN or damaged journal.',wait:'Too many attempts. Try again later.',dreams:'Dreams',sleep:'Sleep',moods:'Mood',habits:'Habits',vault:'Private Vault',new:'New entry',empty:'No entries yet.',save:'Save',delete:'Delete',date:'Date',name:'Title',body:'Description',type:'Dream type',vivid:'Vividness',tags:'Tags (comma-separated)',quality:'Sleep quality',hours:'Hours slept',mood:'Mood',done:'Completed today',locked:'Your private entries never appear in global search or Wallpaper Engine.',change:'Change PIN',old:'Current PIN',newPin:'New PIN',repeat:'Repeat new PIN',forgot:'Lost PINs cannot be recovered.',art:'Illustration (optional, max 100 KB)',night:'Dream illustration',none:'None',saveFailed:'Could not save private journal. Try again.',illustration:'Attach illustration'},
@@ -31,7 +31,7 @@ export function createDreamDiaryView({store}) {
  // Editing happens in dialogs appended outside the view: activity there must also keep it unlocked.
  document.addEventListener('pointerdown',()=>{if(session)touch();});
  document.addEventListener('keydown',()=>{if(session)touch();});
- document.addEventListener('visibilitychange',()=>{if(document.hidden&&session)lock();});
+ // The 40-minute idle timer also runs while the app is in the background.
  function trackDialog(dialog){dialogs.add(dialog);dialog.el.addEventListener('close',()=>dialogs.delete(dialog),{once:true});return dialog;}
  async function openLocked(){
   if(sheet) sheet.close();clear();
@@ -128,5 +128,5 @@ export function createDreamDiaryView({store}) {
   draw();touch();
  }
  landing();
- return {el,mount:async()=>landing(),show:()=>{if(!session)landing();},hide:lock};
+ return {el,mount:async()=>landing(),show:()=>{if(!session)landing();},hide:()=>{}};
 }
