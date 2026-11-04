@@ -1,6 +1,7 @@
 // The Overview tab: all your widgets on one screen, arranged by the layout you
 // chose. On a phone widgets stack in one column using the phone layout.
 import { h, replace } from './dom.js';
+import { createPhraseOfDay } from './daily-phrases.js';
 import { createWidgetCard } from '../widgets/registry.js';
 import { loadLayout } from '../widgets/store.js';
 import { openLayoutEditor } from './layout-editor.js';
@@ -47,7 +48,7 @@ export function createOverviewView({ store, ctx }) {
       h('div', { class: 'panel-head' },
         h('h2', {}, 'Overview'),
         h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
-      dayStatus, grid);
+      dayStatus, createPhraseOfDay(), grid);
   }
 
   let queued = false;

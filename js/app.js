@@ -12,6 +12,7 @@ import { createWeatherService } from './weather/service.js';
 import { createFeedService } from './feed/service.js';
 import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
+import { createDreamDiaryView } from './ui/dream-diary.js';
 import { loadHub, openPersonalHub } from './ui/personal-hub.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
@@ -113,6 +114,7 @@ const mud = createMudView({ store, weather });
 const calendar = createCalendarView({ store, weather });
 const feedView = createFeedView({ store, feed, proxySuggestion });
 const overview = createOverviewView({ store, ctx: { store, weather, feed } });
+const diary = createDreamDiaryView({ store });
 
 const VIEWS = {
   inventory,
@@ -120,9 +122,10 @@ const VIEWS = {
   calendar,
   feed: feedView,
   overview,
+  diary,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Mud', 'mud'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Mud', 'mud'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Dreams', 'moon'],
 ];
 
 const main = h('main', { id: 'main' });
@@ -131,8 +134,9 @@ for (const [key, view] of Object.entries(VIEWS)) { view.el.hidden = true; view.e
 // Navigation preferences are device-local so they work even before sign-in.
 const NAV_KEY = 'tracker-nav-order-v1';
 const savedNav = (() => { try { return JSON.parse(localStorage.getItem(NAV_KEY) || 'null'); } catch { return null; } })();
-if (Array.isArray(savedNav) && savedNav.length === NAV.length && NAV.every(([k]) => savedNav.includes(k))) {
-  NAV.sort((a, b) => savedNav.indexOf(a[0]) - savedNav.indexOf(b[0]));
+if (Array.isArray(savedNav)) {
+  // Preserve the user's old navigation order when a new tab is introduced.
+  NAV.sort((a,b)=>{const ia=savedNav.indexOf(a[0]),ib=savedNav.indexOf(b[0]);return (ia<0?999:ia)-(ib<0?999:ib);});
 }
 const fontChoices = { pixel: "'Pixelify Sans', ui-monospace, monospace", clean: "system-ui, 'Segoe UI', sans-serif", mono: "Consolas, 'Courier New', monospace" };
 function applyTypography() {

@@ -388,18 +388,6 @@ export function createInventoryView({ store, photos }) {
         } finally { URL.revokeObjectURL(url); }
       } catch (err) { toast(err.message || 'Icon creation failed'); }
     } }, t('Generate 16×16 icon'));
-    const builtInIcon = h('button', { class: 'btn small', type: 'button', onclick: async () => {
-      try {
-        const response = await fetch(methotrexateIcon);
-        if (!response.ok) throw new Error('Built-in icon unavailable');
-        const blob = await response.blob();
-        draft.photoFile = new File([blob], 'methotrexate-16.png', { type: 'image/png' });
-        draft.removePhoto = false;
-        renderPhoto(URL.createObjectURL(blob));
-        toast('Methotrexate icon selected. Save the item to apply it.');
-      } catch (err) { toast(err.message); }
-    } }, t('Use Methotrexate icon'));
-
     const desc = h('textarea', { id: 'it-desc', rows: 3, placeholder: 'e.g. 16x16 pixel art icon of an orange headlamp, 8 colours, transparent background' }, existing?.pixel_description ?? '');
     const suggest = () => {
       const nm = name.value.trim() || 'the item';
@@ -498,7 +486,7 @@ export function createInventoryView({ store, photos }) {
             onSaved: async (row) => { await load(); place.replaceChildren(...placeOptions(data.locations)); place.value = row.id; },
           }) }, 'New place')),
         h('label', {}, 'Photo / pixel icon'), photoBox, fileInput,
-        h('div', { class: 'inline-actions' }, generateIcon, builtInIcon),
+        h('div', { class: 'inline-actions' }, generateIcon),
         advanced,
         error,
         h('button', { type: 'submit', class: 'visually-hidden' }, 'Save')),

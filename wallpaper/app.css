@@ -490,7 +490,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
    Stage 4: widgets, overview, feed, layout editor
    =================================================================================== */
 
-.hotbar { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.hotbar { grid-template-columns: repeat(6, minmax(0,1fr)); gap: 4px; }
 .slot-label { font-size: .78rem; }
 @media (min-width: 900px) { .hotbar { grid-template-columns: none; } .slot-label { font-size: .85rem; } }
 .desktop-only-block { display: none; }
@@ -769,3 +769,26 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .pixel-inventory-icon { width:100%; height:100%; image-rendering:pixelated; object-fit:contain; }
 .theme-color-field { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .theme-color-field input { width:56px; min-height:32px; }
+
+/* Daily phrase panel: per-Hanzi glosses are hoverable and tap-accessible. */
+.phrase-panel{margin:12px 0 18px;padding:14px 18px;border:1px solid var(--edge);background:var(--panel);color:var(--ink);}
+.phrase-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.phrase-heading>span,.phrase-gloss,.phrase-meaning{color:var(--ink-dim);font-size:.78rem}
+.phrase-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.phrase-grid>div{min-width:0}.phrase-grid small{display:block;color:var(--ink-dim);font-size:.67rem;letter-spacing:.09em}
+.phrase-hanzi,.phrase-german{display:flex;flex-wrap:wrap;align-items:center;min-height:46px}
+.phrase-char,.phrase-word{border:0;background:none;color:var(--ink);cursor:help;padding:2px 3px;font-family:inherit}
+.phrase-char{font-size:1.7rem}.phrase-word{font-size:1.15rem}
+.phrase-char:hover,.phrase-char:focus-visible,.phrase-word:hover,.phrase-word:focus-visible{background:var(--accent);color:var(--bg);outline:1px solid var(--accent)}
+.phrase-pronunciation{font-size:.82rem;color:var(--accent);margin-top:4px;overflow-wrap:anywhere}
+.phrase-gloss{min-height:24px;margin-top:12px}.phrase-meaning{margin-top:4px}
+@media(max-width:650px){.phrase-grid{grid-template-columns:1fr}}
+.private-landing{max-width:550px;margin:30px auto;padding:28px 20px;text-align:center;background:var(--panel);border:1px solid var(--edge)}
+.private-moon{font-size:3rem;color:var(--accent)}.private-landing p{line-height:1.6}
+.journal-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap}
+.journal-list-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.journal-list{display:grid;gap:10px}.journal-entry{width:100%;display:grid;grid-template-columns:1fr auto;text-align:left;gap:5px 12px;background:var(--panel-2);border:1px solid var(--edge);color:var(--ink);padding:12px;cursor:pointer}
+.journal-entry>span{grid-column:1/-1;color:var(--ink-dim);font-size:.83rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.journal-entry>small{color:var(--ink-dim)}.journal-art{max-width:100%;max-height:180px;object-fit:contain}
+
+@media(max-width:480px){.hotbar{padding-left:3px;padding-right:3px}.slot{min-width:0;border-width:2px}.slot-label{font-size:.63rem;letter-spacing:-.02em}.slot svg{width:20px;height:20px}}
