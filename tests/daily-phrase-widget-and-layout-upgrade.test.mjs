@@ -48,7 +48,7 @@ test('saved desktop and mobile layouts gain the phrase widget without losing pla
   assert.equal(await upgradeLayouts(store), true);
   const desktop = await loadLayout(store,'desktop');
   const mobile = await loadLayout(store,'mobile');
-  assert.deepEqual(desktop.filter(x=>!['phrase','currency'].includes(x.id)), priorDesktop);
+  assert.deepEqual(desktop.filter(x=>!['phrase','currency'].includes(x.id)), priorDesktop.filter(x=>x.id!=='clock'));
   assert.deepEqual(mobile.filter(x=>!['phrase','currency'].includes(x.id)), priorMobile);
   assert.ok(desktop.some(x=>x.id==='phrase'));
   assert.ok(mobile.some(x=>x.id==='phrase'));
@@ -61,7 +61,7 @@ test('saved desktop and mobile layouts gain the phrase widget without losing pla
   // Removing the widget after migration stays removed.
   await store.upsert('widget_layout',{profile:'desktop',layout:priorDesktop});
   assert.equal(await upgradeLayouts(store), false);
-  assert.deepEqual(await loadLayout(store,'desktop'), priorDesktop);
+  assert.deepEqual(await loadLayout(store,'desktop'), priorDesktop.filter(x=>x.id!=='clock')); 
 });
 
 test('legacy layout without version metadata is preserved rather than overwritten', async () => {
@@ -69,5 +69,5 @@ test('legacy layout without version metadata is preserved rather than overwritte
   const custom = [{id:'clock',x:7,y:4,w:3,h:2}];
   await store.upsert('widget_layout',{profile:'desktop',layout:custom});
   assert.equal(await upgradeLayouts(store), true);
-  assert.deepEqual((await loadLayout(store,'desktop')).filter(x=>!['phrase','currency'].includes(x.id)), custom);
+  assert.ok((await loadLayout(store,'desktop')).some(x=>x.id==='mud')); // legacy clock-only layout migrates to the integrated weather widget
 });

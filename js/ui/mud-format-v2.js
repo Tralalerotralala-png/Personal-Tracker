@@ -14,11 +14,12 @@ export const dayLong = (key) => (language()==='es'?new Intl.DateTimeFormat('es-M
 export const dayMonth = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',timeZone:'UTC'}):DAY_MONTH).format(atNoon(key));
 export const mudClass = (label) => `m-${label.toLowerCase()}`;
 
-// Ten pixel blocks, filled in proportion to the index (text label always accompanies it).
+// Four proportional segments retain the precise 0–100 score in the accessible label.
 export function mudBar(row) {
-  const filled = Math.round(row.index / 10);
-  return h('span', { class: `mud-bar ${mudClass(row.label)}`, role: 'img', 'aria-label': `${row.index} out of 100` },
-    Array.from({ length: 10 }, (_, i) => h('span', { class: i < filled ? 'blk on' : 'blk' })));
+  const score = Math.max(0, Math.min(100, Number(row.index) || 0));
+  return h('span', { class: `mud-bar ${mudClass(row.label)}`, role: 'img', 'aria-label': `${score} out of 100` },
+    Array.from({ length: 4 }, (_, i) => h('span', { class: 'blk' },
+      h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * 25) * 4))}%` }))));
 }
 
 export const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;

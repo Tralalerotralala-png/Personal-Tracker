@@ -6,6 +6,7 @@ export const WIDGET_DEFS = {
   loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
   stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 1, route: 'inventory' },
+  // The clock is integrated into Weather on the dashboard; legacy wallpaper layouts retain it.
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
   currency: { title: 'Currency Converter', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: null },
   games:    { title: 'Currently playing', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'games' },

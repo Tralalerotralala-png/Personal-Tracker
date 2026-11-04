@@ -12,6 +12,8 @@ export function createOverviewView({ store, ctx }) {
   const el = h('div', { class: 'view overview' });
   const wide = typeof matchMedia === 'function' ? matchMedia('(min-width: 900px)') : { matches: true, addEventListener() {} };
   let cards = [];
+  let lastDay = '';
+  let lastVisibility = false;
 
   const profile = () => (wide.matches ? 'desktop' : 'mobile');
 
@@ -25,6 +27,7 @@ export function createOverviewView({ store, ctx }) {
     const today = new Date();
     const events = await store.list('events');
     const day = keyOf(today.getFullYear(), today.getMonth()+1, today.getDate());
+    lastDay = day;
     const upcoming = (groupByDay(events, day, day).get(day) || []).length;
     const hub = await loadHub(store);
     const {alerts,items} = await collectAlerts(store,hub);
@@ -58,6 +61,15 @@ export function createOverviewView({ store, ctx }) {
     requestAnimationFrame(() => { queued = false; render(); });
   });
   wide.addEventListener?.('change', () => { if (!el.hidden) render(); });
+  const checkDay = () => {
+    if (el.hidden || !el.isConnected) return;
+    const now = new Date();
+    const key = keyOf(now.getFullYear(), now.getMonth()+1, now.getDate());
+    if (key !== lastDay) render();
+  };
+  const timer = setInterval(checkDay, 30_000);
+  document.addEventListener('visibilitychange', checkDay);
+  window.addEventListener('focus', checkDay);
 
   return {
     el,

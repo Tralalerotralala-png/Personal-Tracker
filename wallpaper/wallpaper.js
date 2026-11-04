@@ -1273,11 +1273,12 @@ const dayLong = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{wee
 const dayMonth = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',timeZone:'UTC'}):DAY_MONTH).format(atNoon(key));
 const mudClass = (label) => `m-${label.toLowerCase()}`;
 
-// Ten pixel blocks, filled in proportion to the index (text label always accompanies it).
+// Four proportional segments retain the precise 0–100 score in the accessible label.
 function mudBar(row) {
-  const filled = Math.round(row.index / 10);
-  return h('span', { class: `mud-bar ${mudClass(row.label)}`, role: 'img', 'aria-label': `${row.index} out of 100` },
-    Array.from({ length: 10 }, (_, i) => h('span', { class: i < filled ? 'blk on' : 'blk' })));
+  const score = Math.max(0, Math.min(100, Number(row.index) || 0));
+  return h('span', { class: `mud-bar ${mudClass(row.label)}`, role: 'img', 'aria-label': `${score} out of 100` },
+    Array.from({ length: 4 }, (_, i) => h('span', { class: 'blk' },
+      h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * 25) * 4))}%` }))));
 }
 
 const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
@@ -2696,6 +2697,7 @@ const WIDGET_DEFS = {
   loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
   stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 1, route: 'inventory' },
+  // The clock is integrated into Weather on the dashboard; legacy wallpaper layouts retain it.
   clock:    { title: 'Clock and date',        minW: 2, minH: 1, defaultW: 3, defaultH: 2, route: null },
   currency: { title: 'Currency Converter', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: null },
   games:    { title: 'Currently playing', minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'games' },
@@ -2831,7 +2833,7 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 // the layout editor preview and (next stage) the wallpaper.
 //
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
-const { h, replace, todayKey, daysSince } = __require("js/ui/dom.js");
+const { h, replace, daysSince } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
 const { mountCurrency } = __require("js/widgets/currency.js");
 const { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
@@ -2875,8 +2877,19 @@ function mountMud(el, { weather, store }) {
     const now = new Date();
     const clock = (tz) => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz });
     const extra = ui?.extra_clock_timezone;
+    const hour = now.getHours() % 12 + now.getMinutes() / 60;
+    const minute = now.getMinutes() + now.getSeconds() / 60;
+    const hand = (angle, length, width, color) => `<line x1="50" y1="50" x2="${50 + Math.sin(angle * Math.PI / 180) * length}" y2="${50 - Math.cos(angle * Math.PI / 180) * length}" stroke="${color}" stroke-width="${width}" stroke-linecap="square"/>`;
+    const ticks = Array.from({ length: 12 }, (_, i) => {
+      const a = i * Math.PI / 6;
+      return `<line x1="${50 + Math.sin(a) * 36}" y1="${50 - Math.cos(a) * 36}" x2="${50 + Math.sin(a) * 41}" y2="${50 - Math.cos(a) * 41}" stroke="var(--ink-dim)" stroke-width="${i % 3 === 0 ? 4 : 2}"/>`;
+    }).join('');
+    const analog = h('span', { class: 'w-analog-clock', title: clock(undefined),
+      html: `<svg viewBox="0 0 100 100" role="img" aria-label="Analog clock ${clock(undefined)}" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="94" height="94" rx="2" fill="var(--panel-2)" stroke="var(--edge-hi)" stroke-width="5"/>${ticks}${hand(hour * 30,25,6,'var(--ink)')}${hand(minute * 6,34,4,'var(--accent)')}<rect x="47" y="47" width="6" height="6" fill="var(--accent)"/></svg>` });
     const localClock = h('div', { class: 'w-weather-clock' },
-      h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined))),
+      analog,
+      h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined)),
+        h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
     const c = s.current;
     const night = isNightAtLocation(c, now);
@@ -2952,7 +2965,12 @@ function mountLoot(el, { store, showPlaces = true }) {
     const [items, locations] = await Promise.all([store.list('items'), store.list('locations')]);
     const lost = items.filter((i) => i.is_lost);
     const pool = items.filter((i) => !i.is_lost);
-    const loot = pool.length ? pool[hash32(`loot-${todayKey()}`) % pool.length] : null;
+    const key = todayKeyLocal();
+    const todayIndex = pool.length ? hash32(`loot-${key}`) % pool.length : -1;
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+    const previousIndex = pool.length ? hash32(`loot-${yesterdayKey}`) % pool.length : -1;
+    const loot = pool.length ? pool[pool.length > 1 && todayIndex === previousIndex ? (todayIndex + 1) % pool.length : todayIndex] : null;
     if (!items.length) return replace(el, note('No items yet. Add some in the Pack tab.'));
     // On the wallpaper, where things are stored is hidden unless you turned that on.
     const where = (i) => (showPlaces ? locationPath(locations, i.location_id) : null);
@@ -2965,7 +2983,13 @@ function mountLoot(el, { store, showPlaces = true }) {
           return h('p', {}, h('b', {}, i.name), h('span', { class: 'w-path' }, detail));
         })) : null));
   };
-  return live(render, (run) => [storeTables(store, ['items', 'locations'], run)]);
+  const inst = live(render, (run) => [storeTables(store, ['items', 'locations'], run)]);
+  let lastDay = todayKeyLocal();
+  const checkDay = () => { const next = todayKeyLocal(); if (next !== lastDay) { lastDay = next; inst.refresh(); } };
+  const timer = setInterval(checkDay, 30_000);
+  document.addEventListener('visibilitychange', checkDay);
+  window.addEventListener('focus', checkDay);
+  return { destroy() { clearInterval(timer); document.removeEventListener('visibilitychange', checkDay); window.removeEventListener('focus', checkDay); inst.destroy(); }, refresh: inst.refresh };
 }
 
 // ---- stats --------------------------------------------------------------------------------------
@@ -2991,7 +3015,7 @@ function mountFeed(el, { feed }) {
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
     if (!s.items.length) return replace(el, note(s.status === 'empty' ? 'No headlines right now.' : 'Loading headlines...'));
     replace(el, h('ul', { class: 'w-feed' }, s.items.slice(0, 12).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
-      h('span', { class: 'w-title' }, it.title),
+      it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
       h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))));
   };
   return live(render, (run) => [feed.subscribe(run)]);
@@ -3051,7 +3075,9 @@ function createWidgetCard(id, ctx, { link = false } = {}) {
   const body = h('div', { class: 'widget-body' });
   const title = link && def.route
     ? h('a', { class: 'widget-title', href: `#${def.route}` }, def.title)
-    : h('span', { class: 'widget-title' }, def.title);
+    : link && id === 'phrase'
+      ? h('button', { class: 'widget-title widget-title-action', type: 'button', onclick: openPhraseHistory }, def.title)
+      : h('span', { class: 'widget-title' }, def.title);
   const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title), body);
   const inst = mountWidget(id, body, ctx);
   return { el, destroy: () => inst.destroy() };
@@ -3074,7 +3100,14 @@ function cleanLayout(raw, profile) {
 
 async function loadLayout(store, profile) {
   const row = await store.get('widget_layout', profile);
-  const saved = cleanLayout(row?.layout, profile);
+  // Clock is now integrated into Weather. Migrate saved desktop/mobile layouts
+  // without moving any of the user's other widgets.
+  const original = cleanLayout(row?.layout, profile);
+  let saved = profile === 'wallpaper' ? original : original.filter(w => w.id !== 'clock');
+  if (profile !== 'wallpaper' && original.some(w => w.id === 'clock') && !saved.some(w => w.id === 'mud')) {
+    const oldClock = original.find(w => w.id === 'clock');
+    saved = cleanLayout([...saved, { id: 'mud', x: oldClock.x, y: oldClock.y, w: Math.max(3, oldClock.w), h: Math.max(2, oldClock.h) }], profile);
+  }
   return saved.length ? saved : cleanLayout(DEFAULT_LAYOUTS[profile], profile);
 }
 

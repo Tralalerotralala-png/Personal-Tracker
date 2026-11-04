@@ -882,3 +882,37 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .journal-inline-editor .form{display:grid;gap:10px;width:min(100%,900px);margin-inline:auto}
 .journal-inline-editor textarea{min-height:190px;width:100%;resize:vertical}
 @media(max-width:700px){.w-forecast-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.w-forecast-day{padding:7px 2px}}
+
+/* Compact unified weather / clock / ground view. */
+.w-analog-clock { width: 66px; height: 66px; flex: 0 0 66px; image-rendering: pixelated; }
+.w-weather-clock { align-items: center; gap: 8px 12px; }
+.w-clock-date { color: var(--ink-dim); font-size: .72rem; }
+.w-time-unit { display: flex; flex-direction: column; gap: 2px; }
+.mud-bar { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 3px; height: 9px; }
+.mud-bar .blk { overflow: hidden; min-width: 0; }
+.mud-bar .blk-fill { display: block; height: 100%; background: var(--mc, var(--accent)); }
+.mud-row { padding: 6px 9px; gap: 3px 8px; }
+.mud-row .mud-bar { grid-column: 3 / -1; width: min(100%, 185px); }
+.mud-row .mud-why { display: none; }
+.mud-row .mud-icon svg { width: 22px; height: 22px; }
+.ground-inline { padding: 9px 12px; border: 1px solid var(--edge); background: var(--panel); display: grid; gap: 6px; }
+.ground-inline-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.ground-inline-summary .mud-bar { width: 110px; }
+.ground-inline .hint { margin: 0; }
+.ground-history summary { cursor: pointer; color: var(--accent); padding: 4px 0; }
+.ground-history .mud-list { margin-top: 8px; }
+@media(min-width:900px) {
+  #app { grid-template-columns: var(--sidebar-width, 104px) minmax(0,1fr); }
+  .hotbar { position: sticky; min-width: 0; }
+  .sidebar-resize-grip { position: absolute; right: -7px; top: 0; bottom: 0; width: 13px; z-index: 9; cursor: col-resize; touch-action: none; }
+  .sidebar-resize-grip:hover, .sidebar-resize-grip:focus-visible { background: color-mix(in srgb, var(--accent) 35%, transparent); outline: none; }
+  main { min-width: 0; }
+}
+@media(max-width:899px) { .sidebar-resize-grip { display: none; } }
+
+.w-analog-clock { display:inline-flex; } .w-analog-clock svg { width:100%; height:100%; }
+
+/* Daily widgets: interactive titles and readable headline links. */
+.widget-title-action{background:none;border:0;color:inherit;font:inherit;padding:0;cursor:pointer;text-align:left}
+.widget-title-action:hover,.widget-title-action:focus-visible,.w-headline-link:hover,.w-headline-link:focus-visible{text-decoration:underline;text-underline-offset:3px}
+.w-headline-link{color:inherit;text-decoration:none;display:block}

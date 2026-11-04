@@ -12,7 +12,14 @@ export function cleanLayout(raw, profile) {
 
 export async function loadLayout(store, profile) {
   const row = await store.get('widget_layout', profile);
-  const saved = cleanLayout(row?.layout, profile);
+  // Clock is now integrated into Weather. Migrate saved desktop/mobile layouts
+  // without moving any of the user's other widgets.
+  const original = cleanLayout(row?.layout, profile);
+  let saved = profile === 'wallpaper' ? original : original.filter(w => w.id !== 'clock');
+  if (profile !== 'wallpaper' && original.some(w => w.id === 'clock') && !saved.some(w => w.id === 'mud')) {
+    const oldClock = original.find(w => w.id === 'clock');
+    saved = cleanLayout([...saved, { id: 'mud', x: oldClock.x, y: oldClock.y, w: Math.max(3, oldClock.w), h: Math.max(2, oldClock.h) }], profile);
+  }
   return saved.length ? saved : cleanLayout(DEFAULT_LAYOUTS[profile], profile);
 }
 

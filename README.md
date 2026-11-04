@@ -88,3 +88,6 @@ Weather is the navigation label for the former Mud tab. It retains the ground-dr
 - English and Spanish widget labels have been expanded.
 
 This release also repairs legacy imports of the weather-format module and refreshes the app service-worker cache.
+
+### Daily widgets and navigation (November 2026)
+The Overview daily status and Daily Loot refresh when the local calendar day changes (and after returning to the tab). Daily Loot uses the local date and avoids repeating the prior day when more than one item is available. Headlines open their source articles in a new tab; widget titles link to their full sections when one exists. The Phrase of the Day title opens its history.

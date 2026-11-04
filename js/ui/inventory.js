@@ -1,7 +1,8 @@
 // The Inventory tab: "Where is it?" search, lost-item quests, the slot grid,
 // filters, and the item editor. Items and Places are two panes of one tab.
-import { h, replace, toast, openSheet, confirmDialog, todayKey, daysSince } from './dom.js';
+import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
 import { pixelIconSvg, hash32 } from './pixel-icon.js';
+import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
   searchItems, locationPath, locationPathParts, indexById, descendantIds,
 } from '../data/inventory-logic.js';
@@ -155,8 +156,12 @@ export function createInventoryView({ store, photos }) {
     const lost = data.items.filter((i) => i.is_lost);
     const showing = !state.q && !state.category && !state.rarities.size && !state.placeId && !state.lostOnly;
     const live = data.items.filter((i) => !i.is_lost);
-    const day = todayKey();
-    const loot = live.length ? live[hash32(`loot-${day}`) % live.length] : null;
+    const day = todayKeyLocal();
+    const todayIndex = live.length ? hash32(`loot-${day}`) % live.length : -1;
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = todayKeyLocal(yesterday);
+    const previousIndex = live.length ? hash32(`loot-${yesterdayKey}`) % live.length : -1;
+    const loot = live.length ? live[live.length > 1 && todayIndex === previousIndex ? (todayIndex + 1) % live.length : todayIndex] : null;
 
     const blocks = [];
     if (showing && lost.length) {

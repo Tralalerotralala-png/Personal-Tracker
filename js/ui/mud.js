@@ -1,6 +1,7 @@
 // The Mud tab: today's answer first, then five observed days, today, and five
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
+import { t } from './language.js';
 import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
 import { glyphSvg, weatherGlyph } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
@@ -175,14 +176,15 @@ export function createMudView({ store, weather }) {
       placeHeader(state),
       banner(state),
       weatherPanel(state, today, future),
-      h('h3', { class: 'group' }, 'Ground conditions'),
-      s ? h('section', { class: `mud-summary ${mudClass(s.today.label)}`, 'aria-label': 'Today at a glance' },
-        h('div', { class: 'mud-big' }, h('span', { class: 'mud-big-label' }, localizedMudLabel(s.today.label)), h('span', { class: 'mud-big-num' }, `${s.today.index}/100`)),
-        h('p', {}, `${localizedMudWhy(s.today.why)}.`),
-        h('p', { class: 'mud-trend' }, summarySentence(s))) : null,
-      h('section', { 'aria-label': 'Observed days' }, h('h3', { class: 'group' }, 'Observed'), h('div', { class: 'mud-list' }, past.map(row))),
-      today ? h('section', { 'aria-label': 'Today' }, h('div', { class: 'mud-list' }, row(today))) : null,
-      h('section', { 'aria-label': 'Forecast days' }, h('h3', { class: 'group' }, 'Forecast'), h('div', { class: 'mud-list' }, future.map(row))),
+      h('section', { class: 'ground-inline', 'aria-label': t('Ground conditions') },
+        h('div', { class: 'ground-inline-summary' },
+          h('b', {}, t('Ground conditions')),
+          s ? h('span', { class: mudClass(s.today.label) }, `${localizedMudLabel(s.today.label)} ${s.today.index}/100`) : null,
+          s ? mudBar(s.today) : null),
+        s ? h('p', { class: 'hint' }, summarySentence(s)) : null,
+        h('details', { class: 'ground-history' },
+          h('summary', {}, t('Daily ground details')),
+          h('div', { class: 'mud-list' }, [...past, ...(today ? [today] : []), ...future].map(row)))),
       h('div', { class: 'mud-foot' },
         h('button', { class: 'btn small ghost', type: 'button', onclick: () => openHowScored({ weather, store }) }, 'How is this scored?'),
         h('button', { class: 'btn small ghost desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, 'Tune the model'),

@@ -167,6 +167,44 @@ function refreshWeatherNav(){
 }
 weather.subscribe(refreshWeatherNav);refreshWeatherNav();setInterval(refreshWeatherNav,60*60*1000);
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
+// Desktop-only draggable sidebar edge. Width is device-local and never synced.
+const sidebarWidthKey = 'tracker-sidebar-width';
+const sidebarMin = 92, sidebarMax = 310, sidebarDefault = 104;
+const applySidebarWidth = value => {
+  const width = Math.max(sidebarMin, Math.min(sidebarMax, Number(value) || sidebarDefault));
+  document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
+  return width;
+};
+try { applySidebarWidth(localStorage.getItem(sidebarWidthKey)); } catch { applySidebarWidth(sidebarDefault); }
+const sidebarGrip = h('div', { class: 'sidebar-resize-grip', role: 'separator', tabindex: '0',
+  'aria-label': 'Resize sidebar', 'aria-orientation': 'vertical', title: 'Drag to resize; double-click to reset' });
+nav.append(sidebarGrip);
+sidebarGrip.addEventListener('pointerdown', event => {
+  if (event.button !== 0 || matchMedia('(max-width: 899px)').matches) return;
+  event.preventDefault();
+  sidebarGrip.setPointerCapture(event.pointerId);
+  const move = e => applySidebarWidth(e.clientX);
+  const stop = e => {
+    sidebarGrip.removeEventListener('pointermove', move);
+    sidebarGrip.removeEventListener('pointerup', stop);
+    sidebarGrip.removeEventListener('pointercancel', stop);
+    try { localStorage.setItem(sidebarWidthKey, getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width').trim().replace('px','')); } catch {}
+  };
+  sidebarGrip.addEventListener('pointermove', move);
+  sidebarGrip.addEventListener('pointerup', stop);
+  sidebarGrip.addEventListener('pointercancel', stop);
+});
+sidebarGrip.addEventListener('dblclick', () => {
+  applySidebarWidth(sidebarDefault);
+  try { localStorage.setItem(sidebarWidthKey, String(sidebarDefault)); } catch {}
+});
+sidebarGrip.addEventListener('keydown', e => {
+  if (!['ArrowLeft','ArrowRight','Home'].includes(e.key)) return;
+  e.preventDefault();
+  const current = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'),10) || sidebarDefault;
+  const next = applySidebarWidth(e.key === 'Home' ? sidebarDefault : current + (e.key === 'ArrowRight' ? 12 : -12));
+  try { localStorage.setItem(sidebarWidthKey, String(next)); } catch {}
+});
 function saveNavOrder() { localStorage.setItem(NAV_KEY, JSON.stringify([...nav.children].map(n => n.dataset.route))); }
 function moveNav(from, to) {
   const items = [...nav.children];
