@@ -4,16 +4,13 @@ import { h, replace } from './dom.js';
 import { createWidgetCard } from '../widgets/registry.js';
 import { loadLayout } from '../widgets/store.js';
 import { openLayoutEditor } from './layout-editor.js';
-import { loadHub, collectAlerts, openPersonalHub } from './personal-hub.js';
-import { t,locale } from './language.js';
-import { groupByDay, keyOf } from '../calendar/recurrence.js';
+import { keyOf } from '../calendar/recurrence.js';
 
 export function createOverviewView({ store, ctx }) {
   const el = h('div', { class: 'view overview' });
   const wide = typeof matchMedia === 'function' ? matchMedia('(min-width: 900px)') : { matches: true, addEventListener() {} };
   let cards = [];
   let lastDay = '';
-  let lastVisibility = false;
 
   const profile = () => (wide.matches ? 'desktop' : 'mobile');
 
@@ -25,19 +22,7 @@ export function createOverviewView({ store, ctx }) {
     clear();
     const grid = h('div', { class: 'ov-grid', role: 'list' });
     const today = new Date();
-    const events = await store.list('events');
-    const day = keyOf(today.getFullYear(), today.getMonth()+1, today.getDate());
-    lastDay = day;
-    const upcoming = (groupByDay(events, day, day).get(day) || []).length;
-    const hub = await loadHub(store);
-    const {alerts,items} = await collectAlerts(store,hub);
-    const todayTasks = hub.task.filter(x=>x.due===day);
-    const dayStatus = h('section', {class:'ov-status desktop-summary', 'aria-label':'Daily status'},
-      h('div',{class:'ov-status-head'},h('h3',{},'Your day'),h('a',{class:'btn small',href:'#hub'},t('Open personal hub'))),
-      h('div',{class:'ov-status-cards'},
-        ...[['Events',upcoming],['Items',items.length],['Tasks',todayTasks.length],['Alerts',alerts.length]].map(([label,value])=>h('div',{class:'ov-status-card'},h('b',{},value),h('span',{},label)))),
-      ...alerts.slice(0,3).map(a=>h('p',{class:'ov-alert'},`${t(a.reason)}: ${a.label}`))
-    );
+    lastDay = keyOf(today.getFullYear(), today.getMonth()+1, today.getDate());
     for (const item of layout) {
       const card = createWidgetCard(item.id, ctx, { link: true });
       card.el.setAttribute('role', 'listitem');
@@ -50,7 +35,7 @@ export function createOverviewView({ store, ctx }) {
       h('div', { class: 'panel-head' },
         h('h2', {}, 'Overview'),
         h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
-      dayStatus, grid);
+      grid);
   }
 
   let queued = false;

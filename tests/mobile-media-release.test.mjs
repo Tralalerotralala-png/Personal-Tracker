@@ -7,10 +7,10 @@ const css=fs.readFileSync(new URL('../css/app.css',import.meta.url),'utf8');
 const overview=fs.readFileSync(new URL('../js/ui/overview.js',import.meta.url),'utf8');
 const games=fs.readFileSync(new URL('../js/ui/games.js',import.meta.url),'utf8');
 const media=fs.readFileSync(new URL('../js/ui/media-library.js',import.meta.url),'utf8');
-test('mobile bottom navigation remains fixed and overview daily summary is hidden',()=>{
+test('mobile bottom navigation remains fixed and overview daily summary is removed',()=>{
   assert.match(css,/#app>\.hotbar\s*\{\s*position:fixed\s*!important/);
-  assert.match(css,/\.overview \.desktop-summary\s*\{\s*display:none/);
-  assert.match(overview,/desktop-summary/);
+  assert.doesNotMatch(css,/\.desktop-summary/);
+  assert.doesNotMatch(overview,/desktop-summary|Your day|ov-status/);
 });
 test('fog and clouds have movable inner layers and honor reduced motion',()=>{
   assert.match(weatherIconSvg(45),/wx-fog-layer/);
