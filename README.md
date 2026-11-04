@@ -115,3 +115,10 @@ Generating an AI icon sends the prompt you write to your deployed Supabase funct
 - **Weather icon alignment:** The shared pixel-art icon renderer centers each condition's visible artwork in its canvas, and the current-weather tile is centered across all themes.
 
 Finance features are original implementations informed by the feature sets of [Actual Budget](https://actualbudget.org/docs/) and [Firefly III](https://github.com/firefly-iii/firefly-iii), not copies of their source code.
+
+
+### Latest interface refinements
+
+- The mobile navigation stays visible at the bottom while Pack and other pages scroll. The redundant daily summary is hidden on phone-sized screens; the individual widgets remain.
+- Weather fog and cloud artwork use restrained animation, with reduced-motion support. Forecast cards include the condition label.
+- Games, books, films, and albums use a short original CSS case-opening interaction when an entry is opened. No third-party media source code or assets were copied.

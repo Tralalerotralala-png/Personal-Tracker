@@ -1025,3 +1025,46 @@ html[data-layout-width="compact"] main{max-width:1100px}
   .hotbar .slot {flex:0 0 clamp(67px,12vw,94px);scroll-snap-align:start;}
   .hotbar .sidebar-resize-grip {display:none;}
 }
+
+/* 2026 interface refinement: persistent phone navigation and compact Overview.
+   The bar stays pinned to the visual viewport while Pack / Logs scroll. */
+@media (max-width: 899px) {
+  html,body { min-width:0; overflow-x:clip; }
+  #app { min-height:100dvh; }
+  #app>main { padding-bottom:calc(94px + env(safe-area-inset-bottom,0px)); min-width:0; }
+  #app>.hotbar { position:fixed !important; left:0 !important; right:0 !important; top:auto !important; bottom:0 !important; width:100%; height:auto; max-height:calc(76px + env(safe-area-inset-bottom,0px)); z-index:100; overscroll-behavior-x:contain; }
+  .overview .desktop-summary { display:none; }
+  .overview { gap:8px; }
+  .overview .ov-grid { grid-auto-rows:56px; gap:7px; }
+}
+/* Shared weather rendering: one centered viewport, independently animated layers. */
+.wx-scene-glyph {width:78px;height:74px;left:50%;top:50%;transform:translate(-50%,-50%);animation:none;}
+.wx-scene-glyph>svg{display:block;width:100%;height:100%;overflow:visible;}
+.wx-fog-layer {animation:ptFogDrift 5.8s steps(4,end) infinite alternate;}
+.wx-cloud-layer {animation:ptCloudDrift 7s steps(5,end) infinite alternate;}
+@keyframes ptFogDrift {0%{transform:translateX(-2px);opacity:.82}50%{transform:translateX(2px);opacity:1}100%{transform:translateX(-1px);opacity:.87}}
+@keyframes ptCloudDrift {0%{transform:translate(-1px,0)}50%{transform:translate(2px,-1px)}100%{transform:translate(-2px,0)}}
+@media(prefers-reduced-motion:reduce){.wx-fog-layer,.wx-cloud-layer{animation:none!important}}
+.reduce-animations .wx-fog-layer,.reduce-animations .wx-cloud-layer{animation:none!important}
+.w-forecast-condition {display:block;font-size:.68rem;line-height:1.15;text-align:center;color:var(--ink-dim);min-height:1.25em;overflow-wrap:anywhere;}
+.w-forecast-day {gap:3px;}
+/* Media-case opening: the cover swings aside as a record or game disc slides out.
+   Artwork is user-owned or user-supplied; all geometry is original CSS. */
+.media-case{width:min(100%,230px);aspect-ratio:3/4;position:relative;perspective:920px;isolation:isolate;align-self:start;margin:4px 20px 16px 4px;filter:drop-shadow(4px 5px 3px #0007)}
+.media-case::before{content:'';position:absolute;inset:0;border:3px solid var(--edge-hi);background:linear-gradient(120deg,var(--panel-2),var(--panel));z-index:-1;}
+.media-case-front{position:absolute;inset:0;z-index:2;transform-origin:0% 50%;transform-style:preserve-3d;animation:ptCaseOpen .82s cubic-bezier(.17,.67,.3,1) both;backface-visibility:hidden;}
+.media-case-front>img,.media-case-front>.game-placeholder{width:100%;height:100%;aspect-ratio:auto;object-fit:cover;border:3px solid var(--edge-hi);display:block;}
+.media-case-disc{position:absolute;top:16%;left:13%;width:74%;aspect-ratio:1/1;border-radius:50%;border:4px solid var(--edge-hi);background:radial-gradient(circle at center,var(--panel) 0 11%,var(--ink-dim) 12% 14%,var(--accent) 15% 17%,#586472 18% 37%,#222a35 38% 42%,#9c8aa5 43% 65%,#333844 66%);box-shadow:inset 0 0 12px #000a,3px 3px 0 #0006;transform:translateX(0);animation:ptDiscSlide .9s .24s cubic-bezier(.18,.72,.2,1) both;z-index:1;}
+.media-case-books .media-case-front{transform-origin:left center;animation:ptBookOpen .85s ease-out both;}
+.media-case-books .media-book-pages{position:absolute;inset:5% 7% 4% 8%;border:3px solid var(--edge-hi);background:repeating-linear-gradient(to bottom,var(--panel-2) 0 8px,var(--edge) 9px 10px);z-index:0;}
+@keyframes ptCaseOpen{from{transform:rotateY(0)}to{transform:rotateY(-34deg)}}
+@keyframes ptBookOpen{from{transform:rotateY(0)}to{transform:rotateY(-52deg)}}
+@keyframes ptDiscSlide{from{transform:translateX(0)}to{transform:translateX(47%)}}
+.game-detail,.media-detail{position:relative;background:radial-gradient(ellipse at 10% 35%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 70%);padding:12px;min-width:0;}
+.game-detail>div:last-child,.media-detail>div:last-child{min-width:0;}
+@media(max-width:650px){.media-case{width:min(42vw,160px);margin-bottom:8px;} .game-detail,.media-detail{gap:8px;}}
+@media(prefers-reduced-motion:reduce){.media-case-front,.media-case-disc{animation:none!important;transform:none!important}}
+.reduce-animations .media-case-front,.reduce-animations .media-case-disc{animation:none!important;transform:none!important}
+/* Fast, keyboard-accessible media filters inspired by common library catalogues. */
+.media-search-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(130px,1fr);gap:8px;margin:8px 0 16px}
+@media(max-width:480px){.media-search-filters{grid-template-columns:1fr}}

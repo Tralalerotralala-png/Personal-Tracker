@@ -13,7 +13,7 @@ export function createMediaLibraryView({store}) {
  const el=h('div',{class:'view media-library-view'});
  const games=createGamesView({store});
  const L=()=>LABELS[language()];
- let active='games',data={books:[],films:[],albums:[]},shelfMode=true,page=null,dirty=false;
+ let active='games',data={books:[],films:[],albums:[]},shelfMode=true,page=null,dirty=false,query='',statusFilter='all';
  const list=kind=>data[kind]||[];
  async function load(){const val=await store.getSetting(KEY);if(val&&typeof val==='object')data=Object.fromEntries(KINDS.map(k=>[k,Array.isArray(val[k])?val[k]:[]]));await games.mount();render();}
  const save=async()=>{await store.setSetting(KEY,data);};
@@ -21,11 +21,12 @@ export function createMediaLibraryView({store}) {
  function back(){if(dirty&&!confirm(language()==='es'?'¿Descartar cambios sin guardar?':'Discard unsaved changes?'))return;dirty=false;page=null;render();}
  function show(entry=null,editing=false){page={entry,editing};render();}
  function edit(entry){page={entry,editing:true};render();}
+ function caseArt(row){return h('div',{class:`media-case media-case-${active}`},active!=='books'?h('div',{class:'media-case-disc','aria-hidden':'true'}):h('div',{class:'media-book-pages','aria-hidden':'true'}),h('div',{class:'media-case-front'},cover(row)));}
  function renderDetail(row){const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
   const journalPanel=h('div',{class:'game-journal'},h('h3',{},L().journal),journal,
     h('button',{class:'btn small',onclick:async()=>{if(!journal.value.trim())return;row.journal=[{id:uuid(),date:new Date().toISOString(),text:clamp(journal.value.trim(),5000)},...(row.journal||[])];await save();show(row);}},L().entry),
     ...(row.journal||[]).map(e=>h('p',{class:'game-journal-entry'},h('small',{},new Date(e.date).toLocaleDateString()),' ',e.text)));
-  return h('section',{class:'media-detail game-detail'},cover(row),h('div',{},h('h2',{},row.title),h('p',{},row.creator||'—'),h('p',{},`${L().status}: ${row.status||'—'}`),h('p',{},`${L().rating}: ${row.rating??'—'}`),h('p',{class:'media-notes'},row.notes||''),journalPanel,
+  return h('section',{class:'media-detail game-detail'},caseArt(row),h('div',{},h('h2',{},row.title),h('p',{},row.creator||'—'),h('p',{},`${L().status}: ${row.status||'—'}`),h('p',{},`${L().rating}: ${row.rating??'—'}`),h('p',{class:'media-notes'},row.notes||''),journalPanel,
     h('div',{class:'inline-actions'},h('button',{class:'btn primary',onclick:()=>edit(row)},L().edit),h('button',{class:'btn danger',onclick:async()=>{if(!await confirmDialog({title:L().delete,message:row.title,confirmLabel:L().delete,danger:true}))return;data[active]=list(active).filter(x=>x.id!==row.id);await save();back();}},L().delete))));
  }
  function renderEditor(row){const field=(label,el)=>h('label',{class:'media-field'},h('span',{},label),el);
@@ -55,10 +56,18 @@ export function createMediaLibraryView({store}) {
    if(active==='games'){games.el.hidden=false;replace(el,top,games.el);return;}
    games.el.hidden=true;
    if(page){replace(el,top,h('div',{class:'game-page-head'},h('button',{class:'btn small',onclick:back},L().cancel),h('h2',{},page.entry?.title||`${L().add} ${L()[active]}`)),h('div',{class:'game-page-body'},page.editing?renderEditor(page.entry):renderDetail(page.entry)));return;}
-   const rows=list(active), shelves=[...new Set(rows.map(x=>x.shelf||'Collection'))];
+   const rows=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+   const shelves=[...new Set(rows.map(x=>x.shelf||'Collection'))];
    const header=h('div',{class:'inline-actions'},h('button',{class:'btn small',onclick:()=>{shelfMode=!shelfMode;render();}},L().view),h('button',{class:'btn primary',onclick:()=>show(null,true)},`${L().add} ${L()[active]}`));
-   const content=rows.length?h('div',{class:'game-shelves '+(!shelfMode?'game-library-grid':'')},shelves.map(s=>h('section',{class:'game-shelf'},h('h3',{},s),h('div',{class:'game-cover-grid'},rows.filter(x=>(x.shelf||'Collection')===s).map(x=>h('button',{class:'game-book',onclick:()=>show(x)},cover(x),h('span',{},x.title))))))):h('p',{class:'empty'},language()==='es'?'Este estante está vacío.':'Your collection is empty.');
-   replace(el,top,header,content);
+   const results=h('div',{class:'media-filter-results'});
+   function updateResults(){
+     const filtered=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+     const names=[...new Set(filtered.map(x=>x.shelf||'Collection'))];
+     replace(results,filtered.length?h('div',{class:'game-shelves '+(!shelfMode?'game-library-grid':'')},names.map(s=>h('section',{class:'game-shelf'},h('h3',{},s),h('div',{class:'game-cover-grid'},filtered.filter(x=>(x.shelf||'Collection')===s).map(x=>h('button',{class:'game-book',onclick:()=>show(x)},cover(x),h('span',{},x.title))))))):h('p',{class:'empty'},language()==='es'?'No hay resultados.':'No matching entries.'));
+   }
+   const search=h('input',{type:'search',value:query,placeholder:language()==='es'?'Buscar en la colección':'Search this collection','aria-label':'Search collection',oninput:e=>{query=e.target.value;updateResults();}});
+   const filter=h('select',{'aria-label':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));
+   updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  return {el,mount:load,show:render,hide:()=>{}};
 }

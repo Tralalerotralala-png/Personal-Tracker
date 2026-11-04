@@ -7,7 +7,7 @@ const KEY='game_library_v1';
 const TEXT={en:{title:'Game Library',add:'Add game',empty:'Your shelves are empty. Add a game to begin.',shelf:'Shelf',notes:'Notes',status:'Status',platform:'Platform',cover:'Cover URL (HTTPS)',upload:'Or upload a cover (up to 120 KB)',save:'Save',delete:'Delete',lookup:'Look up cover',grid:'Cover grid',wood:'Bookshelves',edit:'Edit',rating:'Rating (optional)',newShelf:'New shelf',name:'Title',cancel:'Cancel'},es:{title:'Biblioteca de juegos',add:'Agregar juego',empty:'Tus estantes están vacíos. Agrega un juego para empezar.',shelf:'Estante',notes:'Notas',status:'Estado',platform:'Plataforma',cover:'URL de portada (HTTPS)',upload:'O subir portada (máximo 120 KB)',save:'Guardar',delete:'Eliminar',lookup:'Buscar portada',grid:'Cuadrícula',wood:'Estantes',edit:'Editar',rating:'Calificación (opcional)',newShelf:'Nuevo estante',name:'Título',cancel:'Cancelar'}};
 const baseShelves=['Favorites','Playing','Backlog','Completed'];
 export function createGamesView({store}){
- const el=h('div',{class:'view games-view'});let state={games:[],shelves:baseShelves,mode:'shelf'};let page=null;let sideMode=false;let dirty=false;
+ const el=h('div',{class:'view games-view'});let state={games:[],shelves:baseShelves,mode:'shelf'};let page=null;let sideMode=false;let dirty=false;let query='',gameFilter='all';
  const L=()=>TEXT[language()];
  const clean=(s,n=3000)=>String(s??'').trim().slice(0,n);
  const safeUrl=s=>/^https:\/\/[^\s]+$/i.test(s||'')?s:'';
@@ -31,6 +31,7 @@ export function createGamesView({store}){
    return h('p',{},line||' ');
   }));
  }
+ function caseArt(game){return h('div',{class:'media-case media-case-game','aria-label':'Game case'},h('div',{class:'media-case-disc','aria-hidden':'true'}),h('div',{class:'media-case-front'},cover(game)));}
  function detail(game){
   if (!game.lastOpened || Date.now()-Date.parse(game.lastOpened)>1500) { game.lastOpened=new Date().toISOString();store.setSetting(KEY,state).catch(()=>{}); }
   const edit=h('button',{class:'btn primary',onclick:()=>editor(game)},L().edit);
@@ -40,7 +41,7 @@ export function createGamesView({store}){
   const journalPanel=h('section',{class:'game-journal'},h('h3',{},language()==='es'?'Diario de juego':'Game journal'),
     journalText,h('button',{class:'btn small',onclick:async()=>{if(!journalText.value.trim())return;game.journal=[{id:uuid(),date:new Date().toISOString(),text:journalText.value.trim().slice(0,5000)},...(game.journal||[])];await store.setSetting(KEY,state);detail(game);}},language()==='es'?'Agregar nota':'Add journal note'),
     ...journalEntries.map(x=>h('div',{class:'game-journal-entry'},h('small',{},new Date(x.date).toLocaleDateString()),h('p',{},x.text))));
-  showPage(h('div',{class:'game-detail'},cover(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),journalPanel,h('div',{class:'inline-actions'},edit,remove))),game.title);
+  showPage(h('div',{class:'game-detail'},caseArt(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),journalPanel,h('div',{class:'inline-actions'},edit,remove))),game.title);
  }
  async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:existing?.rating||''});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||'Backlog')===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
  const form=h('div',{class:'form game-editor-form'},h('label',{},L().name),title,h('label',{},L().platform),platform,h('label',{},L().shelf),shelf,h('label',{},L().status),status,h('label',{},L().rating),rating,h('label',{},L().cover),coverUrl,h('button',{class:'btn small',onclick:async()=>{
@@ -62,8 +63,15 @@ export function createGamesView({store}){
 
  }
  function render(){if(page){page.render();return;}el.classList.remove('game-side-mode');const header=h('div',{class:'panel-head'},h('h2',{},L().title),h('div',{class:'inline-actions'},h('button',{class:'btn small',onclick:()=>{state.mode=state.mode==='grid'?'shelf':'grid';save();}},state.mode==='grid'?L().wood:L().grid),h('button',{class:'btn small',onclick:async()=>{const name=prompt(L().newShelf);if(name?.trim()&&!state.shelves.includes(name.trim())){state.shelves.push(clean(name,60));await save();}}},L().newShelf),h('button',{class:'btn primary',onclick:()=>editor()},L().add)));
- const sections=state.shelves.map(name=>{const games=state.games.filter(g=>g.shelf===name);if(!games.length)return null;return h('section',{class:'game-shelf'},h('div',{class:'game-shelf-head'},h('h3',{},name),h('small',{},String(games.length))),h('div',{class:'game-cover-grid'},games.map(g=>h('button',{class:'game-book',onclick:()=>detail(g)},cover(g),h('span',{},g.title)))),h('div',{class:'game-wood'}));});
- replace(el,header,state.games.length?h('div',{class:`game-shelves ${state.mode==='grid'?'game-library-grid':''}`},sections):h('p',{class:'empty'},L().empty));
+ const results=h('div',{class:'game-filter-results'});
+ function updateResults(){
+  const found=state.games.filter(g=>(gameFilter==='all'||g.status===gameFilter)&&(!query||`${g.title} ${g.platform} ${g.notes||''} ${g.shelf}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+  const sections=state.shelves.map(name=>{const games=found.filter(g=>g.shelf===name);if(!games.length)return null;return h('section',{class:'game-shelf'},h('div',{class:'game-shelf-head'},h('h3',{},name),h('small',{},String(games.length))),h('div',{class:'game-cover-grid'},games.map(g=>h('button',{class:'game-book',onclick:()=>detail(g)},cover(g),h('span',{},g.title)))),h('div',{class:'game-wood'}));});
+  replace(results,found.length?h('div',{class:`game-shelves ${state.mode==='grid'?'game-library-grid':''}`},sections):h('p',{class:'empty'},state.games.length?(language()==='es'?'Sin resultados.':'No matching games.'):L().empty));
+ }
+ const search=h('input',{type:'search',placeholder:language()==='es'?'Buscar juegos':'Search games',value:query,'aria-label':'Search games',oninput:e=>{query=e.target.value;updateResults();}});
+ const filter=h('select',{'aria-label':'Filter games by status',onchange:e=>{gameFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos':'All statuses'],['Backlog',language()==='es'?'Pendientes':'Backlog'],['Playing',language()==='es'?'Jugando':'Playing'],['Completed',language()==='es'?'Terminados':'Completed'],['On hold',language()==='es'?'En pausa':'On hold'],['Dropped',language()==='es'?'Abandonados':'Dropped']].map(([value,title])=>h('option',{value,selected:value===gameFilter},title)));
+ updateResults();replace(el,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  return {el,mount:load,show:render,hide:()=>{}};
 }

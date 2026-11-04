@@ -15,6 +15,23 @@ export const monthOf = date => /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date.sli
 const money = (value, currency, languageTag=locale()) => new Intl.NumberFormat(languageTag,{style:'currency',currency,maximumFractionDigits:2}).format(Number(value)||0);
 const label = (en,es) => language()==='es'?es:en;
 const dateString = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString(locale(),{day:'numeric',month:'short',year:'numeric'}) : '—';
+// Upcoming occurrence is a calendar estimate only, never an actual charge.
+// Anchor recurring days to the original record to avoid date drift (Jan 31 -> Feb 28 -> Mar 31).
+export function nextRecurringDate(entry, today = stamp()) {
+  const due=String(entry?.due||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(due)||!['weekly','monthly','yearly'].includes(entry.repeat))return null;
+  const original=new Date(`${due}T12:00:00Z`);if(Number.isNaN(original.valueOf()))return null;
+  const baseYear=original.getUTCFullYear(),baseMonth=original.getUTCMonth(),baseDay=original.getUTCDate();
+  function shifted(i){
+    if(entry.repeat==='weekly'){const d=new Date(original);d.setUTCDate(d.getUTCDate()+7*i);return d;}
+    const delta=entry.repeat==='yearly'?12*i:i;
+    const first=new Date(Date.UTC(baseYear,baseMonth+delta,1,12));
+    const lastDay=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0,12)).getUTCDate();
+    first.setUTCDate(Math.min(baseDay,lastDay));return first;
+  }
+  for(let i=0;i<2400;i++){const d=shifted(i).toISOString().slice(0,10);if(d>=today)return d;}
+  return null;
+}
 export function normalizeTransaction(entry) {
   const amount = Number(entry.amount);
   return { ...entry, amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
@@ -93,11 +110,11 @@ export function createExpensesView({store}) {
       field(label('Currency','Moneda'),currSelect(currency,async e=>{currency=e.target.value;await store.setSetting(KEY_PREFS,{currency});render();})),
       btn(label('Add transaction','Agregar movimiento'),()=>{editing={};renderEditor();},'primary'));
     const tabs=h('div',{class:'hub-tabs expense-tabs'},...[
-      ['transactions',label('Transactions','Movimientos')],['budgets',label('Budgets','Presupuestos')],['calculator',label('Bill calculator','Calculadora de cuentas')],['reports',label('Reports','Informes')]
+      ['transactions',label('Transactions','Movimientos')],['budgets',label('Budgets','Presupuestos')],['subscriptions',label('Subscriptions','Suscripciones')],['calculator',label('Bill calculator','Calculadora de cuentas')],['reports',label('Reports','Informes')]
     ].map(([key,title])=>btn(title,()=>changePanel(key),panel===key?'primary':'')));
     const stats=h('div',{class:'expense-summary'},makeStat(label('Income','Ingresos'),money(summary.received,currency)),makeStat(label('Spent','Gastado'),money(summary.spent,currency)),makeStat(label('Net balance','Saldo neto'),money(summary.balance,currency)),makeStat(label('Transactions','Movimientos'),summary.transactions));
     replace(el,h('div',{class:'panel-head'},h('h2',{},label('Expenses','Gastos')),h('span',{class:'hint'},label('Private finance workspace · no bank connections','Control privado de gastos · sin conexión bancaria'))),controls,stats,tabs,
-      panel==='transactions'?renderTransactions():panel==='budgets'?renderBudgets():panel==='reports'?renderReports():renderCalculator());
+      panel==='transactions'?renderTransactions():panel==='budgets'?renderBudgets():panel==='reports'?renderReports():panel==='subscriptions'?renderSubscriptions():renderCalculator());
   }
   function renderTransactions(){
     const query=input(search,{type:'search',placeholder:label('Find a transaction','Buscar un movimiento'),oninput:e=>{search=e.target.value;updateRows();}});
@@ -169,6 +186,21 @@ export function createExpensesView({store}) {
     return h('div',{class:'expense-content'},sectionHeading(label('Monthly category budgets','Presupuestos mensuales por categoría')),
       h('p',{class:'hint'},label('Budgets apply to one currency and month. Different currencies are never added together.','Los presupuestos corresponden a una moneda y un mes. Nunca se suman monedas diferentes.')),
       h('div',{class:'expense-budget-list'},rows));
+  }
+  function renderSubscriptions(){
+    const today=stamp();
+    const recurring=entries.filter(x=>x.type==='expense'&&x.currency===currency&&x.repeat!=='none')
+      .map(x=>({...x,nextDate:nextRecurringDate(x,today)})).filter(x=>x.nextDate)
+      .sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
+    const monthly=recurring.reduce((sum,x)=>sum+x.amount*(x.repeat==='weekly'?52/12:x.repeat==='yearly'?1/12:1),0);
+    return h('div',{class:'expense-content'},
+      sectionHeading(label('Upcoming subscriptions and bills','Próximas suscripciones y facturas')),
+      h('p',{class:'hint'},label('Only entries marked recurring are shown. Due dates are estimates; this app never charges or creates future transactions automatically.','Solo aparecen movimientos marcados como recurrentes. Las fechas son estimaciones; esta aplicación nunca cobra ni crea movimientos futuros automáticamente.')),
+      h('div',{class:'expense-summary'},makeStat(label('Recurring items','Movimientos recurrentes'),recurring.length),makeStat(label('Estimated monthly cost','Costo mensual estimado'),money(monthly,currency))),
+      recurring.length?h('div',{class:'expense-list'},recurring.map(x=>h('button',{class:'expense-row',type:'button',onclick:()=>{editing=x;renderEditor();}},
+        h('span',{class:'expense-row-date'},dateString(x.nextDate)),
+        h('span',{class:'expense-row-title'},h('b',{},x.title),h('small',{},`${t(x.category)} · ${label('Repeats','Frecuencia')}: ${t(x.repeat)}`)),
+        h('strong',{},money(x.amount,currency))))):h('p',{class:'hint'},label('No recurring expenses in this currency. Edit a transaction to mark it as weekly, monthly or yearly.','No hay gastos recurrentes en esta moneda. Edita un movimiento para marcarlo como semanal, mensual o anual.')));
   }
   function renderReports(){
     const summary=summarizeTransactions(entries,month,currency);const maximum=Math.max(1,...summary.categories.map(x=>x.amount));

@@ -350,11 +350,11 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
   const px = (x,y,w,h,color,cls='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"${cls?` class="${cls}"`:''}/>`;
   const sun = [px(5,1,4,3,'#ffc75b'),px(3,5,8,7,'#ffd875'),px(0,7,2,2,'#ffb446'),px(5,14,4,2,'#ffb446'),px(12,7,2,2,'#ffb446'),px(6,0,2,1,'#ffb446')].join('');
   const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="16" height="16" ');
-  const cloud = [px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('');
+  const cloud = `<g class="wx-cloud-layer">${[px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('')}</g>`;
   const drizzle = [0,1,2].map((i)=>px(12+i*6,20+(i%2),2,3,'#6fb9e9','wx-rain-drop')).join('');
   const storm = px(17,17,4,3,'#ffe183')+px(15,20,3,4,'#ffd15b');
   const rays = [px(5,1,4,3,'#ffd166'),px(3,5,8,7,'#ffe08d'),px(1,7,2,2,'#f9a442'),px(13,7,2,2,'#f9a442'),px(6,15,2,2,'#f9a442')].join('');
-  const fog = [8,12,16].map(y=>px(5,y,22,2,'#abaed5')).join('');
+  const fog = `<g class="wx-fog-layer">${[8,12,16].map((y,i)=>px(5+(i%2),y,22,2,'#abaed5')).join('')}</g>`;
   const bg = night ? moon : sun;
   let content = '';
   if (kind==='sun') content=bg;
