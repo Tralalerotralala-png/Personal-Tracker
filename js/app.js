@@ -15,7 +15,7 @@ import { createOverviewView } from './ui/overview.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createMediaLibraryView } from './ui/media-library.js';
 import { moonPhaseSvg, isNightAtLocation } from './weather/moon-phase.js';
-import { loadHub, openPersonalHub, createPersonalHubView } from './ui/personal-hub.js';
+import { loadHub, openPersonalHub, createPersonalHubView, startBrowserReminders } from './ui/personal-hub.js';
 import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
@@ -285,6 +285,7 @@ async function route() {
 }
 window.addEventListener('hashchange', route);
 await route();
+startBrowserReminders(store);
 
 // ---- keep the forecast fresh (cheap: it only fetches when the saved copy is old) ------------
 weather.refresh();
@@ -316,3 +317,7 @@ if ('serviceWorker' in navigator) {
     });
   }).catch((err) => console.warn('Service worker not registered:', err));
 }
+
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{
+  if(e.data?.type==='open-reminder-tab' && ['#calendar','#hub'].includes(e.data.target))location.hash=e.data.target;
+});

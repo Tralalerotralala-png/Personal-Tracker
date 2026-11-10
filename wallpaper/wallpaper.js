@@ -2988,7 +2988,7 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 const { h, replace, daysSince } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
 const { mountCurrency } = __require("js/widgets/currency.js");
-const { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
+const { mudChip, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { hash32 } = __require("js/ui/pixel-icon.js");
@@ -3071,7 +3071,8 @@ function mountMud(el, { weather, store }) {
             h('span', { class: 'w-forecast-condition' }, localizedWeather(icon.text)),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
-            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}`));
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),
+            mudBar(r));
         })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },

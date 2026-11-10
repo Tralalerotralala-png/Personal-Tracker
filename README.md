@@ -143,3 +143,6 @@ select id, name, public from storage.buckets where id = 'item-photos';
 ```
 
 Also inspect the `Policies` pages in Supabase for the owner-only access rules (and test unauthenticated access) rather than assuming RLS alone proves every policy is safe. Old commits and forks may remain public even after making a repository private. A private source repository also does not automatically make GitHub Pages private.
+
+### Phone reminders
+Personal Hub → Alerts includes an opt-in notification switch and a calendar-event lead time (0–60 minutes). Tasks due today are checked from 9 a.m. to noon. Notifications have generic text to avoid exposing private details on phone lock screens. They work only while the app is open and visible, depending on browser permissions and system settings. They do not provide guaranteed background push or system alarms when the app is closed; that would require a separate push backend.

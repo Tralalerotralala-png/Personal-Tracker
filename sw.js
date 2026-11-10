@@ -3,7 +3,7 @@
 //  - Fonts and the Supabase script (CDN) are cached the same way.
 //  - Requests to Supabase itself are never touched (sync handles those).
 // Bump VERSION whenever you deploy, so installed copies notice the update.
-const VERSION = 'v25';
+const VERSION = 'v26';
 const SHELL = `tracker-shell-${VERSION}`;
 const RUNTIME = `tracker-runtime-${VERSION}`;
 
@@ -145,3 +145,17 @@ async function networkFirst(event, req) {
   if(req.mode==='navigate')return await cache.match('./index.html')||Response.error();
   return Response.error();
 }
+
+self.addEventListener('notificationclick',event=>{
+  event.notification.close();
+  event.waitUntil((async()=>{
+    const target=event.notification.data?.target==='#calendar'?'#calendar':'#hub';
+    const clientsList=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of clientsList){
+      if(client.url.startsWith(self.registration.scope)){
+        await client.focus();client.postMessage({type:'open-reminder-tab',target});return;
+      }
+    }
+    await self.clients.openWindow(new URL('./'+target,self.registration.scope).href);
+  })());
+});

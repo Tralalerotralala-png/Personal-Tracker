@@ -6,7 +6,7 @@
 import { h, replace, daysSince } from '../ui/dom.js';
 import { WIDGET_DEFS } from './defs.js';
 import { mountCurrency } from './currency.js';
-import { mudChip, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
+import { mudChip, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
 import { locationPath } from '../data/inventory-logic.js';
 import { hash32 } from '../ui/pixel-icon.js';
@@ -89,7 +89,8 @@ function mountMud(el, { weather, store }) {
             h('span', { class: 'w-forecast-condition' }, localizedWeather(icon.text)),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
-            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}`));
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),
+            mudBar(r));
         })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },

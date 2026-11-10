@@ -9,6 +9,44 @@ const TYPES = ['task','note','expense'];
 const keyFor = (type, id) => `hub_${type}:${id}`;
 const dateNow = () => new Date().toLocaleDateString('en-CA');
 const fmtDate = date => date ? new Date(`${date}T12:00:00`).toLocaleDateString(locale(), { year:'numeric',month:'short',day:'numeric' }) : '—';
+
+const REMINDER_KEY='notification_preferences';
+const notificationDay=(d)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+export function dueBrowserReminders({tasks=[],events=[],now=new Date(),leadMinutes=10}={}){
+  const result=[],ms=now.getTime(),lead=Math.max(0,Math.min(120,Number(leadMinutes)||0))*60000;
+  for(const event of events){
+    const start=Date.parse(event.starts_at||'');
+    if(!event.all_day&&!event.deleted_at&&Number.isFinite(start)&&ms>=start-lead&&ms<start+300000)result.push({key:'event:'+event.id+':'+event.starts_at,kind:'event'});
+  }
+  if(now.getHours()>=9&&now.getHours()<12)for(const task of tasks){
+    if(!task.done&&task.due===notificationDay(now))result.push({key:'task:'+task.id+':'+task.due,kind:'task'});
+  }
+  return result;
+}
+export function startBrowserReminders(store){
+  let busy=false;const seen=new Set();
+  async function check(){
+    if(busy||document.visibilityState==='hidden'||!('Notification' in window)||Notification.permission!=='granted')return;
+    busy=true;
+    try{
+      const prefs=await store.getSetting(REMINDER_KEY,{enabled:false,leadMinutes:10});
+      if(!prefs?.enabled)return;
+      const [hub,events]=await Promise.all([loadHub(store),store.list('events')]);
+      for(const item of dueBrowserReminders({tasks:hub.task,events,leadMinutes:prefs.leadMinutes})){
+        const k='tracker-notified:'+item.key;
+        try{if(localStorage.getItem(k))continue}catch{if(seen.has(k))continue}
+        const body=item.kind==='event'?'An event is coming up. Open Personal Tracker to view it.':'A task is due today. Open Personal Tracker to view it.';
+        try{
+          const reg='serviceWorker' in navigator?await navigator.serviceWorker.getRegistration():null;
+          if(reg?.showNotification)await reg.showNotification('Personal Tracker',{body,tag:item.key,data:{target:item.kind==='event'?'#calendar':'#hub'},icon:'./icons/icon-192.png'});
+          else new Notification('Personal Tracker',{body,tag:item.key});
+          seen.add(k);try{localStorage.setItem(k,String(Date.now()))}catch{}
+        }catch(err){console.warn('Reminder failed',err)}
+      }
+    }catch(err){console.warn('Reminder check failed',err)}finally{busy=false}
+  }
+  setInterval(check,60000);window.addEventListener('focus',check);document.addEventListener('visibilitychange',check);check();
+}
 const nextDate = (date, repeat) => {
   const day = new Date(`${date || dateNow()}T12:00:00`);
   if (repeat === 'daily') day.setDate(day.getDate() + 1);
@@ -81,8 +119,33 @@ function buildPersonalHub({store, host}) {
   }
   function drawAlerts(){
     const {alerts}=context;
-    return [h('h3',{},t('Notification center')),
-      empty('Alerts are calculated from inventory levels, expiration dates, tasks and upcoming events. They remain visible here; browser push notifications are not enabled.'),
+    const es=locale().startsWith('es');
+    const msg=(en,spanish)=>es?spanish:en;
+    const info=msg('Reminders work only while Personal Tracker is open. They are not guaranteed phone alarms or background push notifications.','Los avisos funcionan solo mientras Personal Tracker esté abierto. No son alarmas garantizadas ni notificaciones en segundo plano.');
+    const status=h('p',{class:'hint'},info);
+    const controls=h('div',{class:'hub-notify-controls'});
+    if(!('Notification' in window)||!window.isSecureContext)controls.append(h('span',{class:'hint'},msg('Notifications unavailable in this browser.','Los avisos no están disponibles en este navegador.')));
+    else {
+      const lead=h('select',{'aria-label':msg('Minutes before','Minutos antes')},[0,5,10,30,60].map(n=>h('option',{value:n},n+' min')));
+      const toggle=button(msg('Enable notifications','Activar avisos'),async()=>{
+        const enabled=toggle.dataset.enabled!=='true';
+        if(enabled&&await Notification.requestPermission()!=='granted'){status.textContent=msg('Notifications blocked. Check browser settings.','Notificaciones bloqueadas. Revisa la configuración del navegador.');return}
+        await store.setSetting(REMINDER_KEY,{enabled,leadMinutes:Number(lead.value)});
+        toggle.dataset.enabled=String(enabled);
+        toggle.textContent=enabled?msg('Disable notifications','Desactivar avisos'):msg('Enable notifications','Activar avisos');
+        status.textContent=enabled?msg('Notifications enabled while the app is open.','Avisos activados mientras la aplicación esté abierta.'):info;
+      });
+      lead.addEventListener('change',async()=>{
+        const p=await store.getSetting(REMINDER_KEY,{enabled:false});
+        await store.setSetting(REMINDER_KEY,{...p,leadMinutes:Number(lead.value)});
+      });
+      controls.append(toggle,h('label',{},msg('Minutes before','Minutos antes')),lead);
+      store.getSetting(REMINDER_KEY,{enabled:false,leadMinutes:10}).then(p=>{
+        lead.value=String(p?.leadMinutes??10);toggle.dataset.enabled=String(!!p?.enabled);
+        if(p?.enabled){toggle.textContent=msg('Disable notifications','Desactivar avisos');status.textContent=msg('Notifications enabled while the app is open.','Avisos activados mientras la aplicación esté abierta.')}
+      }).catch(()=>{});
+    }
+    return [h('h3',{},t('Notification center')),controls,status,
       ...alerts.map(a=>h('div',{class:'hub-row'},h('b',{},a.label),h('span',{class:'track-warning'},t(a.reason)))),
       !alerts.length?empty('Nothing needs attention right now.'):null];
   }
