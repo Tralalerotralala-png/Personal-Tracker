@@ -233,13 +233,16 @@ const DEFAULT_LAYOUTS = {
     { id: 'currency', x: 8, y: 10, w: 4, h: 4 },
   ],
   mobile: [
-    { id: 'stats',    x: 0, y: 0,  w: 12, h: 2 },
-    { id: 'loot',     x: 0, y: 2,  w: 12, h: 3 },
-    { id: 'mud',      x: 0, y: 5,  w: 12, h: 4 },
-    { id: 'calendar', x: 0, y: 9,  w: 12, h: 5 },
-    { id: 'feed',     x: 0, y: 14, w: 12, h: 5 },
-    { id: 'phrase',   x: 0, y: 19, w: 12, h: 4 },
-    { id: 'currency', x: 0, y: 23, w: 12, h: 3 },
+    { id: 'mud', x: 0, y: 0, w: 12, h: 4 },
+    { id: 'calendar', x: 0, y: 4, w: 12, h: 4 },
+    { id: 'phrase', x: 0, y: 8, w: 12, h: 4 },
+    { id: 'loot', x: 0, y: 12, w: 12, h: 3 },
+    { id: 'stats', x: 0, y: 15, w: 12, h: 1 },
+    { id: 'currency', x: 0, y: 16, w: 12, h: 4 },
+    { id: 'sky', x: 0, y: 20, w: 12, h: 3 },
+    { id: 'recent', x: 0, y: 23, w: 12, h: 3 },
+    { id: 'games', x: 0, y: 26, w: 12, h: 3 },
+    { id: 'feed', x: 0, y: 29, w: 12, h: 4 },
   ],
   wallpaper: [
     { id: 'mud',      x: 0, y: 0, w: 7, h: 4 },
@@ -250,7 +253,7 @@ const DEFAULT_LAYOUTS = {
   ],
 };
 
-const LAYOUT_VERSION = 5;
+const LAYOUT_VERSION = 6;
 
 // Migrations only run after cloud sync. Existing widget positions and custom
 // layouts are preserved, and a newly introduced widget is added once. Removing
@@ -287,6 +290,26 @@ async function upgradeLayouts(store) {
         if (upgraded) await store.upsert('widget_layout', { profile, layout: upgraded });
       }
     }
+  }
+  if (version < 6) {
+    // Existing phone layouts were a sparse 12-column grid. Bring back every
+    // current widget once and pack them into one continuous phone column.
+    // Later manual removals are respected because this migration never repeats.
+    const row = await store.get('widget_layout', 'mobile');
+    const existing = normalizeLayout(row?.layout, WIDGET_DEFS, { cols: 12, rows: null });
+    const byId = new Map(existing.map(item => [item.id, item]));
+    const mobileOrder = DEFAULT_LAYOUTS.mobile.map(item => item.id);
+    const merged = [...mobileOrder, ...existing.map(item => item.id).filter(id => !mobileOrder.includes(id) && id !== 'clock')];
+    let y = 0;
+    const dense = merged.map(id => {
+      const def = WIDGET_DEFS[id];
+      const saved = byId.get(id);
+      const h = Math.max(def.minH, Math.min(saved?.h ?? def.defaultH, 6));
+      const item = { id, x: 0, y, w: 12, h };
+      y += h;
+      return item;
+    });
+    await store.upsert('widget_layout', { profile: 'mobile', layout: dense });
   }
   await store.setSetting('layout_version', LAYOUT_VERSION);
   return true;
@@ -3145,9 +3168,13 @@ function mountFeed(el, { feed }) {
     if (s.status === 'no-sources') return replace(el, note('No feed sources yet. Add one in the Feed tab.'));
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
     if (!s.items.length) return replace(el, note(s.status === 'empty' ? 'No headlines right now.' : 'Loading headlines...'));
-    replace(el, h('ul', { class: 'w-feed' }, s.items.slice(0, 12).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
-      it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
-      h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))));
+    const onPhone = typeof matchMedia === 'function' && matchMedia('(max-width: 899px)').matches;
+    const limit = onPhone ? 3 : 12;
+    replace(el, h('div', { class: 'w-feed-preview' },
+      h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
+        it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
+        h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))),
+      onPhone && s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
   };
   return live(render, (run) => [feed.subscribe(run)]);
 }

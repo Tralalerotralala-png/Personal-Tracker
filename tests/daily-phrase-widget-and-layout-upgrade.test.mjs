@@ -36,7 +36,7 @@ test('calendar-based phrase archive preserves the daily selection even on missed
   assert.equal(phraseHistory(new Date(2026, 11, 10), 2).length, 2);
 });
 
-test('saved desktop and mobile layouts gain the phrase widget without losing placements', async () => {
+test('desktop placements survive and mobile gets a complete dense widget layout', async () => {
   const store = createStore({ adapter: createMemoryAdapter() });
   await store.setSetting('layout_version', 2);
   const priorDesktop = [{id:'clock',x:0,y:0,w:3,h:2},{id:'mud',x:3,y:0,w:8,h:4}];
@@ -49,7 +49,10 @@ test('saved desktop and mobile layouts gain the phrase widget without losing pla
   const desktop = await loadLayout(store,'desktop');
   const mobile = await loadLayout(store,'mobile');
   assert.deepEqual(desktop.filter(x=>!['phrase','currency'].includes(x.id)), priorDesktop.filter(x=>x.id!=='clock'));
-  assert.deepEqual(mobile.filter(x=>!['phrase','currency'].includes(x.id)), priorMobile);
+  assert.deepEqual(mobile.map(x=>x.id), ['mud','calendar','phrase','loot','stats','currency','sky','recent','games','feed']);
+  assert.ok(mobile.every(x=>x.x===0 && x.w===12));
+  assert.equal(mobile[0].y,0);
+  for (let i=1;i<mobile.length;i++) assert.equal(mobile[i].y,mobile[i-1].y+mobile[i-1].h);
   assert.ok(desktop.some(x=>x.id==='phrase'));
   assert.ok(mobile.some(x=>x.id==='phrase'));
   assert.ok(desktop.some(x=>x.id==='currency'));
@@ -57,7 +60,7 @@ test('saved desktop and mobile layouts gain the phrase widget without losing pla
   assert.deepEqual(await loadLayout(store,'wallpaper'), priorWallpaper);
   for (const entries of [desktop,mobile]) for (let i=0;i<entries.length;i++) for (let j=i+1;j<entries.length;j++) assert.equal(overlaps(entries[i],entries[j]), false);
   assert.deepEqual(WIDGET_DEFS.phrase.route, null);
-  assert.equal(await store.getSetting('layout_version'), 5);
+  assert.equal(await store.getSetting('layout_version'), 6);
   // Removing the widget after migration stays removed.
   await store.upsert('widget_layout',{profile:'desktop',layout:priorDesktop});
   assert.equal(await upgradeLayouts(store), false);

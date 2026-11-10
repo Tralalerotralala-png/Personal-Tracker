@@ -733,16 +733,8 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .hub-stat b {font-size:1.3rem;color:var(--accent)}
 .hub-stat span {font-size:.8rem;color:var(--ink-dim)}
 /* Daily overview panel and optional theme controls */
-.ov-status { border:2px solid var(--edge); background:var(--panel); margin:12px 0 18px; padding:12px; display:grid; gap:10px; }
-.ov-status-head { display:flex;justify-content:space-between;align-items:center;gap:8px; }
-.ov-status-cards {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
-.ov-status-card {background:var(--panel-2);border:1px solid var(--edge);padding:10px;display:flex;flex-direction:column;gap:3px;}
-.ov-status-card b {font-size:1.3rem;color:var(--accent)}
-.ov-status-card span {font-size:.75rem;color:var(--ink-dim)}
-.ov-alert { color:var(--warn);font-size:.84rem; }
-@media(max-width:500px){.ov-status-cards {grid-template-columns:repeat(2,minmax(0,1fr));}}
 .reduce-animations *, .reduce-animations *::before, .reduce-animations *::after { animation-duration:.01ms !important;transition-duration:.01ms !important; }
-.widget, .ov-status, .panel, .tile-frame { background-color:color-mix(in srgb,var(--panel) calc(var(--panel-opacity,1)*100%),transparent); }
+.widget, .panel, .tile-frame { background-color:color-mix(in srgb,var(--panel) calc(var(--panel-opacity,1)*100%),transparent); }
 
 /* Search remains available on every page, including Overview. */
 .global-search-wrap { position: relative; flex: 1 1 240px; max-width: 560px; min-width: 105px; }
@@ -1033,7 +1025,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
   #app { min-height:100dvh; }
   #app>main { padding-bottom:calc(94px + env(safe-area-inset-bottom,0px)); min-width:0; }
   #app>.hotbar { position:fixed !important; left:0 !important; right:0 !important; top:auto !important; bottom:0 !important; width:100%; height:auto; max-height:calc(76px + env(safe-area-inset-bottom,0px)); z-index:100; overscroll-behavior-x:contain; }
-  .overview .desktop-summary { display:none; }
   .overview { gap:8px; }
   .overview .ov-grid { grid-auto-rows:56px; gap:7px; }
 }
@@ -1068,3 +1059,26 @@ html[data-layout-width="compact"] main{max-width:1100px}
 /* Fast, keyboard-accessible media filters inspired by common library catalogues. */
 .media-search-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(130px,1fr);gap:8px;margin:8px 0 16px}
 @media(max-width:480px){.media-search-filters{grid-template-columns:1fr}}
+
+/* Mobile Overview parity: old 12-column grid coordinates left large empty
+   tracks. Phone cards now have intrinsic heights, a single full-width column,
+   and no clipped currency inputs or hidden widgets. */
+@media (max-width:899px) {
+  .overview { align-content:start; gap:10px; background:none; }
+  .overview .panel-head { min-height:0; padding:0 1px; }
+  .overview .ov-grid { display:flex; flex-direction:column; gap:10px; min-width:0;
+    grid-template:none; grid-auto-rows:auto; align-items:stretch; }
+  .overview .ov-grid > .widget { display:flex; width:100%; height:auto!important;
+    min-height:0; flex:0 0 auto; container:widget / inline-size; overflow:visible; }
+  .overview .ov-grid .widget-body { flex:0 1 auto; min-height:0; overflow:visible; }
+  .overview .ov-grid .w-mud { height:auto; }
+  .overview .ov-grid .wd-phrase .widget-body { overflow:visible; }
+  .overview .ov-grid .w-feed-preview { min-width:0; }
+  .overview .ov-grid .w-feed li { overflow-wrap:anywhere; }
+  .overview .ov-grid .w-feed-more { display:inline-block; margin-top:10px; color:var(--accent); }
+  .overview .ov-grid .wd-currency .currency-pair,
+  .overview .ov-grid .wd-currency .currency-inputs { min-width:0; }
+  .overview .ov-grid .wd-currency .currency-inputs input { min-width:75px; }
+  .overview .ov-grid .wd-currency .currency-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  #app > main { padding-top:10px; }
+}

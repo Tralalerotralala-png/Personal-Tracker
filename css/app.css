@@ -1059,3 +1059,26 @@ html[data-layout-width="compact"] main{max-width:1100px}
 /* Fast, keyboard-accessible media filters inspired by common library catalogues. */
 .media-search-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(130px,1fr);gap:8px;margin:8px 0 16px}
 @media(max-width:480px){.media-search-filters{grid-template-columns:1fr}}
+
+/* Mobile Overview parity: old 12-column grid coordinates left large empty
+   tracks. Phone cards now have intrinsic heights, a single full-width column,
+   and no clipped currency inputs or hidden widgets. */
+@media (max-width:899px) {
+  .overview { align-content:start; gap:10px; background:none; }
+  .overview .panel-head { min-height:0; padding:0 1px; }
+  .overview .ov-grid { display:flex; flex-direction:column; gap:10px; min-width:0;
+    grid-template:none; grid-auto-rows:auto; align-items:stretch; }
+  .overview .ov-grid > .widget { display:flex; width:100%; height:auto!important;
+    min-height:0; flex:0 0 auto; container:widget / inline-size; overflow:visible; }
+  .overview .ov-grid .widget-body { flex:0 1 auto; min-height:0; overflow:visible; }
+  .overview .ov-grid .w-mud { height:auto; }
+  .overview .ov-grid .wd-phrase .widget-body { overflow:visible; }
+  .overview .ov-grid .w-feed-preview { min-width:0; }
+  .overview .ov-grid .w-feed li { overflow-wrap:anywhere; }
+  .overview .ov-grid .w-feed-more { display:inline-block; margin-top:10px; color:var(--accent); }
+  .overview .ov-grid .wd-currency .currency-pair,
+  .overview .ov-grid .wd-currency .currency-inputs { min-width:0; }
+  .overview .ov-grid .wd-currency .currency-inputs input { min-width:75px; }
+  .overview .ov-grid .wd-currency .currency-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  #app > main { padding-top:10px; }
+}

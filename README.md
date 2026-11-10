@@ -122,3 +122,24 @@ Finance features are original implementations informed by the feature sets of [A
 - The mobile navigation stays visible at the bottom while Pack and other pages scroll. The redundant daily summary is hidden on phone-sized screens; the individual widgets remain.
 - Weather fog and cloud artwork use restrained animation, with reduced-motion support. Forecast cards include the condition label.
 - Games, books, films, and albums use a short original CSS case-opening interaction when an entry is opened. No third-party media source code or assets were copied.
+
+
+### Privacy and a public repository
+
+The source code of this GitHub Pages application is public, including the Supabase URL and **publishable** key in `config.js`. A publishable key is designed to be used in a browser; it is **not** an access-control mechanism. Never put a `service_role`, `sb_secret_`, OpenAI secret, personal wallpaper access key, or private data export in the repository. **Do not commit secret credentials.**
+
+Personal data is intended to live in your browser's IndexedDB and your Supabase database, not in the GitHub project files. GitHub visibility does **not** guarantee database privacy: verify the **live** Supabase project's Row Level Security policies, storage bucket privacy, and authenticated access controls before relying on them. The included `supabase/schema.sql` defines owner-only policies, but having SQL in GitHub does not mean it was applied to the live database.
+
+Read-only check in **Supabase → SQL Editor** (confirm every personal table shows `true` for `rowsecurity`):
+
+```sql
+select schemaname, tablename, rowsecurity
+from pg_tables
+where schemaname = 'public'
+  and tablename in ('categories', 'locations', 'items', 'events',
+                    'news_sources', 'settings', 'widget_layout', 'wallpaper_access')
+order by tablename;
+select id, name, public from storage.buckets where id = 'item-photos';
+```
+
+Also inspect the `Policies` pages in Supabase for the owner-only access rules (and test unauthenticated access) rather than assuming RLS alone proves every policy is safe. Old commits and forks may remain public even after making a repository private. A private source repository also does not automatically make GitHub Pages private.

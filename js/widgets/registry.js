@@ -186,9 +186,13 @@ function mountFeed(el, { feed }) {
     if (s.status === 'no-sources') return replace(el, note('No feed sources yet. Add one in the Feed tab.'));
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
     if (!s.items.length) return replace(el, note(s.status === 'empty' ? 'No headlines right now.' : 'Loading headlines...'));
-    replace(el, h('ul', { class: 'w-feed' }, s.items.slice(0, 12).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
-      it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
-      h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))));
+    const onPhone = typeof matchMedia === 'function' && matchMedia('(max-width: 899px)').matches;
+    const limit = onPhone ? 3 : 12;
+    replace(el, h('div', { class: 'w-feed-preview' },
+      h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
+        it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
+        h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))),
+      onPhone && s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
   };
   return live(render, (run) => [feed.subscribe(run)]);
 }

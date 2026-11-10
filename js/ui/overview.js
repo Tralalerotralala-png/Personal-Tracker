@@ -26,15 +26,17 @@ export function createOverviewView({ store, ctx }) {
     for (const item of layout) {
       const card = createWidgetCard(item.id, ctx, { link: true });
       card.el.setAttribute('role', 'listitem');
-      card.el.style.gridColumn = `${item.x + 1} / span ${item.w}`;
-      card.el.style.gridRow = `${item.y + 1} / span ${item.h}`;
+      if (p === 'desktop') {
+        card.el.style.gridColumn = `${item.x + 1} / span ${item.w}`;
+        card.el.style.gridRow = `${item.y + 1} / span ${item.h}`;
+      }
       grid.append(card.el);
       cards.push(card);
     }
     replace(el,
       h('div', { class: 'panel-head' },
         h('h2', {}, 'Overview'),
-        h('button', { class: 'btn desktop-only', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
+        h('button', { class: 'btn small', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
       grid);
   }
 
