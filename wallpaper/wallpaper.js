@@ -1315,12 +1315,12 @@ const dayLong = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{wee
 const dayMonth = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',timeZone:'UTC'}):DAY_MONTH).format(atNoon(key));
 const mudClass = (label) => `m-${label.toLowerCase()}`;
 
-// Four proportional segments retain the precise 0–100 score in the accessible label.
+// Three proportional segments retain the precise 0–100 score in the accessible label.
 function mudBar(row) {
   const score = Math.max(0, Math.min(100, Number(row.index) || 0));
   return h('span', { class: `mud-bar ${mudClass(row.label)}`, role: 'img', 'aria-label': `${score} out of 100` },
-    Array.from({ length: 4 }, (_, i) => h('span', { class: 'blk' },
-      h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * 25) * 4))}%` }))));
+    Array.from({ length: 3 }, (_, i) => h('span', { class: 'blk' },
+      h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * (100 / 3)) * 3))}%` }))));
 }
 
 const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
@@ -2988,7 +2988,7 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 const { h, replace, daysSince } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
 const { mountCurrency } = __require("js/widgets/currency.js");
-const { mudChip, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
+const { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { hash32 } = __require("js/ui/pixel-icon.js");
@@ -3091,6 +3091,13 @@ function mountMud(el, { weather, store }) {
 
 // ---- calendar ------------------------------------------------------------------------------
 
+// Route a dashboard agenda selection to the matching Calendar day or event.
+// The Calendar view listens for this request and processes it after mounting.
+function openCalendarSelection(detail) {
+  window.dispatchEvent(new CustomEvent('tracker-calendar-open', { detail }));
+  if (location.hash !== '#calendar') location.hash = '#calendar';
+}
+
 function mountCalendar(el, { store, weather }) {
   const render = async () => {
     const events = await store.list('events');
@@ -3099,15 +3106,27 @@ function mountCalendar(el, { store, weather }) {
     const byDay = groupByDay(events, from, to);
     const mud = new Map(weather.getState().rows.map((r) => [r.date, r]));
     const days = [...byDay.keys()].sort();
-    if (!days.length) return replace(el, note('Nothing planned this week.'));
+    if (!days.length) return replace(el, note(language()==='es' ? 'No hay eventos previstos esta semana.' : 'Nothing planned this week.'));
     replace(el, h('div', { class: 'w-cal' }, days.map((key) => {
       const dm = mud.get(key);
+      const dayTitle = `${dayLong(key)} ${dayMonth(key)}`;
       return h('section', { class: 'w-day' },
-        h('header', {}, h('b', {}, key === from ? 'Today' : dayShort(key)), h('span', {}, dayMonth(key)), dm ? mudChip(dm) : null),
-        byDay.get(key).map((o) => h('p', { class: 'w-ev' },
+        h('header', {},
+          h('button', { class: 'w-agenda-date', type: 'button', title: dayTitle,
+            'aria-label': `${language()==='es' ? 'Abrir día' : 'Open day'}: ${dayTitle}`,
+            onclick: () => openCalendarSelection({ dateKey: key }) },
+            h('b', {}, key === from ? t('Today') : dayShort(key)), h('span', {}, dayMonth(key))),
+          dm ? h('button', { type:'button', class: 'w-agenda-ground',
+            title: `${localizedMudLabel(dm.label)} ${dm.index}/100`,
+            'aria-label': `${localizedMudLabel(dm.label)} ${dm.index} ${language()==='es' ? 'de' : 'out of'} 100. ${language()==='es' ? 'Abrir día' : 'Open day'} ${dayTitle}`,
+            onclick: () => openCalendarSelection({ dateKey: key }) }, mudBar(dm)) : null),
+        byDay.get(key).map((o) => h('button', { type: 'button', class: 'w-ev w-event-link',
+          title: `${language()==='es' ? 'Abrir evento' : 'Open event'}: ${o.event.title}`,
+          'aria-label': `${language()==='es' ? 'Abrir evento' : 'Open event'} ${o.event.title} · ${dayTitle}`,
+          onclick: () => openCalendarSelection({ dateKey: key, eventId: o.event.id }) },
           h('span', { class: 'dot', style: `background:${o.event.color || '#43b9ad'}` }),
-          h('span', { class: 'w-time' }, o.allDay ? 'All day' : `${String(o.start.getHours()).padStart(2, '0')}:${String(o.start.getMinutes()).padStart(2, '0')}`),
-          o.event.title)));
+          h('span', { class: 'w-time' }, o.allDay ? t('All day') : `${String(o.start.getHours()).padStart(2, '0')}:${String(o.start.getMinutes()).padStart(2, '0')}`),
+          h('span', { class: 'w-event-name' }, o.event.title))));
     })));
   };
   return live(render, (run) => [storeTables(store, ['events'], run), weather.subscribe(run)]);

@@ -14,12 +14,12 @@ export const dayLong = (key) => (language()==='es'?new Intl.DateTimeFormat('es-M
 export const dayMonth = (key) => (language()==='es'?new Intl.DateTimeFormat('es-MX',{day:'numeric',month:'short',timeZone:'UTC'}):DAY_MONTH).format(atNoon(key));
 export const mudClass = (label) => `m-${label.toLowerCase()}`;
 
-// Four proportional segments retain the precise 0–100 score in the accessible label.
+// Three proportional segments retain the precise 0–100 score in the accessible label.
 export function mudBar(row) {
   const score = Math.max(0, Math.min(100, Number(row.index) || 0));
   return h('span', { class: `mud-bar ${mudClass(row.label)}`, role: 'img', 'aria-label': `${score} out of 100` },
-    Array.from({ length: 4 }, (_, i) => h('span', { class: 'blk' },
-      h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * 25) * 4))}%` }))));
+    Array.from({ length: 3 }, (_, i) => h('span', { class: 'blk' },
+      h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * (100 / 3)) * 3))}%` }))));
 }
 
 export const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;

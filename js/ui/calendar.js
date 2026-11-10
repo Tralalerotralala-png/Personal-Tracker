@@ -30,6 +30,7 @@ export function createCalendarView({ store, weather }) {
   const now = new Date();
   const state = { y: now.getFullYear(), m: now.getMonth() + 1, events: [], weekStart: 1 };
   const el = h('div', { class: 'view calendar' });
+  let pendingOverviewSelection = null;
 
   async function load() {
     state.events = await store.list('events');
@@ -292,6 +293,26 @@ export function createCalendarView({ store, weather }) {
     });
   }
 
+  // Navigation from the Coming Up widget. Events open the actual editor, while
+  // tapping a day opens that day's event list (including repeating events).
+  function handleOverviewSelection(event) {
+    const detail = event.detail;
+    if (!detail || !/^\d{4}-\d{2}-\d{2}$/.test(detail.dateKey || '')) return;
+    pendingOverviewSelection = { dateKey: detail.dateKey, eventId: detail.eventId || null };
+    if (!el.hidden && el.isConnected) processOverviewSelection();
+  }
+  function processOverviewSelection() {
+    if (!pendingOverviewSelection || el.hidden || !el.isConnected) return;
+    const { dateKey, eventId } = pendingOverviewSelection;
+    pendingOverviewSelection = null;
+    const { y, m } = parseKey(dateKey);
+    if (state.y !== y || state.m !== m) { state.y = y; state.m = m; render(); }
+    const selected = eventId ? state.events.find(event => event.id === eventId) : null;
+    if (selected) openEventSheet({ event: selected });
+    else openDaySheet(dateKey);
+  }
+  window.addEventListener('tracker-calendar-open', handleOverviewSelection);
+
   // ---- wiring ----------------------------------------------------------------------------
 
   let queued = false;
@@ -305,7 +326,7 @@ export function createCalendarView({ store, weather }) {
 
   return {
     el,
-    async mount() { await load(); render(); },
-    async show() { await load(); render(); },
+    async mount() { await load(); render(); processOverviewSelection(); },
+    async show() { await load(); render(); processOverviewSelection(); },
   };
 }
