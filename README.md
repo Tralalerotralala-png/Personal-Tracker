@@ -123,7 +123,6 @@ Finance features are original implementations informed by the feature sets of [A
 - Weather fog and cloud artwork use restrained animation, with reduced-motion support. Forecast cards include the condition label.
 - Games, books, films, and albums use a short original CSS case-opening interaction when an entry is opened. No third-party media source code or assets were copied.
 
-
 ### Privacy and a public repository
 
 The source code of this GitHub Pages application is public, including the Supabase URL and **publishable** key in `config.js`. A publishable key is designed to be used in a browser; it is **not** an access-control mechanism. Never put a `service_role`, `sb_secret_`, OpenAI secret, personal wallpaper access key, or private data export in the repository. **Do not commit secret credentials.**
@@ -144,5 +143,54 @@ select id, name, public from storage.buckets where id = 'item-photos';
 
 Also inspect the `Policies` pages in Supabase for the owner-only access rules (and test unauthenticated access) rather than assuming RLS alone proves every policy is safe. Old commits and forks may remain public even after making a repository private. A private source repository also does not automatically make GitHub Pages private.
 
-### Phone reminders
-Personal Hub → Alerts includes an opt-in notification switch and a calendar-event lead time (0–60 minutes). Tasks due today are checked from 9 a.m. to noon. Notifications have generic text to avoid exposing private details on phone lock screens. They work only while the app is open and visible, depending on browser permissions and system settings. They do not provide guaranteed background push or system alarms when the app is closed; that would require a separate push backend.
+## Game save backups (private Supabase Storage)
+
+Open **Media Library → Games → choose a game → Game save backups**. Save files,
+configurations and ZIP/7z/RAR archives are stored privately in Supabase Storage,
+not in GitHub or the game notes. Each upload creates a distinct version with a
+SHA-256 checksum, description and timestamp. Downloads are verified before saving.
+The browser accepts files up to **25 MB** per upload and does not automatically
+restore saves into your game's directory. Files are not virus-scanned; never run
+untrusted downloaded files.
+
+**One-time setup is required:** In your own Supabase project's SQL Editor,
+review and run `supabase/game-backups.sql`. It creates a **private** `game-backups`
+bucket with user-folder-specific SELECT, INSERT and DELETE policies. It does
+not add SQL database tables; metadata is stored in your existing owner-protected
+`settings` table. Refresh the app afterward. Until the bucket is available,
+file uploads remain disabled with a setup notice. Do not commit your private
+save files, service-role keys or credentials to GitHub. Verify the bucket's
+`public = false` flag and inspect any *other* Storage policies: RLS policies
+are OR-ed, so a permissive policy would weaken these restrictions. Existing
+personal data is untouched by this migration.
+
+The file manager's storage counter is **tracked backup file bytes**, not your
+Supabase plan's total used or remaining quota. Supabase's global storage limit
+includes other buckets and their files. The regular JSON backup includes backup
+file metadata but **not** the actual file contents. A game removed from the
+library does not automatically delete its separately stored backups, preventing
+accidental data loss; delete backup versions manually when no longer needed.
+
+## Environmental lighting and astronomical event icons
+
+**Settings → Appearance → Environmental lighting** controls a theme-compatible
+background glow (automatic weather + sun/moon, time-only, or off), its strength,
+smooth transitions and whether to highlight sky events. The effect uses the
+selected forecast location's **sunrise/sunset and cloud cover** from Open-Meteo,
+plus the app's approximate lunar phase. Existing custom theme colors remain
+unchanged. The same day/night logic is used for Weather icons and the Overview.
+
+On curated meteor-shower and eclipse dates, an event symbol appears in the
+header and Weather tab. Eclipse dates are **worldwide listings, not evidence of
+visibility at your location**. The app does not simulate actual eclipse
+illumination, exact astronomy or cloud break timing; consult the linked official
+source for visibility and eye-safety guidance. Weather may be stale offline;
+reduced-motion settings remain respected.
+
+## Release verification and limitations
+
+Run `npm test` and `node scripts/build-wallpaper.mjs` after editing source files.
+The published code is public, but user data is stored on the device and synced
+through the Supabase account's RLS policies. No repository-only inspection can
+certify the live database's RLS configuration; check it in the Supabase dashboard
+before storing sensitive material.

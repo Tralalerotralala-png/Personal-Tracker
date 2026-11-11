@@ -272,3 +272,22 @@ Upload this release's contents to the repository root, **except `config.js`**, w
 Personal Hub and Expenses are separate tabs. Expense records continue using your existing `hub_expense:<id>` settings entries; no additional Supabase tables, functions, or migrations are required.
 
 Expenses includes monthly/category budgets, reports, manual income and expense entries, a tip/tax/split calculator, and CSV import/export. CSV files are not encrypted; do not publish them to GitHub or share them casually. Recurrence fields describe planned repeating payments; the app does not automatically record or charge them. It never aggregates different currency amounts into one balance.
+
+## Enable private game backups (new optional feature)
+
+1. Open your **own Supabase project → SQL Editor** and review
+   `supabase/game-backups.sql` from this repository. Run that SQL once.
+2. Verify in **Storage** that `game-backups` is **Private**, not public.
+3. Check `storage.objects` policies for this bucket. SELECT, INSERT and DELETE
+   must be restricted to authenticated users' own `auth.uid()` folder; delete
+   any old overly broad policy if present. This must be checked in the *live*
+   project, not inferred from the SQL file alone.
+4. Sign in to Personal Tracker, open a game in the Media Library, and upload a
+   small test `.sav` or `.zip`. Download it and confirm its checksum matches.
+5. The app displays a setup notice and disables uploads until this private
+   bucket can be accessed. Files never go to your GitHub repository.
+
+No SQL changes are necessary for Environmental Lighting. It is opt-in by
+settings (Automatic by default), and uses Open-Meteo sunrise, sunset and
+cloud cover plus the approximate lunar phase. Eclipse notices show worldwide
+events and do not imply local visibility.

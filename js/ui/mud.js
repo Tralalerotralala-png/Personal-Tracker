@@ -3,7 +3,8 @@
 import { h, replace, openSheet } from './dom.js';
 import { t, language } from './language.js';
 import { isNightAtLocation } from '../weather/moon-phase.js';
-import { upcomingSkyEvents } from '../weather/sky-events.js';
+import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
+import { skyLighting, dateKeyAt } from '../weather/environment.js';
 import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
 import { glyphSvg, weatherGlyph, weatherIconSvg } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
@@ -117,6 +118,8 @@ export function createMudView({ store, weather }) {
     const raw = today.raw;
     const code = current?.weather_code ?? raw.weather_code;
     const g = weatherGlyph(code);
+    const activeSky=skyLighting(state,{},new Date());
+    const event=skyEventOnDate(dateKeyAt(new Date(),state.place?.timezone));
     const kind = g.glyph === 'storm' ? 'storm' : g.glyph === 'rain' ? 'rain' : g.glyph === 'snow' ? 'snow' : g.glyph === 'sun' ? 'sun' : 'cloud';
     const temp = current?.temperature_2m;
     const number = (value, unit = '') => typeof value === 'number' ? `${Math.round(value)}${unit}` : '—';
@@ -126,12 +129,15 @@ export function createMudView({ store, weather }) {
       h('div', { class: 'wx-heading' }, h('h3', {}, t('Weather')), h('span', { class: 'hint' }, current ? 'Current conditions' : 'Daily forecast')),
       h('div', { class: 'wx-hero' },
         h('div', { class: `wx-scene wx-${kind}`, 'aria-hidden': 'true' },
-          h('span', { class: 'wx-scene-glyph', html: weatherIconSvg(code, { night: isNightAtLocation(current) }) }),
+          h('span', { class: 'wx-scene-glyph', html: weatherIconSvg(code, { night: activeSky.night }) }),
           h('span', { class: 'wx-particles' }, Array.from({length: 8}, (_, i) => h('i', { class: 'wx-particle', style: `--i:${i}` })))),
         h('div', { class: 'wx-main' },
           h('strong', { class: 'wx-temperature' }, typeof temp === 'number' ? `${Math.round(temp)}°C` : `${number(raw.tmax, '°')} / ${number(raw.tmin, '°')}C`),
           h('span', { class: 'wx-condition' }, localizedWeather(g.text)),
           h('span', { class: 'hint' }, `${t('High')} ${number(raw.tmax, '°')} · ${t('Low')} ${number(raw.tmin, '°')}`))),
+      event?h('a',{class:'wx-event-banner',href:event.url,target:'_blank',rel:'noopener noreferrer',title:'Worldwide event — check local visibility'},
+        h('span',{class:'wx-event-symbol',html:skyEventIconSvg(event.kind)}),
+        h('span',{},(language()==='es'?event.es:event.en)+' · '+(language()==='es'?'Visibilidad local sin confirmar':'Local visibility unverified'))):null,
       h('div', { class: 'wx-stats' },
         stat('Feels like', number(current?.apparent_temperature, '°C')),
         stat('Humidity', number(current?.relative_humidity_2m, '%')),

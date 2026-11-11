@@ -9,9 +9,9 @@ const KINDS=['books','films','albums'];
 const LABELS={en:{games:'Games',books:'Books',films:'Films',albums:'Albums',library:'Media Library',add:'Add',name:'Title',creator:'Author / Director / Artist',status:'Status',notes:'Notes',cover:'Cover URL (HTTPS)',save:'Save',cancel:'Back',edit:'Edit',delete:'Delete',journal:'Personal journal',entry:'Add note',shelf:'Shelf',view:'Toggle shelf/grid',rating:'Rating'},es:{games:'Juegos',books:'Libros',films:'Películas',albums:'Álbumes',library:'Biblioteca multimedia',add:'Agregar',name:'Título',creator:'Autor / Director / Artista',status:'Estado',notes:'Notas',cover:'URL de portada (HTTPS)',save:'Guardar',cancel:'Volver',edit:'Editar',delete:'Eliminar',journal:'Diario personal',entry:'Agregar nota',shelf:'Estante',view:'Cambiar estantes/cuadrícula',rating:'Calificación'}};
 const names={books:{en:['To read','Reading','Finished'],es:['Por leer','Leyendo','Terminado']},films:{en:['To watch','Watching','Watched'],es:['Por ver','Viendo','Vista']},albums:{en:['To listen','Listening','Listened'],es:['Por escuchar','Escuchando','Escuchado']}};
 const clamp=(x,max)=>String(x??'').slice(0,max);
-export function createMediaLibraryView({store}) {
+export function createMediaLibraryView({store,backups=null}) {
  const el=h('div',{class:'view media-library-view'});
- const games=createGamesView({store});
+ const games=createGamesView({store,backups});
  const L=()=>LABELS[language()];
  let active='games',data={books:[],films:[],albums:[]},shelfMode=true,page=null,dirty=false,query='',statusFilter='all';
  const list=kind=>data[kind]||[];

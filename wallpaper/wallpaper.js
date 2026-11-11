@@ -2133,6 +2133,88 @@ function createSnapshotStore(initial, storage = globalThis.localStorage) {
 }
 Object.assign(__exports, { createSnapshotStore });
 });
+__define("js/weather/environment.js", function (__require, __exports) {
+"use strict";
+// A single environmental-light model used by every theme. Weather is observed,
+// sunrise/sunset follow the chosen location, and the moon is approximate.
+const { moonPhase } = __require("js/weather/moon-phase.js");
+const { skyEventOnDate } = __require("js/weather/sky-events.js");
+
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const RANGES = {
+  dawn: [237, 163, 104], day: [117, 177, 225], dusk: [199, 117, 147],
+  moon: [135, 154, 228], cloudy: [88, 105, 137], eclipse: [150, 114, 172],
+  meteor: [137, 142, 202], dark: [86, 92, 126],
+};
+const SKY_MODES = ['auto', 'time', 'off'];
+
+function localClockMinutes(date = new Date(), timezone = null) {
+  try {
+    const opts = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+    if (timezone) opts.timeZone = timezone;
+    const parts = new Intl.DateTimeFormat('en-GB', opts).formatToParts(date);
+    const hh = Number(parts.find(x => x.type === 'hour')?.value);
+    const mm = Number(parts.find(x => x.type === 'minute')?.value);
+    return hh * 60 + mm;
+  } catch { return date.getHours() * 60 + date.getMinutes(); }
+}
+function dateKeyAt(date = new Date(), timezone = null) {
+  try {
+    const opts = { year:'numeric',month:'2-digit',day:'2-digit' };
+    if (timezone) opts.timeZone = timezone;
+    const parts = new Intl.DateTimeFormat('en-CA', opts).formatToParts(date);
+    const part = k => parts.find(x => x.type === k)?.value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  } catch { return date.toISOString().slice(0, 10); }
+}
+function clockFromIsoLocal(s) {
+  const m = String(s ?? '').match(/T(\d{2}):(\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+function sunPhase(time, sunrise, sunset, isDay) {
+  // ±55 minutes around sun-up / sun-down soften day/night transitions.
+  if (sunrise !== null && sunset !== null && sunrise < sunset) {
+    if (time >= sunrise - 55 && time < sunrise + 55) return 'dawn';
+    if (time >= sunset - 55 && time < sunset + 55) return 'dusk';
+    return time >= sunrise && time < sunset ? 'day' : 'night';
+  }
+  if (isDay === 1) return 'day';
+  if (isDay === 0) return 'night';
+  return time < 360 || time >= 1140 ? 'night' : time < 510 ? 'dawn' : time >= 1050 ? 'dusk' : 'day';
+}
+function skyLighting(weatherState = {}, settings = {}, date = new Date()) {
+  const mode = SKY_MODES.includes(settings.sky_lighting_mode) ? settings.sky_lighting_mode : 'auto';
+  const intensity = clamp(Number.isFinite(Number(settings.sky_lighting_intensity)) ? Number(settings.sky_lighting_intensity) : 35, 0, 100);
+  const timezone = weatherState.place?.timezone ?? null;
+  const time = localClockMinutes(date, timezone);
+  const today = dateKeyAt(date, timezone);
+  const row = weatherState.rows?.find(r => r.date === today);
+  const sunrise = clockFromIsoLocal(row?.raw?.sunrise);
+  const sunset = clockFromIsoLocal(row?.raw?.sunset);
+  const phase = sunPhase(time, sunrise, sunset, weatherState.current?.is_day);
+  const illumination = (1 - Math.cos(2 * Math.PI * moonPhase(date).fraction)) / 2;
+  const code = Number(weatherState.current?.weather_code);
+  const cloud = Number.isFinite(weatherState.current?.cloud_cover)
+    ? clamp(weatherState.current.cloud_cover / 100, 0, 1)
+    : !Number.isFinite(code) ? 0.4 : code === 0 ? 0 : code <= 2 ? 0.25 : code === 3 ? 0.85 : 0.95;
+  const event = settings.sky_lighting_events === false ? null : skyEventOnDate(today);
+  const night = phase === 'night';
+  let color = RANGES[phase === 'night' ? 'moon' : phase];
+  if (mode === 'auto') {
+    if (night && cloud >= 0.75) color = RANGES.cloudy;
+    if (night && illumination < 0.13) color = RANGES.dark;
+    if (event?.kind === 'meteor' && night) color = RANGES.meteor;
+    // Eclipse listings are global, not local visibility predictions. A mild
+    // accent is appropriate; never simulate local totality or sudden darkness.
+    if (event?.kind?.includes('eclipse')) color = RANGES.eclipse;
+  }
+  const amount = mode === 'off' ? 0 : (intensity / 100) * (phase === 'night'
+    ? (0.12 + 0.14 * illumination) * (1 - cloud * 0.45)
+    : phase === 'day' ? 0.22 * (1 - cloud * 0.35) : 0.3 * (1 - cloud * 0.2));
+  return { mode, phase, night, illumination, cloud, event, rgb: color.join(' '), opacity: clamp(amount, 0, 0.34) };
+}
+Object.assign(__exports, { SKY_MODES, localClockMinutes, dateKeyAt, clockFromIsoLocal, skyLighting });
+});
 __define("js/weather/moon-phase.js", function (__require, __exports) {
 "use strict";
 // Mean synodic month approximation; displayed phase, not a precise astronomical ephemeris.
@@ -2431,7 +2513,7 @@ const FORECAST_DAYS = 6;
 
 const DAILY_VARS = [
   'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'rain_sum',
-  'snowfall_sum', 'et0_fao_evapotranspiration', 'wind_speed_10m_max',
+  'snowfall_sum', 'et0_fao_evapotranspiration', 'wind_speed_10m_max', 'sunrise', 'sunset',
 ];
 const SOIL_VARS = ['soil_moisture_0_to_1cm', 'soil_moisture_1_to_3cm', 'soil_moisture_3_to_9cm'];
 
@@ -2454,7 +2536,7 @@ function buildForecastUrl({ lat, lon }, kind) {
   else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
   else {
     p.set('daily', DAILY_VARS.join(','));
-    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m');
+    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover');
   }
   return `${FORECAST_URL}?${p}`;
 }
@@ -2515,6 +2597,7 @@ function parseDaily(json) {
     snowfall_cm: at('snowfall_sum', i),
     et0: at('et0_fao_evapotranspiration', i),
     wind_max: at('wind_speed_10m_max', i),
+    sunrise: at('sunrise', i), sunset: at('sunset', i),
   }));
 }
 
@@ -2630,7 +2713,12 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       const interval = ((await store.getSetting('refresh_minutes'))?.weather ?? 60) * 60_000;
       const cached = (await store.meta.get(CACHE_KEY)) ?? null;
       const sameplace = cached && cached.key === placeKey(place);
-      const age = sameplace ? now().getTime() - new Date(cached.raw.fetchedAt).getTime() : Infinity;
+      // A previous app version did not fetch sunrise, sunset, or cloud cover.
+      // Display its cached forecast immediately, but refresh the new fields.
+      const needsLightingData = sameplace && !cached.raw.skyRefreshChecked && (!cached.raw.days?.some(d => d.sunrise && d.sunset)
+        || !('cloud_cover' in (cached.raw.current || {})));
+      const age = sameplace && !needsLightingData
+        ? now().getTime() - new Date(cached.raw.fetchedAt).getTime() : Infinity;
 
       // Show what we have straight away.
       if (sameplace) {
@@ -2643,6 +2731,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       try {
         if (!state.rows.length) set({ status: 'loading' });
         const raw = await fetchWeather(place, { fetchImpl });
+        raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);
@@ -2744,7 +2833,26 @@ function upcomingSkyEvents(date=new Date(), limit=5) {
  }
  return [...events,...phases].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,Math.max(0,limit));
 }
-Object.assign(__exports, { upcomingSkyEvents });
+
+// Exact-day highlight; eclipse regions must be checked with an authoritative
+// visibility tool. Calendar dates here do not establish local observation.
+function skyEventOnDate(isoDate) {
+ const entry = CALENDAR.find(x => x[0] === isoDate);
+ if (!entry) return null;
+ const [,en,es,url] = entry;
+ const kind = /solar eclipse/i.test(en) ? 'solar_eclipse'
+   : /lunar eclipse/i.test(en) ? 'lunar_eclipse' : 'meteor';
+ return {date:isoDate,en,es,url,kind,localVisibilityKnown:false};
+}
+function skyEventIconSvg(kind) {
+ const core = kind === 'solar_eclipse'
+  ? '<circle cx="12" cy="12" r="9" fill="#d9af66"/><circle cx="11" cy="11" r="8" fill="#18223b"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="#f2d398" stroke-width="2"/>'
+  : kind === 'lunar_eclipse'
+  ? '<circle cx="12" cy="12" r="9" fill="#b77265"/><path d="M15 4a9 9 0 0 1 0 16" stroke="#653c58" stroke-width="5" fill="none"/>'
+  : '<path d="M4 19L20 3M8 20l12-12" stroke="#e0c7ff" stroke-width="3"/><path d="M17 2h5v5" stroke="#ffe2a0" stroke-width="3" fill="none"/>';
+ return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`;
+}
+Object.assign(__exports, { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg });
 });
 __define("js/widgets/currency.js", function (__require, __exports) {
 "use strict";
@@ -2995,7 +3103,8 @@ const { hash32 } = __require("js/ui/pixel-icon.js");
 const { timeAgo } = __require("js/ui/format.js");
 const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
-const { upcomingSkyEvents } = __require("js/weather/sky-events.js");
+const { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } = __require("js/weather/sky-events.js");
+const { skyLighting } = __require("js/weather/environment.js");
 const { language, t } = __require("js/ui/language.js");
 const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
 
@@ -3045,7 +3154,7 @@ function mountMud(el, { weather, store }) {
         h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
     const c = s.current;
-    const night = isNightAtLocation(c, now);
+    const night = skyLighting(s, ui, now).night;
     const moon = moonPhase(now);
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
@@ -3071,8 +3180,7 @@ function mountMud(el, { weather, store }) {
             h('span', { class: 'w-forecast-condition' }, localizedWeather(icon.text)),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
-            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),
-            mudBar(r));
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),mudBar(r));
         })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },
@@ -3091,13 +3199,11 @@ function mountMud(el, { weather, store }) {
 
 // ---- calendar ------------------------------------------------------------------------------
 
-// Route a dashboard agenda selection to the matching Calendar day or event.
-// The Calendar view listens for this request and processes it after mounting.
+// Route dashboard agenda taps to their real day or event editors.
 function openCalendarSelection(detail) {
   window.dispatchEvent(new CustomEvent('tracker-calendar-open', { detail }));
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
-
 function mountCalendar(el, { store, weather }) {
   const render = async () => {
     const events = await store.list('events');
@@ -3250,7 +3356,7 @@ function mountSky(el,{weather}) {
  const render=()=>{const events=upcomingSkyEvents(new Date(),4);const place=weather?.getState().place?.name;
   replace(el,h('div',{class:'w-sky'},
     h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
-    ...events.map(e=>h('p',{class:'w-sky-event'},h('span',{},e.date+' · '),
+    ...events.map(e=>h('p',{class:'w-sky-event'},skyEventOnDate(e.date)?h('span',{class:'w-sky-symbol',html:skyEventIconSvg(skyEventOnDate(e.date).kind)}):null,h('span',{},e.date+' · '),
       h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},language()==='es'?e.es:e.en))),
     place?h('small',{},`${t('Selected location')}: ${place}`):null));
  };

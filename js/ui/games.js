@@ -3,10 +3,11 @@
 import { h, replace, confirmDialog, toast } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
+import { createGameBackupPanel } from './game-backup-panel.js';
 const KEY='game_library_v1';
 const TEXT={en:{title:'Game Library',add:'Add game',empty:'Your shelves are empty. Add a game to begin.',shelf:'Shelf',notes:'Notes',status:'Status',platform:'Platform',cover:'Cover URL (HTTPS)',upload:'Or upload a cover (up to 120 KB)',save:'Save',delete:'Delete',lookup:'Look up cover',grid:'Cover grid',wood:'Bookshelves',edit:'Edit',rating:'Rating (optional)',newShelf:'New shelf',name:'Title',cancel:'Cancel'},es:{title:'Biblioteca de juegos',add:'Agregar juego',empty:'Tus estantes están vacíos. Agrega un juego para empezar.',shelf:'Estante',notes:'Notas',status:'Estado',platform:'Plataforma',cover:'URL de portada (HTTPS)',upload:'O subir portada (máximo 120 KB)',save:'Guardar',delete:'Eliminar',lookup:'Buscar portada',grid:'Cuadrícula',wood:'Estantes',edit:'Editar',rating:'Calificación (opcional)',newShelf:'Nuevo estante',name:'Título',cancel:'Cancelar'}};
 const baseShelves=['Favorites','Playing','Backlog','Completed'];
-export function createGamesView({store}){
+export function createGamesView({store,backups=null}){
  const el=h('div',{class:'view games-view'});let state={games:[],shelves:baseShelves,mode:'shelf'};let page=null;let sideMode=false;let dirty=false;let query='',gameFilter='all';
  const L=()=>TEXT[language()];
  const clean=(s,n=3000)=>String(s??'').trim().slice(0,n);
@@ -41,7 +42,7 @@ export function createGamesView({store}){
   const journalPanel=h('section',{class:'game-journal'},h('h3',{},language()==='es'?'Diario de juego':'Game journal'),
     journalText,h('button',{class:'btn small',onclick:async()=>{if(!journalText.value.trim())return;game.journal=[{id:uuid(),date:new Date().toISOString(),text:journalText.value.trim().slice(0,5000)},...(game.journal||[])];await store.setSetting(KEY,state);detail(game);}},language()==='es'?'Agregar nota':'Add journal note'),
     ...journalEntries.map(x=>h('div',{class:'game-journal-entry'},h('small',{},new Date(x.date).toLocaleDateString()),h('p',{},x.text))));
-  showPage(h('div',{class:'game-detail'},caseArt(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),journalPanel,h('div',{class:'inline-actions'},edit,remove))),game.title);
+  showPage(h('div',{class:'game-detail'},caseArt(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),journalPanel,createGameBackupPanel({backups,gameId:game.id}),h('div',{class:'inline-actions'},edit,remove))),game.title);
  }
  async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:existing?.rating||''});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||'Backlog')===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
  const form=h('div',{class:'form game-editor-form'},h('label',{},L().name),title,h('label',{},L().platform),platform,h('label',{},L().shelf),shelf,h('label',{},L().status),status,h('label',{},L().rating),rating,h('label',{},L().cover),coverUrl,h('button',{class:'btn small',onclick:async()=>{

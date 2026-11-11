@@ -692,7 +692,10 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 :root[data-day-phase="day"] { --day-accent: rgba(92,187,183,.06); }
 :root[data-day-phase="evening"] { --day-accent: rgba(212,132,100,.10); }
 :root[data-day-phase="night"] { --day-accent: rgba(71,99,155,.11); }
-.overview { background: radial-gradient(ellipse at 95% 0%,var(--day-accent,transparent),transparent 65%); }
+.overview { background:none; }
+:root[data-sky-light='on'] main { background-image: radial-gradient(ellipse at 96% 2%, rgb(var(--sky-glow-rgb, 117 177 225) / var(--sky-glow-opacity, 0.05)), transparent 68%); }
+:root.sky-smooth main { transition: background-color 2s ease, opacity 2s ease; }
+:root[data-sky-light='off'] main { background-image:none; }
 .ov-today { display:flex; gap:.7rem; align-items:center; flex-wrap:wrap; padding:.65rem 1rem; margin:0 0 .9rem; border:1px solid var(--line,#4b514f); border-radius:6px; }
 .ov-today strong { color:var(--accent,#68b8b1); }
 .ov-today span:last-child { opacity:.75; margin-left:auto; }
@@ -1083,7 +1086,30 @@ html[data-layout-width="compact"] main{max-width:1100px}
   #app > main { padding-top:10px; }
 }
 
-/* Daily Overview forecast includes four proportional ground-condition bars. */
+/* Environmental sky color is separate from theme palettes and scanlines. */
+.sky-today-badge { display:flex;align-items:center;justify-content:center;border:1px solid var(--edge);background:var(--panel-2);padding:4px;width:35px;height:35px;cursor:pointer;color:var(--ink); }
+.sky-today-badge[hidden] { display:none !important; }
+.sky-today-badge svg { width:24px;height:24px; }
+.wx-event-banner { display:flex;align-items:center;gap:10px;border:1px solid var(--edge);padding:7px 10px;color:var(--ink);font-size:.82rem;text-decoration:none;max-width:100%; }
+.wx-event-symbol svg { display:block;width:26px;height:26px; }
+.wx-event-banner:hover { border-color:var(--accent); }
+.game-backups { margin:18px 0 0;border:1px solid var(--edge);padding:12px;min-width:0; }
+.game-backups h3 { margin:0 0 8px; }
+.game-backups .backup-list { display:grid;gap:7px; }
+.backup-entry { display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--edge);background:var(--panel-2);flex-wrap:wrap; }
+.backup-entry-meta { display:grid;gap:3px;min-width:0;overflow-wrap:anywhere; }
+.backup-entry-meta small { color:var(--ink-dim); }
+.backup-upload { display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,160px);gap:8px;margin-top:12px;align-items:end; }
+.backup-upload label { display:grid;gap:5px;min-width:0; }
+.backup-upload input[type=file] { max-width:100%; }
+.backup-upload input[type=text] { grid-column:1 / -1; }
+.backup-upload button { justify-self:start; }
+.sky-settings { display:grid;gap:8px;border:1px solid var(--edge);padding:10px;margin:10px 0; }
+.sky-settings label.check { display:flex;gap:8px;align-items:center; }
+@media(max-width:650px) { .backup-upload{grid-template-columns:1fr;} .backup-upload input[type=text]{grid-column:auto;} .sky-today-badge{width:30px;height:30px;} }
+@media(prefers-reduced-motion: reduce){ :root.sky-smooth main {transition:none;} }
+:root.reduce-animations main {transition:none !important;}
+
 .w-forecast-day .mud-bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;width:min(94%,145px);height:7px;min-height:7px;flex:none}
 .w-forecast-day .mud-bar .blk{display:block;min-width:0;border:1px solid var(--edge);background:var(--bg)}
 .w-forecast-day .mud-bar .blk-fill{display:block;height:100%;background:var(--accent)}
@@ -1092,13 +1118,9 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .w-forecast-day .mud-bar.m-swamp .blk-fill{background:#bd6262}
 .hub-notify-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 14px}
 .hub-notify-controls select{max-width:135px}
-
-/* Compact, navigable Coming Up agenda. Three-segment ground meter. */
 .w-cal .w-day { min-width: 0; }
 .w-day header { flex-wrap: wrap; align-items: center; gap: 6px; }
-.w-day .w-agenda-date, .w-day .w-agenda-ground, .w-day .w-event-link {
-  font: inherit; color: inherit; background: transparent; cursor: pointer; border: 0;
-}
+.w-day .w-agenda-date, .w-day .w-agenda-ground, .w-day .w-event-link { font: inherit; color: inherit; background: transparent; cursor: pointer; border: 0; }
 .w-day .w-agenda-date { display: inline-flex; align-items: baseline; gap: 7px; padding: 2px 3px; min-width: 0; text-align: left; }
 .w-day .w-agenda-ground { display: inline-flex; align-items: center; padding: 4px 5px; min-height: 22px; }
 .w-day .w-agenda-ground .mud-bar { grid-column: auto; width: 58px; height: 8px; gap: 3px; }
@@ -1108,3 +1130,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .w-cal .w-event-name { overflow-wrap: anywhere; min-width: 0; }
 .w-day .w-agenda-date:hover, .w-day .w-event-link:hover, .w-day .w-agenda-ground:hover { color: var(--accent); background: var(--panel-2); }
 .w-day .w-agenda-date:focus-visible, .w-day .w-event-link:focus-visible, .w-day .w-agenda-ground:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.w-sky-symbol { display:inline-flex;vertical-align:middle;width:18px;height:18px;margin-right:6px; }
+.w-sky-symbol svg { width:100%;height:100%; }

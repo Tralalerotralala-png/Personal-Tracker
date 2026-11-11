@@ -218,10 +218,37 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   }},language()==='es'?'Guardar como tema nuevo':'Save current palette as theme');
   const layoutWidth=h('select',{'aria-label':'Layout width',onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),layout_width:e.target.value});window.dispatchEvent(new Event('tracker-theme-refresh'));}},
     [['adaptive','Adaptive (recommended)'],['compact','Compact'],['wide','Full width']].map(([value,label])=>h('option',{value,selected:(ui?.layout_width||'adaptive')===value},label)));
+  // Environmental light augments the palette instead of replacing any colors.
+  const skyMode=h('select',{'aria-label': 'Environmental lighting mode',onchange:async e=>{
+    await store.setSetting('ui',{...(await store.getSetting('ui')),sky_lighting_mode:e.target.value});
+    window.dispatchEvent(new Event('tracker-theme-refresh'));
+  }},[['auto',language()==='es'?'Automático (clima y luna)':'Automatic (weather + moon)'],
+     ['time',language()==='es'?'Solo hora del día':'Time of day only'],
+     ['off',language()==='es'?'Desactivado':'Off — static theme']].map(([value,label])=>h('option',{value,selected:(ui?.sky_lighting_mode||'auto')===value},label)));
+  const glowSlider=h('input',{type:'range',min:0,max:100,step:5,value:ui?.sky_lighting_intensity??35,
+    'aria-label':'Environmental glow intensity',oninput:async e=>{
+      await store.setSetting('ui',{...(await store.getSetting('ui')),sky_lighting_intensity:Number(e.target.value)});
+      window.dispatchEvent(new Event('tracker-theme-refresh'));
+    }});
+  const skySmooth=h('input',{type:'checkbox',checked:ui?.sky_lighting_smooth!==false,onchange:async e=>{
+    await store.setSetting('ui',{...(await store.getSetting('ui')),sky_lighting_smooth:e.target.checked});
+    window.dispatchEvent(new Event('tracker-theme-refresh'));
+  }});
+  const skyEvents=h('input',{type:'checkbox',checked:ui?.sky_lighting_events!==false,onchange:async e=>{
+    await store.setSetting('ui',{...(await store.getSetting('ui')),sky_lighting_events:e.target.checked});
+    window.dispatchEvent(new Event('tracker-theme-refresh'));
+  }});
+  const skyControls=h('div',{class:'sky-settings'},
+    h('h4',{},language()==='es'?'Iluminación ambiental':'Environmental lighting'),
+    h('p',{class:'hint'},language()==='es'?'Usa la hora de salida y puesta del sol, el clima y la fase lunar del lugar seleccionado. Los eclipses son avisos globales: la visibilidad local no está confirmada.':'Uses sunrise/sunset, weather and moon phase at your selected location. Eclipse alerts are worldwide listings, not local visibility predictions.'),
+    h('label',{},language()==='es'?'Modo de iluminación':'Lighting mode'),skyMode,
+    h('label',{},language()==='es'?'Intensidad':'Glow intensity'),glowSlider,
+    h('label',{class:'check'},skySmooth,language()==='es'?'Transiciones suaves':'Smooth transitions'),
+    h('label',{class:'check'},skyEvents,language()==='es'?'Destacar eventos celestes':'Highlight sky events'));
   const display = h('section', { class: 'set-block' },
     h('h3', {}, 'Display'),
     h('label', {}, t('Theme presets')), presetChoices, presetName, h('h4',{},language()==='es'?'Mis temas':'My saved themes'),savedThemes,saveTheme,
-    h('label', {}, 'Desktop layout width'), layoutWidth,
+    h('label', {}, 'Desktop layout width'), layoutWidth,skyControls,
     h('label', {}, 'Accent color'), accentColor,
     h('p', { class: 'hint' }, 'Customize each part of the palette. Changes sync with your account.'), ...customColors,
     h('label', {}, 'Panel opacity'), panelOpacity,

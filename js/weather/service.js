@@ -39,7 +39,12 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
       const interval = ((await store.getSetting('refresh_minutes'))?.weather ?? 60) * 60_000;
       const cached = (await store.meta.get(CACHE_KEY)) ?? null;
       const sameplace = cached && cached.key === placeKey(place);
-      const age = sameplace ? now().getTime() - new Date(cached.raw.fetchedAt).getTime() : Infinity;
+      // A previous app version did not fetch sunrise, sunset, or cloud cover.
+      // Display its cached forecast immediately, but refresh the new fields.
+      const needsLightingData = sameplace && !cached.raw.skyRefreshChecked && (!cached.raw.days?.some(d => d.sunrise && d.sunset)
+        || !('cloud_cover' in (cached.raw.current || {})));
+      const age = sameplace && !needsLightingData
+        ? now().getTime() - new Date(cached.raw.fetchedAt).getTime() : Infinity;
 
       // Show what we have straight away.
       if (sameplace) {
@@ -52,6 +57,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
       try {
         if (!state.rows.length) set({ status: 'loading' });
         const raw = await fetchWeather(place, { fetchImpl });
+        raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);

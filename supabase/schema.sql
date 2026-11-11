@@ -608,3 +608,7 @@ grant execute on function public.wallpaper_status()                 to authentic
 grant execute on function public.set_wallpaper_show_places(boolean) to authenticated;
 grant execute on function public.revoke_wallpaper_key()             to authenticated;
 grant execute on function public.wallpaper_snapshot(text)           to anon, authenticated;
+
+-- OPTIONAL: Game backup Storage must be provisioned using the separate
+-- supabase/game-backups.sql migration in an existing project.
+-- Never use a public bucket for save files.

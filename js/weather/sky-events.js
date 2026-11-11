@@ -30,3 +30,22 @@ export function upcomingSkyEvents(date=new Date(), limit=5) {
  }
  return [...events,...phases].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,Math.max(0,limit));
 }
+
+// Exact-day highlight; eclipse regions must be checked with an authoritative
+// visibility tool. Calendar dates here do not establish local observation.
+export function skyEventOnDate(isoDate) {
+ const entry = CALENDAR.find(x => x[0] === isoDate);
+ if (!entry) return null;
+ const [,en,es,url] = entry;
+ const kind = /solar eclipse/i.test(en) ? 'solar_eclipse'
+   : /lunar eclipse/i.test(en) ? 'lunar_eclipse' : 'meteor';
+ return {date:isoDate,en,es,url,kind,localVisibilityKnown:false};
+}
+export function skyEventIconSvg(kind) {
+ const core = kind === 'solar_eclipse'
+  ? '<circle cx="12" cy="12" r="9" fill="#d9af66"/><circle cx="11" cy="11" r="8" fill="#18223b"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="#f2d398" stroke-width="2"/>'
+  : kind === 'lunar_eclipse'
+  ? '<circle cx="12" cy="12" r="9" fill="#b77265"/><path d="M15 4a9 9 0 0 1 0 16" stroke="#653c58" stroke-width="5" fill="none"/>'
+  : '<path d="M4 19L20 3M8 20l12-12" stroke="#e0c7ff" stroke-width="3"/><path d="M17 2h5v5" stroke="#ffe2a0" stroke-width="3" fill="none"/>';
+ return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`;
+}

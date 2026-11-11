@@ -14,19 +14,16 @@ import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createMediaLibraryView } from './ui/media-library.js';
-import { moonPhaseSvg, isNightAtLocation } from './weather/moon-phase.js';
+import { moonPhaseSvg } from './weather/moon-phase.js';
+import { skyLighting } from './weather/environment.js';
+import { skyEventIconSvg } from './weather/sky-events.js';
+import { createGameBackupService } from './game-backups.js';
 import { loadHub, openPersonalHub, createPersonalHubView, startBrowserReminders } from './ui/personal-hub.js';
 import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
 
 const root = document.getElementById('app');
-function updateDayPhase() {
-  const hour = new Date().getHours();
-  document.documentElement.dataset.dayPhase = hour < 6 || hour >= 20 ? 'night' : hour < 10 ? 'morning' : hour < 17 ? 'day' : 'evening';
-}
-updateDayPhase(); setInterval(updateDayPhase, 60_000);
-
 let ctx;
 try {
   ctx = await initData();
@@ -39,6 +36,7 @@ try {
 }
 const { mode, store, auth, client } = ctx;
 const photos = createPhotos({ store, client });
+const gameBackups = client ? createGameBackupService({store,client}) : null;
 const weather = createWeatherService({ store });
 // Signed-in requests to the optional feed proxy carry your sign-in token, so only you can use it.
 const proxyHeaders = auth ? async () => {
@@ -120,7 +118,7 @@ const calendar = createCalendarView({ store, weather });
 const feedView = createFeedView({ store, feed, proxySuggestion });
 const overview = createOverviewView({ store, ctx: { store, weather, feed } });
 const diary = createDreamDiaryView({ store });
-const games = createMediaLibraryView({ store });
+const games = createMediaLibraryView({ store, backups:gameBackups });
 const hubView = createPersonalHubView({ store });
 const expensesView = createExpensesView({ store });
 
@@ -164,13 +162,39 @@ const moonNavIcon = navButtons.find(n => n.dataset.route === 'diary')?.querySele
 function refreshMoonNav(){ if(moonNavIcon) moonNavIcon.innerHTML=moonPhaseSvg(); }
 refreshMoonNav(); setInterval(refreshMoonNav, 60*60*1000);
 const weatherNavIcon=navButtons.find(n=>n.dataset.route==='mud')?.querySelector('.slot-icon');
+let currentUi = {};
 function refreshWeatherNav(){
-  const current=weather.getState().current;
+  const state=weather.getState();
+  const current=state.current;
   if(!weatherNavIcon || !current)return;
   const code=Number(current.weather_code);
-  weatherNavIcon.innerHTML=weatherIconSvg(code,{night:isNightAtLocation(current)});
+  const sky=skyLighting(state, currentUi, new Date());
+  weatherNavIcon.innerHTML=weatherIconSvg(code,{night:sky.night});
+  weatherNavIcon.title=sky.event ? `${sky.event.en} — local visibility unverified` : '';
 }
-weather.subscribe(refreshWeatherNav);refreshWeatherNav();setInterval(refreshWeatherNav,60*60*1000);
+const skyBadge=h('button',{class:'sky-today-badge',type:'button',hidden:true,'aria-label':'Sky event calendar',title:'Astronomical event (visibility varies)',onclick:()=>{location.hash='#mud';}});
+async function refreshEnvironmentalLight(){
+  try {
+    currentUi=await store.getSetting('ui')||{};
+    const sky=skyLighting(weather.getState(),currentUi,new Date());
+    const rootStyle=document.documentElement.style;
+    document.documentElement.dataset.skyLight=sky.mode==='off'?'off':'on';
+    document.documentElement.dataset.dayPhase=sky.phase;
+    rootStyle.setProperty('--sky-glow-rgb',sky.rgb);
+    rootStyle.setProperty('--sky-glow-opacity',String(sky.opacity));
+    document.documentElement.classList.toggle('sky-smooth',currentUi.sky_lighting_smooth!==false);
+    if(sky.event){skyBadge.hidden=false;skyBadge.innerHTML=skyEventIconSvg(sky.event.kind);skyBadge.title=`${sky.event.en}: global event; local visibility not verified`;
+      skyBadge.setAttribute('aria-label',skyBadge.title);
+    } else {skyBadge.hidden=true;skyBadge.replaceChildren();}
+    refreshWeatherNav();
+  }catch(error){console.warn('Environmental lighting unavailable:',error);}
+}
+weather.subscribe(()=>{refreshEnvironmentalLight();});
+refreshEnvironmentalLight();
+setInterval(()=>{if(document.visibilityState!=='hidden')refreshEnvironmentalLight();},3*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshEnvironmentalLight();});
+window.addEventListener('tracker-theme-refresh',refreshEnvironmentalLight);
+
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
 // Desktop-only draggable sidebar edge. Width is device-local and never synced.
 const sidebarWidthKey = 'tracker-sidebar-width';
@@ -265,7 +289,7 @@ document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.targe
 
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
-  searchWrap, h('span', { class: 'spacer' }), pill,
+  searchWrap, h('span', { class: 'spacer' }), skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 

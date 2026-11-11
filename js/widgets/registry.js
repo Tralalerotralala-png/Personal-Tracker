@@ -13,7 +13,8 @@ import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } from '../weather/moon-phase.js';
-import { upcomingSkyEvents } from '../weather/sky-events.js';
+import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
+import { skyLighting } from '../weather/environment.js';
 import { language, t } from '../ui/language.js';
 import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily-phrases.js';
 
@@ -63,7 +64,7 @@ function mountMud(el, { weather, store }) {
         h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
     const c = s.current;
-    const night = isNightAtLocation(c, now);
+    const night = skyLighting(s, ui, now).night;
     const moon = moonPhase(now);
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
@@ -89,8 +90,7 @@ function mountMud(el, { weather, store }) {
             h('span', { class: 'w-forecast-condition' }, localizedWeather(icon.text)),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
-            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),
-            mudBar(r));
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),mudBar(r));
         })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },
@@ -109,13 +109,11 @@ function mountMud(el, { weather, store }) {
 
 // ---- calendar ------------------------------------------------------------------------------
 
-// Route a dashboard agenda selection to the matching Calendar day or event.
-// The Calendar view listens for this request and processes it after mounting.
+// Route dashboard agenda taps to their real day or event editors.
 function openCalendarSelection(detail) {
   window.dispatchEvent(new CustomEvent('tracker-calendar-open', { detail }));
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
-
 function mountCalendar(el, { store, weather }) {
   const render = async () => {
     const events = await store.list('events');
@@ -268,7 +266,7 @@ function mountSky(el,{weather}) {
  const render=()=>{const events=upcomingSkyEvents(new Date(),4);const place=weather?.getState().place?.name;
   replace(el,h('div',{class:'w-sky'},
     h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
-    ...events.map(e=>h('p',{class:'w-sky-event'},h('span',{},e.date+' · '),
+    ...events.map(e=>h('p',{class:'w-sky-event'},skyEventOnDate(e.date)?h('span',{class:'w-sky-symbol',html:skyEventIconSvg(skyEventOnDate(e.date).kind)}):null,h('span',{},e.date+' · '),
       h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},language()==='es'?e.es:e.en))),
     place?h('small',{},`${t('Selected location')}: ${place}`):null));
  };
