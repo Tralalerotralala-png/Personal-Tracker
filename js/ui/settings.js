@@ -1,6 +1,6 @@
 // Settings sheet: account, sync, rarity meanings, categories, display, backup.
 import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
-import { language, t } from './language.js';
+import { language, t, categoryLabel } from './language.js';
 import { TRACK_FIELDS, TRACK_LABELS, categoryFields } from '../data/tracking.js';
 import { openPersonalHub } from './personal-hub.js';
 import { RARITIES } from '../data/schema.js';
@@ -123,9 +123,10 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   function renderCats(rows) {
     catList.replaceChildren(...rows.map((c) => {
       const icon = h('input', { type: 'text', value: c.icon ?? '', maxlength: 4, class: 'cat-icon', 'aria-label': `${c.name} icon` });
-      const name = h('input', { type: 'text', value: c.name, maxlength: 80, 'aria-label': 'Category name' });
+      const shownName = categoryLabel(c);
+      const name = h('input', { type: 'text', value: shownName, maxlength: 80, 'aria-label': 'Category name' });
       const color = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(c.color ?? '') ? c.color : '#c9b58a', 'aria-label': `${c.name} colour` });
-      const save = async () => { if (name.value.trim()) await store.upsert('categories', { ...c, name: name.value.trim(), icon: icon.value.trim() || null, color: color.value }); };
+      const save = async () => { if (name.value.trim()) await store.upsert('categories', { ...c, name: name.value.trim() === shownName ? c.name : name.value.trim(), icon: icon.value.trim() || null, color: color.value }); };
       [icon, name, color].forEach((i) => i.addEventListener('change', save));
       const fieldControls = h('div', { class:'cat-field-controls' }, TRACK_FIELDS.map(key => {
         const checkbox = h('input', { type:'checkbox', checked: Boolean(categoryFields(categoryDefaults,c.id)[key]), onchange: async e => {
