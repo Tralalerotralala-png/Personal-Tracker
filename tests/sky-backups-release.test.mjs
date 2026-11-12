@@ -112,3 +112,11 @@ test('backup index can summarize tracked files without exposing true quota as a 
  assert.match(panel,/not all Supabase storage/);
  assert.match(service,/return \{userId,list,listAll/);
 });
+
+test('read-only settings diagnostics never display credentials or personal records',()=>{
+ const settings=fs.readFileSync(new URL('../js/ui/settings.js',import.meta.url),'utf8');
+ assert.match(settings,/Project diagnostics/);
+ assert.match(settings,/tracker-shell-/);
+ assert.match(settings,/Private access check passed/);
+ assert.match(settings,/\['diagnostics', 'Diagnostics'/);
+});

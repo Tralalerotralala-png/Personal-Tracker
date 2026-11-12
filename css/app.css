@@ -1173,3 +1173,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .backup-vault-overview { border:1px solid var(--edge);background:var(--panel);padding:10px;margin:10px 0; }
 .backup-vault-overview p { margin:6px 0;overflow-wrap:anywhere; }
 .backup-vault-overview a { color:var(--accent); }
+
+.diagnostics-report { margin-top:12px; }
+.diagnostics-line { margin:6px 0;padding:6px 8px;background:var(--panel-2);overflow-wrap:anywhere; }

@@ -308,6 +308,45 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('h3', {}, 'Install on your phone'),
     h('p', { class: 'prose' }, 'iPhone: open this page in Safari, tap Share, then Add to Home Screen. Android: open it in Chrome, open the menu, then Install app.'));
 
+  const diagnosticsReport=h('div',{class:'diagnostics-report','aria-live':'polite'});
+  const runDiagnostics=h('button',{class:'btn small',type:'button',onclick:async()=>{
+    runDiagnostics.disabled=true;
+    replace(diagnosticsReport,h('p',{class:'hint'},language()==='es'?'Comprobando...':'Checking...'));
+    try{
+      const es=language()==='es';
+      const sync=mode==='cloud'?store.sync.getStatus():null;
+      const worker='serviceWorker' in navigator?(navigator.serviceWorker.controller?(es?'Activo':'Active'):(es?'Aún sin controlar esta página':'Not controlling this page yet')):(es?'No compatible':'Not supported');
+      const cached=typeof caches==='undefined'?[]:await caches.keys();
+      const shells=cached.filter(n=>n.startsWith('tracker-shell-')).sort();
+      const weatherState=weather.getState();
+      let storage=es?'Sin cuenta conectada':'Not connected';
+      if(mode==='cloud'&&ctx.client){
+        try{
+          const {data}=await ctx.client.auth.getSession();
+          if(data?.session?.user?.id){
+            const {error}=await ctx.client.storage.from('game-backups').list(data.session.user.id+'/',{limit:1});
+            storage=error?(es?'No disponible o sin configurar':'Unavailable or not configured'):(es?'Acceso privado comprobado':'Private access check passed');
+          }
+        }catch{storage=es?'No se pudo comprobar':'Could not check';}
+      }
+      const rows=[
+        [es?'Conexión':'Connection',navigator.onLine===false?(es?'Sin conexión':'Offline'):(es?'En línea':'Online')],
+        [es?'Almacenamiento local':'Local storage',typeof indexedDB==='undefined'?(es?'No compatible':'Not supported'):(es?'Disponible':'Available')],
+        [es?'Sincronización':'Sync',sync?`${sync.state} · ${sync.pending||0} pending`:(es?'Solo local':'Local only')],
+        [es?'Modo sin conexión':'Offline mode',worker],
+        [es?'Caché guardada':'Stored cache',shells.at(-1)||(es?'Sin caché':'No stored shell cache')],
+        [es?'Datos meteorológicos':'Weather data',weatherState.status+(weatherState.fetchedAt?' · '+new Date(weatherState.fetchedAt).toLocaleString():'')],
+        [es?'Copias privadas':'Private backups',storage],
+      ];
+      replace(diagnosticsReport,...rows.map(([name,value])=>h('p',{class:'diagnostics-line'},h('strong',{},name+': '),value)));
+    }catch(err){replace(diagnosticsReport,h('p',{class:'form-error'},String(err.message||err)));}
+    finally{runDiagnostics.disabled=false;}
+  }},language()==='es'?'Ejecutar diagnósticos':'Run diagnostics');
+  const diagnostics=h('section',{class:'set-block'},
+    h('h3',{},language()==='es'?'Diagnósticos del proyecto':'Project diagnostics'),
+    h('p',{class:'hint'},language()==='es'?'Revisa sincronización, caché, clima y copias sin mostrar contraseñas ni datos personales.':'Check sync, caching, weather, and private storage without showing passwords or personal records.'),
+    runDiagnostics,diagnosticsReport);
+
   // Compact settings categories: only the selected section is visible.
   const groups = [
     ['general', 'General', [languageBlock, account, install]],
@@ -315,6 +354,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     ['pack', 'Pack', [cats, rarity]],
     ['appearance', 'Appearance', [display, typography, navigation]],
     ['data', 'Data & tools', [personalHub, backup]],
+    ['diagnostics', 'Diagnostics', [diagnostics]],
   ];
   const selected = sessionStorage.getItem('tracker-settings-section') || 'general';
   const tabs = h('nav', { class: 'settings-tabs', 'aria-label': t('Settings') });
