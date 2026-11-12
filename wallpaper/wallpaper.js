@@ -57,16 +57,21 @@ function parseRRule(text) {
     if (m) until = `${m[1]}-${m[2]}-${m[3]}`;
   }
   const bymonthday = parts.BYMONTHDAY ? parseInt(parts.BYMONTHDAY, 10) || null : null;
-  return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday };
+  const exdates = (parts.EXDATE || '').split(',').filter(v => /^\d{8}$/.test(v)).map(v => `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`);
+  const exbefore = /^\d{8}$/.test(parts.EXBEFORE || '') ? `${parts.EXBEFORE.slice(0,4)}-${parts.EXBEFORE.slice(4,6)}-${parts.EXBEFORE.slice(6,8)}` : null;
+  return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday, exdates, exbefore };
 }
 
-function buildRRule({ freq, interval = 1, byday = null, count = null, until = null }) {
+function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [], exbefore = null }) {
   if (!FREQS.includes(freq)) return null;
   const parts = [`FREQ=${freq}`];
   if (interval > 1) parts.push(`INTERVAL=${interval}`);
   if (freq === 'WEEKLY' && byday?.length) parts.push(`BYDAY=${[...byday].sort((a, b) => a - b).map((i) => WEEKDAYS[i]).join(',')}`);
   if (count) parts.push(`COUNT=${count}`);
   if (until) parts.push(`UNTIL=${until.replaceAll('-', '')}`);
+  const exclusions = [...new Set(exdates)].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+  if (exclusions.length) parts.push(`EXDATE=${exclusions.map(k => k.replaceAll('-', '')).join(',')}`);
+  if (exbefore && /^\d{4}-\d{2}-\d{2}$/.test(exbefore)) parts.push(`EXBEFORE=${exbefore.replaceAll('-', '')}`);
   return parts.join(';');
 }
 
@@ -82,6 +87,27 @@ function describeRRule(text) {
   if (r.count) s += `, ${r.count} times`;
   if (r.until) s += `, until ${r.until}`;
   return s;
+}
+
+function excludeOccurrence(rrule, key) {
+  const rule = parseRRule(rrule);
+  if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return rrule;
+  return buildRRule({ ...rule, exdates: [...rule.exdates, key] });
+}
+
+// Keep the original DTSTART and COUNT: changing them would shift fortnightly
+// weekly rules or restart a finite series.
+function excludeThrough(rrule, dateKey) {
+  const rule = parseRRule(rrule);
+  if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return rrule;
+  return buildRRule({...rule, exbefore: rule.exbefore && rule.exbefore > dateKey ? rule.exbefore : dateKey});
+}
+// Truncate a recurring series immediately before the chosen calendar date.
+function excludeFrom(rrule, dateKey) {
+  const rule = parseRRule(rrule);
+  if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return rrule;
+  const last = addDaysKey(dateKey,-1);
+  return buildRRule({...rule,until:rule.until && rule.until < last ? rule.until : last});
 }
 
 // ---- events -> occurrences -------------------------------------------------------------
@@ -151,7 +177,7 @@ function occurrencesOf(event, fromKey, toKey) {
     if (!hit) continue;
     produced += 1;
     if (rule.count && produced > rule.count) break;
-    if (touches(key)) out.push(make(key));
+    if (touches(key) && !rule.exdates.includes(key) && !(rule.exbefore && key <= rule.exbefore)) out.push(make(key));
     if (out.length > 800) break;
   }
   return out;
@@ -176,7 +202,7 @@ function groupByDay(events, fromKey, toKey) {
   }
   return map;
 }
-Object.assign(__exports, { keyOf, todayKeyLocal, parseKey, addDaysKey, weekdayOfKey, daysBetweenKeys, parseRRule, buildRRule, describeRRule, startParts, occurrencesOf, groupByDay });
+Object.assign(__exports, { keyOf, todayKeyLocal, parseKey, addDaysKey, weekdayOfKey, daysBetweenKeys, parseRRule, buildRRule, describeRRule, excludeOccurrence, excludeThrough, excludeFrom, startParts, occurrencesOf, groupByDay });
 });
 __define("js/data/defaults.js", function (__require, __exports) {
 "use strict";
@@ -1326,7 +1352,10 @@ function mudBar(row) {
 const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
 
 function mudChip(row) {
-  return h('span', { class: `mud-chip ${mudClass(row.label)}` }, localizedMudLabel(row.label), h('b', {}, row.index));
+  // The number remains available to screen readers and on hover. Visually,
+  // status uses the same three-segment scale as the rest of the forecast.
+  const label = `${localizedMudLabel(row.label)} ${row.index}/100`;
+  return h('span', { class: `mud-chip mud-chip-meter ${mudClass(row.label)}`, title:label, 'aria-label':label }, mudBar(row));
 }
 
 // "Today is Muddy (62). Getting muddier, peaking Thursday at Swamp (81)."
