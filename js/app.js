@@ -184,7 +184,7 @@ async function refreshEnvironmentalLight(){
     rootStyle.setProperty('--sky-glow-opacity',String(sky.opacity));
     // The header needs a visible accent; the broad background remains subdued.
     // Keep zero intensity truly off, and preserve the moon/weather color.
-    rootStyle.setProperty('--sky-header-opacity',String(sky.opacity > 0 ? Math.min(0.48, 0.14 + sky.opacity * 3.2) : 0));
+    rootStyle.setProperty('--sky-header-opacity',String(sky.opacity > 0 ? Math.min(0.48, 0.02 + sky.opacity * 4.5) : 0));
     document.documentElement.classList.toggle('sky-smooth',currentUi.sky_lighting_smooth!==false);
     if(sky.event){skyBadge.hidden=false;skyBadge.innerHTML=skyEventIconSvg(sky.event.kind);skyBadge.title=`${sky.event.en}: global event; local visibility not verified`;
       skyBadge.setAttribute('aria-label',skyBadge.title);

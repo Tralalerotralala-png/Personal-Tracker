@@ -249,7 +249,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   // A sample palette and sky-light preview. No saved preference changes
   // until Apply is pressed; the sample events are not local visibility claims.
   const previewPalette=h('select',{'aria-label':'Preview palette'},
-    Object.entries(presets).map(([id,p])=>h('option',{value:id,selected:id===(presets[ui?.theme_preset]?'': 'classic')},p.name)));
+    Object.entries(presets).map(([id,p])=>h('option',{value:id,selected:id===(presets[ui?.theme_preset]?ui.theme_preset:'classic')},p.name)));
   previewPalette.value=presets[ui?.theme_preset]?ui.theme_preset:'classic';
   const previewScene=h('select',{'aria-label':'Preview sky condition'},
     [['current','Current sky'],['dawn','Dawn'],['day','Daylight'],['dusk','Sunset'],['night','Moonlight'],['meteor','Meteor shower'],['eclipse','Eclipse accent'],['off','No lighting']]
