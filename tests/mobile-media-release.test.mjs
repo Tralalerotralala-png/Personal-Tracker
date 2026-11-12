@@ -61,7 +61,7 @@ test('built-in inventory categories follow language without renaming custom name
   }
 });
 test('starter category searches work with English and Spanish labels',()=>{
- const ctx = { items:[{id:'i',name:'Bandages'}], locations:[], categories:[{id:'c0000000-0000-4000-8000-000000000007',name:'Farmacia'}] };
+ const ctx = { items:[{id:'i',name:'Bandages',category_id:'c0000000-0000-4000-8000-000000000007'}], locations:[], categories:[{id:'c0000000-0000-4000-8000-000000000007',name:'Farmacia'}] };
  assert.equal(searchItems(ctx,'Pharmacy').length,1);
  assert.equal(searchItems(ctx,'Farmacia').length,1);
 });
