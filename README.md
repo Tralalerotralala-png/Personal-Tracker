@@ -1,8 +1,54 @@
 # Personal Tracker
 
-A modular, offline-capable personal dashboard with Supabase sync and a read-only Wallpaper Engine companion.
+**An offline-first, customizable personal dashboard for organizing everyday life, collections, finances, schedules, and information in one place.**
 
-**First-time setup:** [SETUP.md](SETUP.md). **Already installed?** Follow the short update instructions below.
+Personal Tracker is a personal web application built around the needs and preferences of its original user. Its retro-inspired pixel-art interface combines practical tracking tools with flexible layouts, configurable themes, and optional cloud synchronization. Rather than trying to be a universal productivity service, it is designed as a workspace that can evolve with its owner.
+
+The project is **personal by design, not restricted to one person**. Its default categories, visual choices, and workflows may be specific to the original installation, but the source can be forked and adapted for another person's needs.
+
+## What it includes
+
+- **Overview:** A responsive, customizable dashboard with rearrangeable widgets, daily language phrases, weather, upcoming events, and other information.
+- **Pack:** Inventory and collection tracking with categories, quantities, custom images, and pixel-art icons.
+- **Weather & sky:** Forecasts, hourly precipitation, ground-condition estimates, moon phases, astronomical events, and appearance effects driven by daylight and weather.
+- **Calendar & Personal Hub:** Events, recurring dates, tasks, notes, and reminders.
+- **Media Library:** Shelves for games, books, films, and albums, including cover art, progress, ratings, notes, and game journals.
+- **Game backups:** Optional private Supabase Storage uploads for save files and configuration backups.
+- **Expenses:** Transactions, budgets, subscriptions, reports, and practical calculation tools.
+- **Logs:** A PIN-protected, client-side-encrypted journal for dreams and other personal records.
+- **Feeds & language learning:** News/RSS feeds and daily Mandarin and German phrases.
+- **Wallpaper Engine:** An optional, separate read-only companion for the desktop.
+
+The application supports desktop and mobile layouts, English and Spanish, offline access, and customizable appearance presets. Some online features depend on third-party services or additional setup.
+
+## Designed for personal use — adaptable for yours
+
+Personal Tracker started as a **single-user project**, not a hosted service, public social network, or commercial product. The interface and features reflect real personal use and may change as those needs change. Not every feature will suit everyone, and that is intentional: the code is organized into modules so an independent installation can remove, customize, or extend individual tools.
+
+**Forking this repository does not give you access to the original user's personal records.** Those records are not bundled with the application source. Your own installation should use its own browser storage and, if desired, its own Supabase project.
+
+### Set up your own installation
+
+1. **Fork or download** the repository and deploy it to GitHub Pages or another static host.
+2. **Create your own Supabase project** if you want authentication, cross-device synchronization, and cloud file storage. The app can also run in local-only mode without Supabase.
+3. Run `supabase/schema.sql` in your Supabase SQL Editor, and configure email authentication and the appropriate redirect URLs.
+4. Copy `config.example.js` to `config.js` and enter **your own** Supabase project URL and **publishable/anon** key. Never use a service-role or secret key in browser code.
+5. If you want private game-save backups, also run `supabase/game-backups.sql` and verify that its private bucket and owner-restricted Storage policies are active.
+6. Customize the themes, widget layouts, categories, and features to make the app your own.
+
+See **[SETUP.md](SETUP.md)** for the full setup walkthrough. A static hosting account and a Supabase account are separate: forking the code does not clone the database or any private files.
+
+### Privacy and security
+
+The GitHub repository contains application code and example configuration, **not a database export of personal entries**. Records live in the browser's local storage and, when enabled, in the configured Supabase project. Supabase publishable keys are designed to be public; **actual protection depends on correctly enabled Row Level Security, authentication, and private Storage policies**. Verify those policies in your own project before storing private information.
+
+Never commit passwords, service-role/secret keys, wallpaper access keys, exported personal backups, or private files. The journal uses client-side encryption, but a four-digit PIN is low-entropy and should not be treated as strong protection for highly sensitive secrets. The optional game backup feature requires its separate Supabase setup before uploads can work.
+
+## Project approach
+
+Personal Tracker favors a coherent pixel-art interface, modular source code, minimal unnecessary dependencies, privacy-conscious defaults, offline capability, and incremental improvements driven by everyday use. It is an evolving personal project rather than a guaranteed production-ready hosted service.
+
+**First-time setup:** [SETUP.md](SETUP.md). **Already installed?** Follow the update instructions below.
 
 ## Install an update
 
@@ -15,7 +61,7 @@ A modular, offline-capable personal dashboard with Supabase sync and a read-only
 
 **If Windows asks to replace `index.html` while the target appears empty:** inspect the *source* and *destination* paths in the copy dialog. There is only **one** `index.html` in the new ZIP. Make sure you are copying the extracted contents and not extracting/copied contents into themselves.
 
-No new Supabase SQL migration is required for this release. The widget-layout migration adds Phrase of the Day once to saved desktop and mobile layouts **without erasing existing positions**; if you remove the widget later, it stays removed.
+Most app updates do not require a database migration. **Private game backups are an exception:** new installations must apply `supabase/game-backups.sql` and verify Storage policies before using the vault.
 
 ## Features
 
