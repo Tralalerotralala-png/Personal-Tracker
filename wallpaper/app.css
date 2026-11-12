@@ -1258,3 +1258,10 @@ html[data-layout-width="compact"] main{max-width:1100px}
   .w-mud-dashboard .w-weather-clock { grid-template-columns:66px minmax(0,1fr); }
   .w-mud-dashboard .w-weather-clock .w-time-unit:last-child:nth-child(3) { grid-column:1 / -1; }
 }
+
+/* Two equal, compact time-zone clocks, including narrow mobile screens. */
+.w-mud-dashboard .w-weather-clock { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:start; }
+.w-mud-dashboard .w-weather-clock .w-time-unit { min-width:0; text-align:center; align-items:center; }
+.w-mud-dashboard .w-weather-clock .w-time-unit strong { font-size:clamp(.95rem,4cqw,1.55rem); white-space:nowrap; }
+.w-mud-dashboard .w-weather-clock .w-time-unit span { overflow-wrap:anywhere; }
+@media(max-width:420px) { .w-mud-dashboard .w-weather-clock { grid-template-columns:repeat(2,minmax(0,1fr)); } .w-mud-dashboard .w-weather-clock .w-time-unit:last-child:nth-child(2) { grid-column:auto; } }
