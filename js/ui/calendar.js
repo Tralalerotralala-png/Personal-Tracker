@@ -4,7 +4,7 @@ import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
 import { t, locale } from './language.js';
 import { mudClass, dayLong, dayMonth, mudChip } from './mud-format-v2.js';
 import {
-  groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts, excludeOccurrence,
+  groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts, excludeOccurrence, excludeThrough, excludeFrom,
 } from '../calendar/recurrence.js';
 import { importIcsText, fetchIcsText } from '../calendar/ics.js';
 
@@ -218,7 +218,7 @@ export function createCalendarView({ store, weather }) {
         const interval = repeat.value === 'BIWEEKLY' ? 2 : Math.max(1, parseInt(every.value, 10) || 1);
         if (['WEEKLY', 'BIWEEKLY'].includes(repeat.value) && chosenDays.size === 0) { error.textContent = 'Pick at least one weekday to repeat on.'; return; }
         if (until.value && until.value < date.value) { error.textContent = 'The repeat cannot stop before the event starts.'; return; }
-        rrule = buildRRule({ freq: repeat.value === 'BIWEEKLY' ? 'WEEKLY' : repeat.value, interval, byday: ['WEEKLY', 'BIWEEKLY'].includes(repeat.value) ? [...chosenDays] : null, count: rule?.count ?? null, until: until.value || null, exdates: rule?.exdates ?? [] });
+        rrule = buildRRule({ freq: repeat.value === 'BIWEEKLY' ? 'WEEKLY' : repeat.value, interval, byday: ['WEEKLY', 'BIWEEKLY'].includes(repeat.value) ? [...chosenDays] : null, count: rule?.count ?? null, until: until.value || null, exdates: rule?.exdates ?? [], exbefore: rule?.exbefore ?? null });
       }
 
       await store.upsert('events', {
@@ -229,31 +229,54 @@ export function createCalendarView({ store, weather }) {
       toast(isEdit ? 'Event saved' : 'Event added');
     }
 
-    async function removeScope(single) {
-      const key = occurrenceKey || parts.key;
+    async function removeScope(scope, selectedDate = null) {
+      const base = parts.key;
+      const key = selectedDate || occurrenceKey || base;
+      const recurring = Boolean(event.rrule);
+      const labels = {
+        single: 'this occurrence', previous: 'this and previous occurrences',
+        future: 'all occurrences from the selected date', all: 'the entire series'
+      };
+      const description = recurring ? labels[scope] : 'this event';
       const ok = await confirmDialog({
-        title: single ? `Delete occurrence on ${key}?` : `Delete ${event.title}?`,
-        confirmLabel: single ? 'Delete this occurrence' : event.rrule ? 'Delete entire series' : 'Delete event',
+        title: `Delete ${description}?`,
+        confirmLabel: 'Delete',
         danger: true,
-        message: single ? 'Only this date will be removed. Other repeats stay on the calendar.'
-          : event.rrule ? 'Every repeat will be removed on synced devices.' : 'This event will be removed on synced devices.',
+        message: recurring
+          ? `Delete ${description} for "${event.title}" (${key})? Other dates outside the selected range will remain.`
+          : 'This event will be removed on your synced devices.',
       });
       if (!ok) return;
-      if (single) await store.upsert('events', { ...event, rrule: excludeOccurrence(event.rrule, key) });
-      else await store.remove('events', event.id);
+      if (!recurring || scope === 'all' || (scope === 'future' && key <= base)) {
+        await store.remove('events', event.id);
+      } else {
+        const rrule = scope === 'single' ? excludeOccurrence(event.rrule,key)
+          : scope === 'previous' ? excludeThrough(event.rrule,key)
+          : excludeFrom(event.rrule,key);
+        await store.upsert('events',{...event,rrule});
+      }
       sheet.close();
-      toast(single ? 'Occurrence deleted' : 'Event deleted');
+      toast('Event selection deleted');
     }
+
     function remove() {
-      if (!event.rrule) return removeScope(false);
+      if (!event.rrule) return removeScope('all');
       const key = occurrenceKey || parts.key;
+      const fromInput = h('input',{type:'date',value:key,'aria-label':'Delete from date'});
       const chooser = openSheet({
-        title: 'Delete repeating event', size: 'small',
-        body: h('p', { class: 'prose' }, `${event.title} · ${key}. Choose what to delete.`),
+        title: 'Delete repeating event',
+        size: 'small',
+        body: [
+          h('p',{class:'prose'},event.title),
+          h('p',{class:'hint'},'Choose which dates to remove. Each option asks for confirmation.'),
+          h('label',{},'Start deleting from this date',fromInput),
+        ],
         footer: [
-          h('button', { class: 'btn ghost', type: 'button', onclick: () => chooser.close() }, 'Cancel'),
-          h('button', { class: 'btn danger', type: 'button', onclick: () => { chooser.close(); removeScope(true); } }, 'This event'),
-          h('button', { class: 'btn danger', type: 'button', onclick: () => { chooser.close(); removeScope(false); } }, 'Entire series'),
+          h('button',{class:'btn ghost',type:'button',onclick:()=>chooser.close()},'Cancel'),
+          h('button',{class:'btn danger',type:'button',onclick:()=>{chooser.close();removeScope('single');}},'Only this event'),
+          h('button',{class:'btn danger',type:'button',onclick:()=>{chooser.close();removeScope('previous');}},'This and previous events'),
+          h('button',{class:'btn danger',type:'button',onclick:()=>{if(!fromInput.value)return;chooser.close();removeScope('future',fromInput.value);}},'From selected date'),
+          h('button',{class:'btn danger',type:'button',onclick:()=>{chooser.close();removeScope('all');}},'All events'),
         ],
       });
     }

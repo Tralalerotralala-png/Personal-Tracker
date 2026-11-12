@@ -4,7 +4,7 @@ process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseRRule, buildRRule, describeRRule, occurrencesOf, groupByDay, excludeOccurrence, addDaysKey, daysBetweenKeys, weekdayOfKey,
+  parseRRule, buildRRule, describeRRule, occurrencesOf, groupByDay, excludeOccurrence, excludeThrough, excludeFrom, addDaysKey, daysBetweenKeys, weekdayOfKey,
 } from '../js/calendar/recurrence.js';
 import { parseIcs, parseIcsDate, zonedToUtc, importIcsText, fetchIcsText } from '../js/calendar/ics.js';
 import { createStore } from '../js/data/store.js';
@@ -23,7 +23,7 @@ test('date keys: arithmetic is calendar-exact', () => {
 });
 
 test('rrule: parse, build, describe', () => {
-  assert.deepEqual(parseRRule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6'), { freq: 'WEEKLY', interval: 2, byday: [1, 3], count: 6, until: null, bymonthday: null, exdates: [] });
+  assert.deepEqual(parseRRule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6'), { freq: 'WEEKLY', interval: 2, byday: [1, 3], count: 6, until: null, bymonthday: null, exdates: [], exbefore: null });
   assert.equal(parseRRule('FREQ=YEARLY;UNTIL=20301231T000000Z').until, '2030-12-31');
   assert.equal(parseRRule('FREQ=HOURLY'), null);
   assert.equal(parseRRule(''), null);
@@ -179,4 +179,17 @@ test('single cancellation preserves other repeating dates',()=>{
  const changed={...e,rrule:excludeOccurrence(e.rrule,'2026-10-12')};
  assert.deepEqual(keys(occurrencesOf(changed,'2026-10-01','2026-11-01')),['2026-10-05','2026-10-19','2026-10-26']);
  assert.equal(excludeOccurrence(changed.rrule,'2026-10-12'),changed.rrule);
+});
+
+test('delete through date keeps original count and alternate-week rhythm',()=>{
+ const ev=allDay('Every other week','2026-10-05',{rrule:'FREQ=WEEKLY;INTERVAL=2;COUNT=5'});
+ const earlier={...ev,rrule:excludeThrough(ev.rrule,'2026-10-20')};
+ assert.deepEqual(occurrencesOf(earlier,'2026-10-01','2026-12-31').map(o=>o.key),['2026-11-02','2026-11-16','2026-11-30']);
+ assert.equal(parseRRule(earlier.rrule).count,5);
+});
+test('delete from date retains earlier dates and original recurrence anchor',()=>{
+ const ev=allDay('Daily','2026-10-01',{rrule:'FREQ=DAILY;COUNT=10'});
+ const limited={...ev,rrule:excludeFrom(ev.rrule,'2026-10-05')};
+ assert.deepEqual(occurrencesOf(limited,'2026-10-01','2026-10-15').map(o=>o.key),['2026-10-01','2026-10-02','2026-10-03','2026-10-04']);
+ assert.equal(parseRRule(limited.rrule).until,'2026-10-04');
 });

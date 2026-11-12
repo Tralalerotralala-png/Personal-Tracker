@@ -42,10 +42,11 @@ export function parseRRule(text) {
   }
   const bymonthday = parts.BYMONTHDAY ? parseInt(parts.BYMONTHDAY, 10) || null : null;
   const exdates = (parts.EXDATE || '').split(',').filter(v => /^\d{8}$/.test(v)).map(v => `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`);
-  return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday, exdates };
+  const exbefore = /^\d{8}$/.test(parts.EXBEFORE || '') ? `${parts.EXBEFORE.slice(0,4)}-${parts.EXBEFORE.slice(4,6)}-${parts.EXBEFORE.slice(6,8)}` : null;
+  return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday, exdates, exbefore };
 }
 
-export function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [] }) {
+export function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [], exbefore = null }) {
   if (!FREQS.includes(freq)) return null;
   const parts = [`FREQ=${freq}`];
   if (interval > 1) parts.push(`INTERVAL=${interval}`);
@@ -54,6 +55,7 @@ export function buildRRule({ freq, interval = 1, byday = null, count = null, unt
   if (until) parts.push(`UNTIL=${until.replaceAll('-', '')}`);
   const exclusions = [...new Set(exdates)].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
   if (exclusions.length) parts.push(`EXDATE=${exclusions.map(k => k.replaceAll('-', '')).join(',')}`);
+  if (exbefore && /^\d{4}-\d{2}-\d{2}$/.test(exbefore)) parts.push(`EXBEFORE=${exbefore.replaceAll('-', '')}`);
   return parts.join(';');
 }
 
@@ -75,6 +77,21 @@ export function excludeOccurrence(rrule, key) {
   const rule = parseRRule(rrule);
   if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return rrule;
   return buildRRule({ ...rule, exdates: [...rule.exdates, key] });
+}
+
+// Keep the original DTSTART and COUNT: changing them would shift fortnightly
+// weekly rules or restart a finite series.
+export function excludeThrough(rrule, dateKey) {
+  const rule = parseRRule(rrule);
+  if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return rrule;
+  return buildRRule({...rule, exbefore: rule.exbefore && rule.exbefore > dateKey ? rule.exbefore : dateKey});
+}
+// Truncate a recurring series immediately before the chosen calendar date.
+export function excludeFrom(rrule, dateKey) {
+  const rule = parseRRule(rrule);
+  if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return rrule;
+  const last = addDaysKey(dateKey,-1);
+  return buildRRule({...rule,until:rule.until && rule.until < last ? rule.until : last});
 }
 
 // ---- events -> occurrences -------------------------------------------------------------
@@ -144,7 +161,7 @@ export function occurrencesOf(event, fromKey, toKey) {
     if (!hit) continue;
     produced += 1;
     if (rule.count && produced > rule.count) break;
-    if (touches(key) && !rule.exdates.includes(key)) out.push(make(key));
+    if (touches(key) && !rule.exdates.includes(key) && !(rule.exbefore && key <= rule.exbefore)) out.push(make(key));
     if (out.length > 800) break;
   }
   return out;
