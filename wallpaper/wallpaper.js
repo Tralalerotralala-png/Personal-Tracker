@@ -62,11 +62,12 @@ function parseRRule(text) {
   return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday, exdates, exbefore };
 }
 
-function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [], exbefore = null }) {
+function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [], exbefore = null, bymonthday = null }) {
   if (!FREQS.includes(freq)) return null;
   const parts = [`FREQ=${freq}`];
   if (interval > 1) parts.push(`INTERVAL=${interval}`);
   if (freq === 'WEEKLY' && byday?.length) parts.push(`BYDAY=${[...byday].sort((a, b) => a - b).map((i) => WEEKDAYS[i]).join(',')}`);
+  if (bymonthday && freq === 'MONTHLY') parts.push(`BYMONTHDAY=${bymonthday}`);
   if (count) parts.push(`COUNT=${count}`);
   if (until) parts.push(`UNTIL=${until.replaceAll('-', '')}`);
   const exclusions = [...new Set(exdates)].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
@@ -627,6 +628,40 @@ function parseFeed(text, { baseUrl, maxItems = 40, summaryLength = 300 } = {}) {
   return { title: feedTitle, items };
 }
 Object.assign(__exports, { decodeEntities, stripHtml, safeUrl, parseDateToIso, parseFeed });
+});
+__define("js/feed/reading.js", function (__require, __exports) {
+"use strict";
+// Personal reading history and saved links. Stored in the existing owner-scoped
+// settings table; no external article content is copied or scraped.
+const READING_KEY = 'feed_reading_v1';
+function articleKey(item) {
+  const link = typeof item.link === 'string' && /^https?:\/\//i.test(item.link) ? item.link : '';
+  return String(link || item.source_id + ':' + item.id).slice(0,500);
+}
+async function readingIndex(store) {
+  const data = await store.getSetting(READING_KEY,{});
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+}
+async function updateReading(store,item,patch) {
+  const key=articleKey(item);
+  if(!key)return;
+  const current=await readingIndex(store);
+  const before=current[key]||{};
+  const next={...before,...patch,title:String(item.title||before.title||'').slice(0,240),
+    link:/^https?:\/\//i.test(item.link||'')?item.link:before.link||'',
+    source:String(item.source_name||before.source||'').slice(0,120),
+    at:new Date().toISOString()};
+  // Keep saved links even after they disappear from the original source. Prune
+  // older read-only records to avoid growing synchronized settings indefinitely.
+  const all={...current,[key]:next};
+  const nonSaved=Object.entries(all).filter(([,x])=>!x.saved).sort((a,b)=>String(b[1].at||'').localeCompare(String(a[1].at||'')));
+  for(const [old] of nonSaved.slice(400))delete all[old];
+  await store.setSetting(READING_KEY,all);
+}
+function savedHeadlines(index) {
+  return Object.values(index||{}).filter(x=>x.saved && /^https?:\/\//i.test(x.link||'')).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+Object.assign(__exports, { READING_KEY, articleKey, readingIndex, updateReading, savedHeadlines });
 });
 __define("js/feed/service.js", function (__require, __exports) {
 "use strict";
@@ -3484,40 +3519,6 @@ function saveLayout(store, profile, layout) {
   return store.upsert('widget_layout', { profile, layout: layout.map(({ id, x, y, w, h }) => ({ id, x, y, w, h })) });
 }
 Object.assign(__exports, { boundsFor, cleanLayout, loadLayout, saveLayout });
-});
-__define("js/feed/reading.js", function (__require, __exports) {
-"use strict";
-// Personal reading history and saved links. Stored in the existing owner-scoped
-// settings table; no external article content is copied or scraped.
-const READING_KEY = 'feed_reading_v1';
-function articleKey(item) {
-  const link = typeof item.link === 'string' && /^https?:\/\//i.test(item.link) ? item.link : '';
-  return String(link || item.source_id + ':' + item.id).slice(0,500);
-}
-async function readingIndex(store) {
-  const data = await store.getSetting(READING_KEY,{});
-  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
-}
-async function updateReading(store,item,patch) {
-  const key=articleKey(item);
-  if(!key)return;
-  const current=await readingIndex(store);
-  const before=current[key]||{};
-  const next={...before,...patch,title:String(item.title||before.title||'').slice(0,240),
-    link:/^https?:\/\//i.test(item.link||'')?item.link:before.link||'',
-    source:String(item.source_name||before.source||'').slice(0,120),
-    at:new Date().toISOString()};
-  // Keep saved links even after they disappear from the original source. Prune
-  // older read-only records to avoid growing synchronized settings indefinitely.
-  const all={...current,[key]:next};
-  const nonSaved=Object.entries(all).filter(([,x])=>!x.saved).sort((a,b)=>String(b[1].at||'').localeCompare(String(a[1].at||'')));
-  for(const [old] of nonSaved.slice(400))delete all[old];
-  await store.setSetting(READING_KEY,all);
-}
-function savedHeadlines(index) {
-  return Object.values(index||{}).filter(x=>x.saved && /^https?:\/\//i.test(x.link||'')).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
-}
-Object.assign(__exports, { READING_KEY, articleKey, readingIndex, updateReading, savedHeadlines });
 });
 __require("js/wallpaper/main.js");
 })();
