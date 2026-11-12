@@ -187,6 +187,9 @@ export function createMudView({ store, weather }) {
       ...events.map(event=>{
         const exact=skyEventOnDate(event.date);
         const kind=event.kind==='moon'?'moon':exact?.kind||'meteor';
+        const place=state.place?.label || state.place?.name || (language()==='es'?'ubicación sin seleccionar':'no selected location');
+        const clouds=typeof state.current?.cloud_cover==='number'?Math.round(state.current.cloud_cover):null;
+        const isNear=event.date===dateKeyAt(new Date(),state.place?.timezone);
         const es=language()==='es';
         const info=kind==='solar_eclipse'||kind==='lunar_eclipse'
           ? (es?'La visibilidad y el horario dependen de tu ubicación. Consulta el mapa antes de planear una observación.':'Visibility and timing depend on your location. Check the visibility map before planning to watch.')
@@ -196,6 +199,15 @@ export function createMudView({ store, weather }) {
           h('summary',{},h('span',{class:'wx-event-symbol',html:kind==='moon'?moonPhaseSvg(new Date(event.date+'T12:00:00Z')):skyEventIconSvg(kind)}),
             h('span',{},event.date+' · '+(es?event.es:event.en))),
           h('p',{class:'hint'},info),
+          h('p',{class:'wx-viewing-guide'},
+            es?`Guía para ${place}: `:`Guide for ${place}: `,
+            clouds===null?(es?'Sin datos actuales de nubes.':'No current cloud data.')
+              : (es?`Nubosidad actual: ${clouds}%. `:`Current cloud cover: ${clouds}%. `),
+            isNear?(es?'Consulta las condiciones esta noche y busca un lugar oscuro con el horizonte despejado.':'Check conditions tonight and choose a dark location with a clear horizon.')
+              : (es?'El cielo puede cambiar antes del evento.':'Clouds may change before the event.'),
+            ' ',
+            es?'La dirección exacta, el horario máximo y la visibilidad deben verificarse en la fuente.':'Confirm viewing direction, peak time, and local visibility with the event source.'),
+          h('p',{class:'hint'},es?'No se supone que un eclipse sea visible desde este lugar.':'An eclipse is not assumed visible from this location.'),
           h('a',{href:event.url,target:'_blank',rel:'noopener noreferrer'},es?'Consultar fuente y visibilidad':'Check source and visibility'));
       }));
   }
@@ -228,6 +240,14 @@ export function createMudView({ store, weather }) {
       placeHeader(state),
       banner(state),
       weatherPanel(state, today, future),
+      h('details',{class:'wx-forecast-review'},
+        h('summary',{},language()==='es'?'Pronóstico anterior comparado':'Yesterday’s forecast compared'),
+        state.forecastReview
+          ? h('p',{},language()==='es'
+              ? `Para ${state.forecastReview.date}: se pronosticaron ${fmt(state.forecastReview.forecastRain)} mm de lluvia y ${fmt(state.forecastReview.forecastHigh)}°C. El modelo retrospectivo indica ${fmt(state.forecastReview.retrospectiveRain)} mm y ${fmt(state.forecastReview.retrospectiveHigh)}°C.`
+              : `For ${state.forecastReview.date}: forecast ${fmt(state.forecastReview.forecastRain)} mm rain and ${fmt(state.forecastReview.forecastHigh)}°C high. Later retrospective model data shows ${fmt(state.forecastReview.retrospectiveRain)} mm and ${fmt(state.forecastReview.retrospectiveHigh)}°C.`)
+          : h('p',{class:'hint'},language()==='es'?'Se mostrarán comparaciones después de guardar un pronóstico y volver al día siguiente.':'Comparison becomes available after a forecast is saved and the next day’s data arrives.'),
+        h('p',{class:'hint'},language()==='es'?'La comparación es entre versiones del modelo Open-Meteo, no mediciones realizadas en tu domicilio.':'Both values come from Open-Meteo model data, not measurements at your address.')),
       hourlyRain(state),
       skyPanel(state),
       h('details', { class: 'ground-history wx-history', open: historyExpanded ? true : null, ontoggle: e=>{if(e.target.isConnected)historyExpanded=e.target.open;} },

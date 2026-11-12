@@ -5,9 +5,10 @@ import { fetchWeather, fetchRainHours, todayInTimezone } from './open-meteo.js';
 import { computeMud, displayWindow, summarize } from './mud.js';
 
 const CACHE_KEY = 'weather-cache';
+const FORECAST_ARCHIVE_KEY='weather-forecast-archive-v1';
 
 export function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () => new Date() }) {
-  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null, hourly: [], history: [] };
+  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null, hourly: [], history: [], forecastReview:null };
   const listeners = new Set();
   let running = null;
 
@@ -59,9 +60,28 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
         const raw = await fetchWeather(place, { fetchImpl });
         raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
+        const archive=await store.meta.get(FORECAST_ARCHIVE_KEY) || {};
+        const old=(archive.place===placeKey(place)?archive.forecasts:{}) || {};
+        const today=todayInTimezone(raw.timezone,now());
+        const yesterday=new Date(today+'T12:00:00Z');
+        yesterday.setUTCDate(yesterday.getUTCDate()-1);
+        const yesterdayKey=yesterday.toISOString().slice(0,10);
+        const prior=old[yesterdayKey];
+        const retrospective=raw.days.find(d=>d.date===yesterdayKey);
+        const review=prior&&prior.issued<yesterdayKey&&retrospective
+          ? {date:yesterdayKey,issued:prior.issued,
+             forecastRain:prior.precip,retrospectiveRain:retrospective.precip,
+             forecastHigh:prior.tmax,retrospectiveHigh:retrospective.tmax} : null;
+        const forecasts={};
+        for(const [date,saved] of Object.entries(old))if(date>=yesterdayKey&&date<=today+'~')forecasts[date]=saved;
+        for(const day of raw.days){
+          if(day.date<=today || forecasts[day.date])continue;
+          forecasts[day.date]={issued:today,precip:day.precip,tmax:day.tmax};
+        }
+        await store.meta.set(FORECAST_ARCHIVE_KEY,{place:placeKey(place),forecasts});
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);
-        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, hourly: raw.hourly?.length ? raw.hourly : state.hourly, status: c.todayFound ? 'ok' : 'error', error: c.todayFound ? null : 'The weather data did not include today.' });
+        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, hourly: raw.hourly?.length ? raw.hourly : state.hourly, status: c.todayFound ? 'ok' : 'error', forecastReview:review, error: c.todayFound ? null : 'The weather data did not include today.' });
       } catch (err) {
         set({ place, status: state.rows.length ? 'stale' : 'error', error: err.message });
       }
