@@ -371,6 +371,15 @@ __define("js/data/inventory-logic.js", function (__require, __exports) {
 // "locations" etc. are plain arrays of rows, e.g. from store.list('locations').
 
 const norm = (s) => String(s ?? '').toLowerCase();
+const DEFAULT_CATEGORY_ALIASES = new Map([
+  ['c0000000-0000-4000-8000-000000000001', ['Tools', 'Herramientas']],
+  ['c0000000-0000-4000-8000-000000000002', ['Electronics', 'Electrónica']],
+  ['c0000000-0000-4000-8000-000000000003', ['Outdoor & Garden', 'Exterior y jardín']],
+  ['c0000000-0000-4000-8000-000000000004', ['Clothing & Gear', 'Ropa y equipo']],
+  ['c0000000-0000-4000-8000-000000000005', ['Household', 'Hogar']],
+  ['c0000000-0000-4000-8000-000000000006', ['Keepsakes', 'Recuerdos']],
+  ['c0000000-0000-4000-8000-000000000007', ['Pharmacy', 'Farmacia']],
+]);
 
 function indexById(rows) {
   return new Map(rows.filter((r) => !r.deleted_at).map((r) => [r.id, r]));
@@ -449,7 +458,9 @@ function searchItems({ items, locations, categories }, query, { limit = 50 } = {
     if (item.deleted_at) continue;
     const name = norm(item.name);
     const path = norm(pathOf(item.location_id));
-    const cat = norm(catMap.get(item.category_id)?.name);
+    const category = catMap.get(item.category_id);
+    const aliases = DEFAULT_CATEGORY_ALIASES.get(category?.id);
+    const cat = norm([category?.name, ...(aliases?.includes(category?.name) ? aliases : [])].join(' '));
     const extra = norm(`${item.notes ?? ''} ${item.pixel_description ?? ''}`);
 
     let score = 0;
