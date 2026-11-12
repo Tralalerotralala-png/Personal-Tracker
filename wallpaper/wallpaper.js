@@ -1750,7 +1750,7 @@ __define("js/wallpaper/config.js", function (__require, __exports) {
 //   3. whatever was used last time on this device
 const SAVED_KEY = 'wp:config';
 
-const DEFAULTS = { url: '', anonKey: '', wallpaperKey: '', refreshMinutes: 10, textScale: 1, margin: 2, scanlines: false, accent: '' };
+const DEFAULTS = { url: '', anonKey: '', wallpaperKey: '', refreshMinutes: 10, textScale: 1, margin: 2, scanlines: false, accent: '', privacyMode:false };
 
 const clampNum = (v, min, max, fallback) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback; };
 
@@ -1781,6 +1781,7 @@ function fromProperties(props) {
   if (v('textscale') !== undefined) out.textScale = clampNum(v('textscale'), 0.7, 2, 1);
   if (v('margin') !== undefined) out.margin = clampNum(v('margin'), 0, 8, DEFAULTS.margin);
   if (v('scanlines') !== undefined) out.scanlines = Boolean(v('scanlines'));
+  if (v('privacymode') !== undefined) out.privacyMode = Boolean(v('privacymode'));
   if (v('accentcolor') !== undefined) out.accent = colorToHex(v('accentcolor'));
   return out;
 }
@@ -1796,6 +1797,7 @@ function fromAddress(search = '', hash = '') {
   if (get('refresh')) out.refreshMinutes = clampNum(get('refresh'), 2, 120, DEFAULTS.refreshMinutes);
   if (get('scale')) out.textScale = clampNum(get('scale'), 0.7, 2, 1);
   if (get('scanlines')) out.scanlines = get('scanlines') === '1' || get('scanlines') === 'true';
+  if (get('privacy')) out.privacyMode = get('privacy') === '1' || get('privacy') === 'true';
   return out;
 }
 
@@ -1872,6 +1874,7 @@ function start() {
     document.documentElement.style.setProperty('--wp-scale', String(config.textScale));
     document.documentElement.style.setProperty('--wp-margin', `${config.margin}vmin`);
     document.documentElement.classList.toggle('scanlines', config.scanlines);
+    document.documentElement.classList.toggle('privacy-display',Boolean(config.privacyMode));
     if (config.accent) document.documentElement.style.setProperty('--accent', config.accent);
   }
 
@@ -2679,9 +2682,10 @@ const { fetchWeather, fetchRainHours, todayInTimezone } = __require("js/weather/
 const { computeMud, displayWindow, summarize } = __require("js/weather/mud.js");
 
 const CACHE_KEY = 'weather-cache';
+const FORECAST_ARCHIVE_KEY='weather-forecast-archive-v1';
 
 function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () => new Date() }) {
-  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null, hourly: [], history: [] };
+  let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null, hourly: [], history: [], forecastReview:null };
   const listeners = new Set();
   let running = null;
 
@@ -2733,9 +2737,28 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
         const raw = await fetchWeather(place, { fetchImpl });
         raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
+        const archive=await store.meta.get(FORECAST_ARCHIVE_KEY) || {};
+        const old=(archive.place===placeKey(place)?archive.forecasts:{}) || {};
+        const today=todayInTimezone(raw.timezone,now());
+        const yesterday=new Date(today+'T12:00:00Z');
+        yesterday.setUTCDate(yesterday.getUTCDate()-1);
+        const yesterdayKey=yesterday.toISOString().slice(0,10);
+        const prior=old[yesterdayKey];
+        const retrospective=raw.days.find(d=>d.date===yesterdayKey);
+        const review=prior&&prior.issued<yesterdayKey&&retrospective
+          ? {date:yesterdayKey,issued:prior.issued,
+             forecastRain:prior.precip,retrospectiveRain:retrospective.precip,
+             forecastHigh:prior.tmax,retrospectiveHigh:retrospective.tmax} : null;
+        const forecasts={};
+        for(const [date,saved] of Object.entries(old))if(date>=yesterdayKey&&date<=today+'~')forecasts[date]=saved;
+        for(const day of raw.days){
+          if(day.date<=today || forecasts[day.date])continue;
+          forecasts[day.date]={issued:today,precip:day.precip,tmax:day.tmax};
+        }
+        await store.meta.set(FORECAST_ARCHIVE_KEY,{place:placeKey(place),forecasts});
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);
-        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, hourly: raw.hourly?.length ? raw.hourly : state.hourly, status: c.todayFound ? 'ok' : 'error', error: c.todayFound ? null : 'The weather data did not include today.' });
+        set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, hourly: raw.hourly?.length ? raw.hourly : state.hourly, status: c.todayFound ? 'ok' : 'error', forecastReview:review, error: c.todayFound ? null : 'The weather data did not include today.' });
       } catch (err) {
         set({ place, status: state.rows.length ? 'stale' : 'error', error: err.message });
       }
@@ -3101,6 +3124,7 @@ const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurre
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { hash32 } = __require("js/ui/pixel-icon.js");
 const { timeAgo } = __require("js/ui/format.js");
+const { articleKey, readingIndex, updateReading } = __require("js/feed/reading.js");
 const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
 const { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } = __require("js/weather/sky-events.js");
@@ -3288,21 +3312,35 @@ function mountStats(el, { store }) {
 
 // ---- feed ----------------------------------------------------------------------------------------
 
-function mountFeed(el, { feed }) {
-  const render = () => {
+function mountFeed(el, { feed, store }) {
+  const render = async () => {
+    const read=await readingIndex(store);
     const s = feed.getState();
     if (s.status === 'no-sources') return replace(el, note('No feed sources yet. Add one in the Feed tab.'));
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
     if (!s.items.length) return replace(el, note(s.status === 'empty' ? 'No headlines right now.' : 'Loading headlines...'));
     const onPhone = typeof matchMedia === 'function' && matchMedia('(max-width: 899px)').matches;
-    const limit = onPhone ? 3 : 12;
+    // Keep the dashboard compact while letting older cached stories remain
+    // accessible with a scroll. The full Feed page holds the rest.
+    const limit = onPhone ? 24 : 30;
+    const oldScroll = el.querySelector('.w-feed-scroll')?.scrollTop ?? 0;
     replace(el, h('div', { class: 'w-feed-preview' },
-      h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
-        it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
-        h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))),
-      onPhone && s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
+      h('div', { class: 'w-feed-scroll', tabindex: 0, role: 'region',
+        'aria-label': language() === 'es' ? 'Titulares, desplázate para ver noticias anteriores' : 'Headlines, scroll to see older stories' },
+        h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => {
+          const saved=read[articleKey(it)]||{};
+          return h('li',{class:`${it.matched?.length?'hit ':''}${saved.read?'feed-read':''}`},
+            it.link && /^https?:\/\//i.test(it.link) ? h('a',{class:'w-title w-headline-link',href:it.link,target:'_blank',rel:'noopener noreferrer',
+              onclick:()=>{updateReading(store,it,{read:true}).catch(()=>{});}},it.title):h('span',{class:'w-title'},it.title),
+            h('span',{class:'w-meta'},`${saved.read?'Read · ':'New · '}${it.source_name}${it.published?', '+timeAgo(it.published):''}`),
+            h('button',{class:'w-feed-save',type:'button','aria-label':saved.saved?'Remove bookmark':'Save for later',
+              onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆'));
+        }))),
+      s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
+    const viewport = el.querySelector('.w-feed-scroll');
+    if (viewport) viewport.scrollTop = oldScroll;
   };
-  return live(render, (run) => [feed.subscribe(run)]);
+  return live(render, (run) => [feed.subscribe(run),storeTables(store,['settings'],run)]);
 }
 
 // ---- clock -----------------------------------------------------------------------------------------
@@ -3417,6 +3455,40 @@ function saveLayout(store, profile, layout) {
   return store.upsert('widget_layout', { profile, layout: layout.map(({ id, x, y, w, h }) => ({ id, x, y, w, h })) });
 }
 Object.assign(__exports, { boundsFor, cleanLayout, loadLayout, saveLayout });
+});
+__define("js/feed/reading.js", function (__require, __exports) {
+"use strict";
+// Personal reading history and saved links. Stored in the existing owner-scoped
+// settings table; no external article content is copied or scraped.
+const READING_KEY = 'feed_reading_v1';
+function articleKey(item) {
+  const link = typeof item.link === 'string' && /^https?:\/\//i.test(item.link) ? item.link : '';
+  return String(link || item.source_id + ':' + item.id).slice(0,500);
+}
+async function readingIndex(store) {
+  const data = await store.getSetting(READING_KEY,{});
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+}
+async function updateReading(store,item,patch) {
+  const key=articleKey(item);
+  if(!key)return;
+  const current=await readingIndex(store);
+  const before=current[key]||{};
+  const next={...before,...patch,title:String(item.title||before.title||'').slice(0,240),
+    link:/^https?:\/\//i.test(item.link||'')?item.link:before.link||'',
+    source:String(item.source_name||before.source||'').slice(0,120),
+    at:new Date().toISOString()};
+  // Keep saved links even after they disappear from the original source. Prune
+  // older read-only records to avoid growing synchronized settings indefinitely.
+  const all={...current,[key]:next};
+  const nonSaved=Object.entries(all).filter(([,x])=>!x.saved).sort((a,b)=>String(b[1].at||'').localeCompare(String(a[1].at||'')));
+  for(const [old] of nonSaved.slice(400))delete all[old];
+  await store.setSetting(READING_KEY,all);
+}
+function savedHeadlines(index) {
+  return Object.values(index||{}).filter(x=>x.saved && /^https?:\/\//i.test(x.link||'')).sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+}
+Object.assign(__exports, { READING_KEY, articleKey, readingIndex, updateReading, savedHeadlines });
 });
 __require("js/wallpaper/main.js");
 })();
