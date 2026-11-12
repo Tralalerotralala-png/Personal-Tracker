@@ -104,8 +104,9 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   // -- rarity meanings
   const rarityInputs = RARITIES.map((r) => {
     const cur = labels?.[r] ?? DEFAULT_SETTINGS.rarity_labels[r];
-    return { r, label: h('input', { type: 'text', value: cur.label, maxlength: 24, 'aria-label': `${r} name` }),
-      meaning: h('input', { type: 'text', value: cur.meaning ?? '', maxlength: 80, 'aria-label': `${r} meaning`, placeholder: 'What this tier means to you' }) };
+    return { r, storedLabel: cur.label, storedMeaning: cur.meaning ?? '', shownLabel: t(cur.label), shownMeaning: t(cur.meaning ?? ''),
+      label: h('input', { type: 'text', value: t(cur.label), maxlength: 24, 'aria-label': `${r} name` }),
+      meaning: h('input', { type: 'text', value: t(cur.meaning ?? ''), maxlength: 80, 'aria-label': `${r} meaning`, placeholder: 'What this tier means to you' }) };
   });
   const rarity = h('section', { class: 'set-block' },
     h('h3', {}, 'Rarity tiers'),
@@ -113,7 +114,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     rarityInputs.map(({ r, label, meaning }) => h('div', { class: `rarity-edit r-${r}` }, label, meaning)),
     h('button', { class: 'btn small', type: 'button', onclick: async () => {
       const value = {};
-      for (const { r, label, meaning } of rarityInputs) value[r] = { label: label.value.trim() || DEFAULT_SETTINGS.rarity_labels[r].label, meaning: meaning.value.trim() };
+      for (const { r, label, meaning, storedLabel, storedMeaning, shownLabel, shownMeaning } of rarityInputs) value[r] = { label: label.value.trim() === shownLabel ? storedLabel : (label.value.trim() || DEFAULT_SETTINGS.rarity_labels[r].label), meaning: meaning.value.trim() === shownMeaning ? storedMeaning : meaning.value.trim() };
       await store.setSetting('rarity_labels', value);
       toast('Rarity tiers saved');
     } }, 'Save tiers'));
