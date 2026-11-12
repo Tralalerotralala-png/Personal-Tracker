@@ -129,3 +129,11 @@ test('search includes games and other media and supports keyboard navigation',()
  assert.match(app,/Keyboard shortcuts/);
  assert.match(app,/Alt \+ 1/);
 });
+
+test('hub activity timeline excludes private logs and uses saved timestamps',()=>{
+ const hub=fs.readFileSync(new URL('../js/ui/personal-hub.js',import.meta.url),'utf8');
+ assert.match(hub,/timeline:'Activity'/);
+ assert.match(hub,/Private Logs are excluded/);
+ assert.match(hub,/game\.lastOpened/);
+ assert.match(hub,/item\.updated_at/);
+});

@@ -57,7 +57,7 @@ const nextDate = (date, repeat) => {
 };
 export async function loadHub(store) {
   const rows = await store.list('settings', { where: r => /^hub_(task|note|expense):/.test(r.key) || r.key.startsWith('item_tracking:') });
-  const types = Object.fromEntries(TYPES.map(type => [type, rows.filter(r => r.key.startsWith(`hub_${type}:`)).map(r => ({...r.value, id:r.key.split(':')[1]}))]));
+  const types = Object.fromEntries(TYPES.map(type => [type, rows.filter(r => r.key.startsWith(`hub_${type}:`)).map(r => ({...r.value, id:r.key.split(':')[1], lastChangedAt:r.updated_at||r.created_at||r.value?.lastChangedAt||null}))]));
   types.tracking = Object.fromEntries(rows.filter(r=>r.key.startsWith('item_tracking:')).map(r=>[r.key.slice(14),r.value]));
   return types;
 }
@@ -80,10 +80,16 @@ export async function collectAlerts(store, hub) {
 function buildPersonalHub({store, host}) {
   const wrap=h('div',{class:'hub'}), tabs=h('div',{class:'hub-tabs'}), panel=h('div',{class:'hub-panel'});
   wrap.append(tabs,panel);
-  let active='alerts'; let hub, context;
-  const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',search:'Search',insights:'Insights'};
+  let active='alerts'; let hub, context, gamesLibrary, otherMedia;
+  const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',search:'Search',insights:'Insights',timeline:'Activity'};
   host.append(wrap);
-  async function reload() { hub=await loadHub(store); context=await collectAlerts(store,hub); draw(); }
+  async function reload() {
+    hub=await loadHub(store);
+    [context,gamesLibrary,otherMedia]=await Promise.all([
+      collectAlerts(store,hub),store.getSetting('game_library_v1'),store.getSetting('other_media_library_v1')
+    ]);
+    draw();
+  }
   const button=(label,onclick,style='')=>h('button',{class:`btn small ${style}`,type:'button',onclick},label);
   const empty=msg=>h('p',{class:'hint'},msg);
   const displayDate=(date)=>h('span',{class:'hint'},fmtDate(date));
@@ -181,7 +187,36 @@ function buildPersonalHub({store, host}) {
       h('h3',{},'Items by category'),...Array.from(byCat,([label,count])=>h('div',{class:'hub-row'},label,h('b',{},count))),
       empty('Expense totals above include MXN entries only; other currencies are not converted.')];
   }
-  function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():drawEntries(active)));}
+  function drawTimeline(){
+    const es=locale().startsWith('es');
+    const rows=[];
+    const add=(at,title,kind)=>{
+      const ms=Date.parse(at||'');
+      if(Number.isFinite(ms)&&title)rows.push({at:new Date(ms).toISOString(),title:String(title),kind});
+    };
+    for(const item of context.items)add(item.updated_at||item.created_at,item.name,es?'Inventario':'Inventory');
+    for(const event of context.events)add(event.updated_at||event.created_at,event.title,es?'Calendario':'Calendar');
+    for(const type of ['task','note','expense']){
+      for(const row of hub[type])add(row.lastChangedAt,row.title,({task:es?'Tarea':'Task',note:es?'Nota':'Note',expense:es?'Gasto':'Expense'})[type]);
+    }
+    for(const game of (Array.isArray(gamesLibrary?.games)?gamesLibrary.games:[])){
+      add(game.lastOpened,game.title,es?'Juego abierto':'Game opened');
+      for(const entry of game.journal||[])add(entry.date,game.title,es?'Diario del juego':'Game journal');
+    }
+    for(const type of ['books','films','albums']){
+      for(const item of (Array.isArray(otherMedia?.[type])?otherMedia[type]:[])){
+        for(const entry of item.journal||[])add(entry.date,item.title,es?'Nota de biblioteca':'Library journal');
+      }
+    }
+    rows.sort((a,b)=>b.at.localeCompare(a.at));
+    return [h('h3',{},es?'Actividad reciente':'Recent activity'),
+      h('p',{class:'hint'},es?'Fechas de cambios y apuntes guardados. No incluye el diario privado.':'Dates of saved changes and journal notes. Private Logs are excluded.'),
+      ...rows.slice(0,25).map(row=>h('div',{class:'hub-timeline-row'},
+        h('time',{datetime:row.at},new Date(row.at).toLocaleString(locale())),
+        h('strong',{},row.title),h('span',{class:'hint'},row.kind))),
+      !rows.length?empty(es?'Todavía no hay actividad fechada.':'No dated activity yet.'):null];
+  }
+  function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():active==='timeline'?drawTimeline():drawEntries(active)));}
   reload().catch(error=>replace(panel,h('p',{class:'form-error'},error.message)));
   return {refresh:reload};
 }

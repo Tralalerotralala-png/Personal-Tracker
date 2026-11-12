@@ -1176,3 +1176,8 @@ html[data-layout-width="compact"] main{max-width:1100px}
 
 .diagnostics-report { margin-top:12px; }
 .diagnostics-line { margin:6px 0;padding:6px 8px;background:var(--panel-2);overflow-wrap:anywhere; }
+
+.hub-timeline-row { display:grid;grid-template-columns:minmax(120px,180px) minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid var(--edge); }
+.hub-timeline-row time { font-size:.8rem;color:var(--ink-dim); }
+.hub-timeline-row strong { min-width:0;overflow-wrap:anywhere; }
+@media(max-width:650px){ .hub-timeline-row { grid-template-columns:1fr;gap:4px; } }
