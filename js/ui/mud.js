@@ -2,7 +2,7 @@
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
 import { t, language } from './language.js';
-import { isNightAtLocation } from '../weather/moon-phase.js';
+import { isNightAtLocation, moonPhaseSvg } from '../weather/moon-phase.js';
 import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
 import { skyLighting, dateKeyAt } from '../weather/environment.js';
 import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
@@ -143,6 +143,13 @@ export function createMudView({ store, weather }) {
         stat('Humidity', number(current?.relative_humidity_2m, '%')),
         stat('Wind', number(current?.wind_speed_10m ?? raw.wind_max, ' km/h')),
         stat('Rain today', raw.precip === null ? '—' : `${fmt(raw.precip)} mm`)),
+      h('p', { class:'wx-confidence', role:'note' },
+        h('strong', {}, language()==='es'?'Confianza de la estimación: ':'Estimate confidence: ',
+          state.status==='stale'||[raw.precip,raw.tmax,raw.tmin,raw.wind_max].filter(Number.isFinite).length<3
+            ? (language()==='es'?'Limitada':'Limited'):(language()==='es'?'Moderada':'Moderate')),
+        language()==='es'
+          ? ' · El estado del suelo es un cálculo meteorológico, no una medición directa. La calificación indica los datos disponibles, no una precisión comprobada.'
+          : ' · Ground conditions are modeled from weather, not measured with a sensor. The rating reflects available inputs, not a verified accuracy percentage.'),
       h('h4', { class: 'wx-outlook-title' }, t('Weather and ground — next six days')),
       h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
@@ -177,8 +184,20 @@ export function createMudView({ store, weather }) {
     const events=upcomingSkyEvents(new Date(),6);
     return h('details',{class:'wx-sky-events'},h('summary',{},t('Upcoming sky events')+` (${events.length})`),
       h('p',{class:'wx-history-note'},t('Dates are approximate. Visibility at your location is not guaranteed; check the source before planning.')),
-      ...events.map(event=>h('p',{class:'wx-sky-event'},h('strong',{},event.date+' · '+(language()==='es'?event.es:event.en)+' '),
-        h('a',{href:event.url,target:'_blank',rel:'noopener noreferrer'},t('Details and visibility')))));
+      ...events.map(event=>{
+        const exact=skyEventOnDate(event.date);
+        const kind=event.kind==='moon'?'moon':exact?.kind||'meteor';
+        const es=language()==='es';
+        const info=kind==='solar_eclipse'||kind==='lunar_eclipse'
+          ? (es?'La visibilidad y el horario dependen de tu ubicación. Consulta el mapa antes de planear una observación.':'Visibility and timing depend on your location. Check the visibility map before planning to watch.')
+          : kind==='moon'?(es?'La fecha de la fase lunar es aproximada.':'The moon phase date is approximate.')
+          : (es?'Fecha aproximada del máximo. El horario y las condiciones del cielo pueden variar.':'Approximate peak date. Timing and sky conditions depend on your location.');
+        return h('details',{class:'wx-sky-card'},
+          h('summary',{},h('span',{class:'wx-event-symbol',html:kind==='moon'?moonPhaseSvg(new Date(event.date+'T12:00:00Z')):skyEventIconSvg(kind)}),
+            h('span',{},event.date+' · '+(es?event.es:event.en))),
+          h('p',{class:'hint'},info),
+          h('a',{href:event.url,target:'_blank',rel:'noopener noreferrer'},es?'Consultar fuente y visibilidad':'Check source and visibility'));
+      }));
   }
   function render(state) {
     if (state.status === 'no-location' || (!state.place && state.status === 'idle')) {

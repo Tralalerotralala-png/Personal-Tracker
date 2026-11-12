@@ -1160,3 +1160,12 @@ html[data-layout-width="compact"] main{max-width:1100px}
   .hotbar .slot { min-height: 58px; padding-inline: 2px; }
   .hotbar .slot-icon { width:26px; height:26px; flex-basis:26px; }
 }
+
+.wx-confidence { display:flex;flex-wrap:wrap;gap:5px;margin:0;padding:8px 10px;border:1px solid var(--edge);font-size:.8rem;color:var(--ink-dim); }
+.wx-confidence strong { color:var(--ink); }
+.wx-sky-card { margin:8px 0;padding:8px 10px;background:var(--panel);border:1px solid var(--edge); }
+.wx-sky-card summary { display:flex;align-items:center;gap:9px;cursor:pointer; }
+.wx-sky-card .wx-event-symbol { flex:0 0 22px; }
+.wx-sky-card .wx-event-symbol svg { width:22px;height:22px; }
+.wx-sky-card p { margin:9px 0; }
+.wx-sky-card a { color:var(--accent); }

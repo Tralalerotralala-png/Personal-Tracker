@@ -96,3 +96,11 @@ test('overview sky header remains visible and respects intensity off',()=>{
  assert.match(meter,/mudBar\(row\)/);
  assert.match(css,/\.hotbar \.slot-icon \{ display: flex/);
 });
+
+test('weather data confidence and expandable sky event details',()=>{
+ const mud=fs.readFileSync(new URL('../js/ui/mud.js',import.meta.url),'utf8');
+ assert.match(mud,/wx-confidence/);
+ assert.match(mud,/not a verified accuracy percentage/);
+ assert.match(mud,/wx-sky-card/);
+ assert.match(mud,/skyEventIconSvg\(kind\)/);
+});
