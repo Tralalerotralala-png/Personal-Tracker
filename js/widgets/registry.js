@@ -201,7 +201,7 @@ function mountStats(el, { store }) {
 
 function mountFeed(el, { feed, store }) {
   const render = async () => {
-    const read=await readingIndex(store);
+    const read=store?.readOnly?{}:await readingIndex(store);
     const s = feed.getState();
     if (s.status === 'no-sources') return replace(el, note('No feed sources yet. Add one in the Feed tab.'));
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
@@ -218,9 +218,9 @@ function mountFeed(el, { feed, store }) {
           const saved=read[articleKey(it)]||{};
           return h('li',{class:`${it.matched?.length?'hit ':''}${saved.read?'feed-read':''}`},
             it.link && /^https?:\/\//i.test(it.link) ? h('a',{class:'w-title w-headline-link',href:it.link,target:'_blank',rel:'noopener noreferrer',
-              onclick:()=>{updateReading(store,it,{read:true}).catch(()=>{});}},it.title):h('span',{class:'w-title'},it.title),
+              onclick:store?.readOnly?null:()=>{updateReading(store,it,{read:true}).catch(()=>{});}},it.title):h('span',{class:'w-title'},it.title),
             h('span',{class:'w-meta'},`${saved.read?'Read · ':'New · '}${it.source_name}${it.published?', '+timeAgo(it.published):''}`),
-            h('button',{class:'w-feed-save',type:'button','aria-label':saved.saved?'Remove bookmark':'Save for later',
+            store?.readOnly?null:h('button',{class:'w-feed-save',type:'button','aria-label':saved.saved?'Remove bookmark':'Save for later',
               onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆'));
         }))),
       s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));

@@ -262,21 +262,31 @@ export function createCalendarView({ store, weather }) {
     function remove() {
       if (!event.rrule) return removeScope('all');
       const key = occurrenceKey || parts.key;
-      const fromInput = h('input',{type:'date',value:key,'aria-label':'Delete from date'});
-      const chooser = openSheet({
-        title: 'Delete repeating event',
-        size: 'small',
-        body: [
-          h('p',{class:'prose'},event.title),
-          h('p',{class:'hint'},'Choose which dates to remove. Each option asks for confirmation.'),
-          h('label',{},'Start deleting from this date',fromInput),
-        ],
-        footer: [
+      const fromInput=h('input',{type:'date',value:key,'aria-label':'Delete from date'});
+      const fromField=h('label',{},'Start deleting from',fromInput);
+      const choices=[
+        ['single','Only this event'],
+        ['previous','This and previous events'],
+        ['future','From a specific date'],
+        ['all','All events'],
+      ];
+      let selection='single';
+      fromField.hidden=true;
+      const scopeOptions=h('div',{class:'delete-scope-choices'},
+        choices.map(([value,label])=>h('label',{class:'check delete-scope-option'},
+          h('input',{type:'radio',name:'delete-event-scope',value,checked:value==='single',onchange:()=>{
+            selection=value;fromField.hidden=value!=='future';
+          }}),label)));
+      const chooser=openSheet({
+        title:'Delete repeating event',size:'small',
+        body:[h('p',{class:'prose'},event.title+' · '+key),
+          h('p',{class:'hint'},'Choose which dates to remove. The other dates stay as they are.'),scopeOptions,fromField],
+        footer:[
           h('button',{class:'btn ghost',type:'button',onclick:()=>chooser.close()},'Cancel'),
-          h('button',{class:'btn danger',type:'button',onclick:()=>{chooser.close();removeScope('single');}},'Only this event'),
-          h('button',{class:'btn danger',type:'button',onclick:()=>{chooser.close();removeScope('previous');}},'This and previous events'),
-          h('button',{class:'btn danger',type:'button',onclick:()=>{if(!fromInput.value)return;chooser.close();removeScope('future',fromInput.value);}},'From selected date'),
-          h('button',{class:'btn danger',type:'button',onclick:()=>{chooser.close();removeScope('all');}},'All events'),
+          h('button',{class:'btn danger',type:'button',onclick:()=>{
+            if(selection==='future'&&!fromInput.value)return;
+            chooser.close();removeScope(selection,selection==='future'?fromInput.value:null);
+          }},'Continue to confirmation'),
         ],
       });
     }

@@ -1244,3 +1244,7 @@ html[data-layout-width="compact"] main{max-width:1100px}
 }
 .privacy-toggle[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 @media(max-width:480px){.privacy-toggle{padding:4px 6px;font-size:.72rem}}
+
+.delete-scope-choices{display:grid;gap:7px;margin:12px 0}
+.delete-scope-option{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--edge);cursor:pointer}
+.delete-scope-option input{flex:none}
