@@ -78,3 +78,9 @@ test('service worker includes new entry points and wallpaper is generated',()=>{
  const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8');
  assert.match(app,/createGameBackupService/);assert.match(app,/refreshEnvironmentalLight/);
 });
+
+test('game deletion checks backup index to prevent orphaned private files',()=>{
+ const games=fs.readFileSync(new URL('../js/ui/games.js',import.meta.url),'utf8');
+ assert.match(games,/await backups\.list\(game\.id\)/);
+ assert.match(games,/Delete this game.s saved backups first/);
+});

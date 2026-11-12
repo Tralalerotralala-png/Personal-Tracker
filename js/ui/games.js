@@ -36,7 +36,7 @@ export function createGamesView({store,backups=null}){
  function detail(game){
   if (!game.lastOpened || Date.now()-Date.parse(game.lastOpened)>1500) { game.lastOpened=new Date().toISOString();store.setSetting(KEY,state).catch(()=>{}); }
   const edit=h('button',{class:'btn primary',onclick:()=>editor(game)},L().edit);
-  const remove=h('button',{class:'btn small danger',onclick:async()=>{if(!await confirmDialog({title:L().delete,message:`Delete ${game.title}?`,confirmLabel:L().delete,danger:true}))return;state.games=state.games.filter(g=>g.id!==game.id);page=null;sideMode=false;await save();}},L().delete);
+  const remove=h('button',{class:'btn small danger',onclick:async()=>{if(backups){try{const attached=await backups.list(game.id);if(attached.length){toast(language()==='es'?'Elimina primero las copias de este juego para no dejar archivos huérfanos en Supabase.':'Delete this game’s saved backups first to avoid orphaned Supabase files.');return;}}catch(err){toast(language()==='es'?'No se pudo verificar las copias; intenta de nuevo.':'Could not verify game backups. Try again before deleting.');return;}}if(!await confirmDialog({title:L().delete,message:`Delete ${game.title}?`,confirmLabel:L().delete,danger:true}))return;state.games=state.games.filter(g=>g.id!==game.id);page=null;sideMode=false;await save();}},L().delete);
   const journalText=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Anota tu progreso...':'Record your progress...'});
   const journalEntries=(game.journal||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   const journalPanel=h('section',{class:'game-journal'},h('h3',{},language()==='es'?'Diario de juego':'Game journal'),
