@@ -5,6 +5,7 @@ import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
 import { timeAgo, plural } from './format.js';
 import { ADAPTERS, ADDABLE_KINDS, FeedError } from '../feed/sources.js';
 import { parseKeywordText } from '../feed/service.js';
+import {articleKey, readingIndex, updateReading, savedHeadlines} from '../feed/reading.js';
 
 const KIND_LABEL = { rss: 'News feed', atom: 'News feed', bluesky: 'Bluesky', mastodon: 'Mastodon', x: 'X' };
 
@@ -20,12 +21,15 @@ const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '
 
 export function createFeedView({ store, feed, proxySuggestion }) {
   const el = h('div', { class: 'view feed-view' });
-  const ui = { source: null, onlyMatches: false };
+  const ui = { source: null, onlyMatches: false, reading: 'all' };
+  let readIndex={};
+  const setReading=async(item,patch)=>{await updateReading(store,item,patch);readIndex=await readingIndex(store);render(feed.getState());};
+  store.subscribe(e=>{if(e.type==='change'&&e.tables?.includes('settings'))readingIndex(store).then(next=>{readIndex=next;render(feed.getState());}).catch(()=>{});});
 
   function render(state) {
     const sourcesWithProblems = state.sources.filter((s) => s.state === 'error' || s.state === 'stale');
 
-    if (state.status === 'no-sources') {
+    if (state.status === 'no-sources' && !savedHeadlines(readIndex).length) {
       replace(el, h('div', { class: 'empty feed-empty' },
         h('h2', {}, 'Your feed is empty'),
         h('p', {}, 'Add the accounts and sites you want headlines from. Bluesky and Mastodon accounts work straight away; news sites use their RSS feed link.'),
@@ -39,7 +43,7 @@ export function createFeedView({ store, feed, proxySuggestion }) {
         h('button', { class: 'btn small', type: 'button', onclick: () => feed.refresh({ force: true }) }, 'Refresh'),
         h('button', { class: 'btn small', type: 'button', onclick: () => openSourcesSheet({ store, feed, proxySuggestion }) }, 'Sources and keywords')));
 
-    if (state.status === 'all-off') {
+    if (state.status === 'all-off' && !savedHeadlines(readIndex).length) {
       replace(el, head, h('div', { class: 'empty' }, h('p', {}, 'All your sources are switched off.'),
         h('button', { class: 'btn', type: 'button', onclick: () => openSourcesSheet({ store, feed, proxySuggestion }) }, 'Manage sources')));
       return;
@@ -48,11 +52,19 @@ export function createFeedView({ store, feed, proxySuggestion }) {
     const chips = h('div', { class: 'chip-row', role: 'group', 'aria-label': 'Filter headlines' },
       h('button', { class: `chip${!ui.source && !ui.onlyMatches ? ' on' : ''}`, type: 'button', 'aria-pressed': String(!ui.source && !ui.onlyMatches), onclick: () => { ui.source = null; ui.onlyMatches = false; render(feed.getState()); } }, 'All'),
       state.sources.filter((s) => s.enabled).map((s) => h('button', { class: `chip${ui.source === s.id ? ' on' : ''}`, type: 'button', 'aria-pressed': String(ui.source === s.id), onclick: () => { ui.source = ui.source === s.id ? null : s.id; render(feed.getState()); } }, s.name)),
-      state.keywords.length ? h('button', { class: `chip kw${ui.onlyMatches ? ' on' : ''}`, type: 'button', 'aria-pressed': String(ui.onlyMatches), onclick: () => { ui.onlyMatches = !ui.onlyMatches; render(feed.getState()); } }, 'Keyword matches') : null);
+      state.keywords.length ? h('button', { class: `chip kw${ui.onlyMatches ? ' on' : ''}`, type: 'button', 'aria-pressed': String(ui.onlyMatches), onclick: () => { ui.onlyMatches = !ui.onlyMatches; render(feed.getState()); } }, 'Keyword matches') : null,
+      [['unread','Unread'],['hide','Hide read'],['saved','Saved for later']].map(([value,label])=>h('button',{
+        class:`chip${ui.reading===value?' on':''}`,type:'button','aria-pressed':String(ui.reading===value),
+        onclick:()=>{ui.reading=ui.reading===value?'all':value;render(feed.getState());}
+      },label)));
 
     let items = state.items;
     if (ui.source) items = items.filter((i) => i.source_id === ui.source);
     if (ui.onlyMatches) items = items.filter((i) => i.matched?.length);
+    if(ui.reading==='saved') items=savedHeadlines(readIndex).map(x=>({
+      ...x, source_name:x.source, published:x.at, id:x.link, matched:[], savedSnapshot:true
+    }));
+    if(ui.reading==='unread'||ui.reading==='hide')items=items.filter(i=>!readIndex[articleKey(i)]?.read);
 
     const banner = sourcesWithProblems.length
       ? h('p', { class: 'banner warn', role: 'status' },
@@ -60,13 +72,23 @@ export function createFeedView({ store, feed, proxySuggestion }) {
         h('button', { class: 'linklike', type: 'button', onclick: () => openSourcesSheet({ store, feed, proxySuggestion }) }, 'See details')) : null;
 
     const list = items.length
-      ? h('ul', { class: 'feed-list' }, items.map((it) => h('li', { class: `feed-item${it.matched?.length ? ' hit' : ''}` },
-        h('div', { class: 'feed-meta' }, h('span', { class: 'feed-src' }, it.source_name), it.author && it.kind !== 'bluesky' && it.kind !== 'mastodon' ? h('span', {}, it.author) : null, h('span', {}, timeAgo(it.published))),
-        it.link
-          ? h('a', { class: 'feed-title', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, highlight(it.title, state.keywords))
-          : h('span', { class: 'feed-title' }, highlight(it.title, state.keywords)),
-        it.summary ? h('p', { class: 'feed-summary' }, highlight(it.summary, state.keywords)) : null)))
-      : h('div', { class: 'empty' }, h('p', {}, state.status === 'loading' ? 'Loading headlines...' : ui.onlyMatches ? 'No headlines match your keywords right now.' : 'No headlines right now.'));
+      ? h('ul',{class:'feed-list'},items.map(it=>{
+        const record=readIndex[articleKey(it)]||{};
+        return h('li',{class:`feed-item${it.matched?.length?' hit':''}${record.read?' feed-read':''}`},
+          h('div',{class:'feed-meta'},
+            h('span',{class:'feed-src'},it.source_name||it.source||''),
+            it.author&&it.kind!=='bluesky'&&it.kind!=='mastodon'?h('span',{},it.author):null,
+            h('span',{},timeAgo(it.published)),
+            h('span',{class:'feed-read-state'},record.read?'Read':'Unread')),
+          it.link
+            ? h('a',{class:'feed-title',href:it.link,target:'_blank',rel:'noopener noreferrer',onclick:()=>{setReading(it,{read:true}).catch(()=>{});}},highlight(it.title,state.keywords))
+            : h('span',{class:'feed-title'},highlight(it.title,state.keywords)),
+          it.summary&&!it.savedSnapshot?h('p',{class:'feed-summary'},highlight(it.summary,state.keywords)):null,
+          h('div',{class:'feed-article-actions'},
+            h('button',{type:'button',class:'btn small ghost',onclick:()=>setReading(it,{read:!record.read})},record.read?'Mark unread':'Mark read'),
+            h('button',{type:'button',class:'btn small ghost',onclick:()=>setReading(it,{saved:!record.saved})},record.saved?'Remove bookmark':'Save for later')));
+      }))
+      : h('div',{class:'empty'},h('p',{},state.status==='loading'?'Loading headlines...':'No headlines match this filter.'));
 
     replace(el, head, banner, chips, list);
   }
@@ -74,8 +96,8 @@ export function createFeedView({ store, feed, proxySuggestion }) {
   feed.subscribe(render);
   return {
     el,
-    async mount() { render(feed.getState()); feed.refresh(); },
-    show() { render(feed.getState()); },
+    async mount() { readIndex=await readingIndex(store);render(feed.getState());feed.refresh(); },
+    async show() { readIndex=await readingIndex(store);render(feed.getState()); },
   };
 }
 

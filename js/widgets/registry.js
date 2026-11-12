@@ -11,6 +11,7 @@ import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js
 import { locationPath } from '../data/inventory-logic.js';
 import { hash32 } from '../ui/pixel-icon.js';
 import { timeAgo } from '../ui/format.js';
+import {articleKey,readingIndex,updateReading} from '../feed/reading.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } from '../weather/moon-phase.js';
 import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
@@ -198,8 +199,9 @@ function mountStats(el, { store }) {
 
 // ---- feed ----------------------------------------------------------------------------------------
 
-function mountFeed(el, { feed }) {
-  const render = () => {
+function mountFeed(el, { feed, store }) {
+  const render = async () => {
+    const read=await readingIndex(store);
     const s = feed.getState();
     if (s.status === 'no-sources') return replace(el, note('No feed sources yet. Add one in the Feed tab.'));
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
@@ -212,14 +214,20 @@ function mountFeed(el, { feed }) {
     replace(el, h('div', { class: 'w-feed-preview' },
       h('div', { class: 'w-feed-scroll', tabindex: 0, role: 'region',
         'aria-label': language() === 'es' ? 'Titulares, desplázate para ver noticias anteriores' : 'Headlines, scroll to see older stories' },
-        h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
-          it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
-          h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`))))),
+        h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => {
+          const saved=read[articleKey(it)]||{};
+          return h('li',{class:`${it.matched?.length?'hit ':''}${saved.read?'feed-read':''}`},
+            it.link && /^https?:\/\//i.test(it.link) ? h('a',{class:'w-title w-headline-link',href:it.link,target:'_blank',rel:'noopener noreferrer',
+              onclick:()=>{updateReading(store,it,{read:true}).catch(()=>{});}},it.title):h('span',{class:'w-title'},it.title),
+            h('span',{class:'w-meta'},`${saved.read?'Read · ':'New · '}${it.source_name}${it.published?', '+timeAgo(it.published):''}`),
+            h('button',{class:'w-feed-save',type:'button','aria-label':saved.saved?'Remove bookmark':'Save for later',
+              onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆'));
+        }))),
       s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
     const viewport = el.querySelector('.w-feed-scroll');
     if (viewport) viewport.scrollTop = oldScroll;
   };
-  return live(render, (run) => [feed.subscribe(run)]);
+  return live(render, (run) => [feed.subscribe(run),storeTables(store,['settings'],run)]);
 }
 
 // ---- clock -----------------------------------------------------------------------------------------

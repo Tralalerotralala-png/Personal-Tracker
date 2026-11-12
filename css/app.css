@@ -1201,3 +1201,11 @@ html[data-layout-width="compact"] main{max-width:1100px}
   .overview .ov-grid .wd-feed .w-feed-preview { height: auto; }
   .overview .ov-grid .wd-feed .w-feed-scroll { flex: 0 1 auto; max-height: min(280px, 42vh); }
 }
+
+/* Reading history and saved-link controls. */
+.feed-item.feed-read .feed-title,.w-feed li.feed-read .w-headline-link {opacity:.56}
+.feed-read-state {font-size:.75rem;color:var(--ink-dim);letter-spacing:.03em}
+.feed-article-actions {display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.w-feed li {position:relative;padding-right:26px}
+.w-feed-save {position:absolute;right:0;top:0;padding:0 3px;border:0;background:transparent;color:var(--accent);font-size:1.05rem;cursor:pointer}
+.w-feed-save:focus-visible{outline:2px solid var(--accent)}
