@@ -3237,7 +3237,6 @@ function mountMud(el, { weather, store }) {
     const analog = h('span', { class: 'w-analog-clock', title: clock(undefined),
       html: `<svg viewBox="0 0 100 100" role="img" aria-label="Analog clock ${clock(undefined)}" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="94" height="94" rx="2" fill="var(--panel-2)" stroke="var(--edge-hi)" stroke-width="5"/>${ticks}${hand(hour * 30,25,6,'var(--ink)')}${hand(minute * 6,34,4,'var(--accent)')}<rect x="47" y="47" width="6" height="6" fill="var(--accent)"/></svg>` });
     const localClock = h('div', { class: 'w-weather-clock' },
-      analog,
       h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined)),
         h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
       extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
