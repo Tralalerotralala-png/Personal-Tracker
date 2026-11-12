@@ -1,5 +1,6 @@
 // Places: the tree of rooms, shelves and containers where things are stored.
 import { h, replace, openSheet, confirmDialog, toast } from './dom.js';
+import { t, language } from './language.js';
 import { flattenLocationTree, wouldCreateCycle, descendantIds } from '../data/inventory-logic.js';
 
 const KIND_SUGGESTIONS = ['building', 'room', 'cupboard', 'shelf', 'drawer', 'bin', 'box', 'tray', 'wall', 'vehicle'];
@@ -7,7 +8,7 @@ const indent = (depth) => '\u00a0\u00a0\u00a0'.repeat(depth);
 
 // <option>s for a location <select>: the whole tree, indented.
 export function placeOptions(locations, { exclude = new Set(), unassignedLabel = 'Unassigned' } = {}) {
-  const opts = [h('option', { value: '' }, unassignedLabel)];
+  const opts = [h('option', { value: '' }, t(unassignedLabel))];
   for (const p of flattenLocationTree(locations)) {
     if (exclude.has(p.id)) continue;
     opts.push(h('option', { value: p.id }, `${indent(p.depth)}${p.name}`));
@@ -19,7 +20,7 @@ export function placeOptions(locations, { exclude = new Set(), unassignedLabel =
 export function openPlaceSheet({ store, locations, place = null, defaults = {}, onSaved }) {
   const isEdit = Boolean(place);
   const name = h('input', { type: 'text', value: place?.name ?? '', maxlength: 200, autocomplete: 'off', required: true, id: 'pl-name' });
-  const kind = h('input', { type: 'text', value: place?.kind ?? '', list: 'pl-kinds', autocomplete: 'off', id: 'pl-kind' });
+  const kind = h('input', { type: 'text', value: t(place?.kind ?? ''), list: 'pl-kinds', autocomplete: 'off', id: 'pl-kind' });
   const parent = h('select', { id: 'pl-parent' },
     placeOptions(locations, { exclude: isEdit ? descendantIds(locations, place.id) : new Set(), unassignedLabel: 'Top level (not inside anything)' }));
   parent.value = place?.parent_id ?? defaults.parent_id ?? '';
@@ -36,7 +37,7 @@ export function openPlaceSheet({ store, locations, place = null, defaults = {}, 
       return;
     }
     const row = await store.upsert('locations', {
-      ...(place ?? {}), name: nm, kind: kind.value.trim() || null, parent_id: parentId, notes: notes.value.trim() || null,
+      ...(place ?? {}), name: nm, kind: (KIND_SUGGESTIONS.find(k => t(k) === kind.value.trim()) || kind.value.trim()) || null, parent_id: parentId, notes: notes.value.trim() || null,
     });
     sheet.close();
     toast(isEdit ? 'Place saved' : 'Place added');
@@ -60,7 +61,7 @@ export function openPlaceSheet({ store, locations, place = null, defaults = {}, 
     body: h('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); save(); } },
       h('label', { for: 'pl-name' }, 'Name'), name,
       h('label', { for: 'pl-kind' }, 'Kind (optional)'), kind,
-      h('datalist', { id: 'pl-kinds' }, KIND_SUGGESTIONS.map((k) => h('option', { value: k }))),
+      h('datalist', { id: 'pl-kinds' }, KIND_SUGGESTIONS.map((k) => h('option', { value: t(k) }))),
       h('label', { for: 'pl-parent' }, 'Inside'), parent,
       h('label', { for: 'pl-notes' }, 'Notes (optional)'), notes,
       error,
@@ -101,7 +102,7 @@ export function createPlacesPanel({ store, getData, onBrowse }) {
               h('button', { class: 'tree-main', type: 'button', onclick: () => onBrowse(p.id),
                 'aria-label': `Show items in ${p.path}` },
                 h('span', { class: 'tree-name' }, p.name),
-                h('span', { class: 'tree-meta' }, p.kind ? `${p.kind}, ` : '', h('span', { class: 'tree-count' }, n === 1 ? '1 item' : `${n} items`))),
+                h('span', { class: 'tree-meta' }, p.kind ? `${t(p.kind)}, ` : '', h('span', { class: 'tree-count' }, n === 1 ? t('1 item') : `${n} ${t('items')}`))),
               h('button', { class: 'btn small', type: 'button', 'aria-label': `Add a place inside ${p.name}`, title: 'Add a place inside',
                 onclick: () => openPlaceSheet({ store, locations, defaults: { parent_id: p.id } }) }, '+'),
               h('button', { class: 'btn small ghost', type: 'button', 'aria-label': `Edit ${p.name}`,
@@ -109,7 +110,7 @@ export function createPlacesPanel({ store, getData, onBrowse }) {
           })),
       unassigned
         ? h('button', { class: 'btn ghost wide', type: 'button', onclick: () => onBrowse('none') },
-            `${unassigned} ${unassigned === 1 ? 'item has' : 'items have'} no place`)
+            language() === 'es' ? `${unassigned} ${unassigned === 1 ? 'objeto sin lugar' : 'objetos sin lugar'}` : `${unassigned} ${unassigned === 1 ? 'item has' : 'items have'} no place`)
         : null);
   }
 
