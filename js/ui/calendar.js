@@ -4,7 +4,7 @@ import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
 import { t, locale } from './language.js';
 import { mudClass, dayLong, dayMonth, mudChip } from './mud-format-v2.js';
 import {
-  groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts,
+  groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts, excludeOccurrence,
 } from '../calendar/recurrence.js';
 import { importIcsText, fetchIcsText } from '../calendar/ics.js';
 
@@ -128,7 +128,7 @@ export function createCalendarView({ store, weather }) {
         dm ? h('div', { class: `day-mud ${mudClass(dm.label)}` }, mudChip(dm), h('span', {}, `${dm.why}.`)) : null,
         occs.length
           ? h('ul', { class: 'day-events' }, occs.map((o) => h('li', {},
-            h('button', { class: 'day-event', type: 'button', style: `--c:${o.event.color || EVENT_COLORS[0]}`, onclick: () => { sheet.close(); openEventSheet({ event: o.event }); } },
+            h('button', { class: 'day-event', type: 'button', style: `--c:${o.event.color || EVENT_COLORS[0]}`, onclick: () => { sheet.close(); openEventSheet({ event: o.event, occurrenceKey: o.key }); } },
               h('span', { class: 'day-time' }, occTime(o)),
               h('span', { class: 'day-title' }, o.event.title),
               o.event.rrule ? h('span', { class: 'hint' }, describeRRule(o.event.rrule)) : null))))
@@ -140,7 +140,7 @@ export function createCalendarView({ store, weather }) {
 
   // ---- event editor -------------------------------------------------------------------
 
-  function openEventSheet({ event = null, dateKey = todayKey() }) {
+  function openEventSheet({ event = null, dateKey = todayKey(), occurrenceKey = null }) {
     const isEdit = Boolean(event);
     const parts = event ? startParts(event) : { key: dateKey, hh: new Date().getHours() + 1, mm: 0 };
     const startTime = `${pad(Math.min(parts.hh, 23))}:${pad(parts.mm)}`;
@@ -218,7 +218,7 @@ export function createCalendarView({ store, weather }) {
         const interval = repeat.value === 'BIWEEKLY' ? 2 : Math.max(1, parseInt(every.value, 10) || 1);
         if (['WEEKLY', 'BIWEEKLY'].includes(repeat.value) && chosenDays.size === 0) { error.textContent = 'Pick at least one weekday to repeat on.'; return; }
         if (until.value && until.value < date.value) { error.textContent = 'The repeat cannot stop before the event starts.'; return; }
-        rrule = buildRRule({ freq: repeat.value === 'BIWEEKLY' ? 'WEEKLY' : repeat.value, interval, byday: ['WEEKLY', 'BIWEEKLY'].includes(repeat.value) ? [...chosenDays] : null, count: rule?.count ?? null, until: until.value || null });
+        rrule = buildRRule({ freq: repeat.value === 'BIWEEKLY' ? 'WEEKLY' : repeat.value, interval, byday: ['WEEKLY', 'BIWEEKLY'].includes(repeat.value) ? [...chosenDays] : null, count: rule?.count ?? null, until: until.value || null, exdates: rule?.exdates ?? [] });
       }
 
       await store.upsert('events', {
@@ -229,15 +229,33 @@ export function createCalendarView({ store, weather }) {
       toast(isEdit ? 'Event saved' : 'Event added');
     }
 
-    async function remove() {
+    async function removeScope(single) {
+      const key = occurrenceKey || parts.key;
       const ok = await confirmDialog({
-        title: `Delete ${event.title}?`, confirmLabel: 'Delete event', danger: true,
-        message: event.rrule ? 'This deletes the whole series, every repeat.' : 'It disappears from every device.',
+        title: single ? `Delete occurrence on ${key}?` : `Delete ${event.title}?`,
+        confirmLabel: single ? 'Delete this occurrence' : event.rrule ? 'Delete entire series' : 'Delete event',
+        danger: true,
+        message: single ? 'Only this date will be removed. Other repeats stay on the calendar.'
+          : event.rrule ? 'Every repeat will be removed on synced devices.' : 'This event will be removed on synced devices.',
       });
       if (!ok) return;
-      await store.remove('events', event.id);
+      if (single) await store.upsert('events', { ...event, rrule: excludeOccurrence(event.rrule, key) });
+      else await store.remove('events', event.id);
       sheet.close();
-      toast('Event deleted');
+      toast(single ? 'Occurrence deleted' : 'Event deleted');
+    }
+    function remove() {
+      if (!event.rrule) return removeScope(false);
+      const key = occurrenceKey || parts.key;
+      const chooser = openSheet({
+        title: 'Delete repeating event', size: 'small',
+        body: h('p', { class: 'prose' }, `${event.title} · ${key}. Choose what to delete.`),
+        footer: [
+          h('button', { class: 'btn ghost', type: 'button', onclick: () => chooser.close() }, 'Cancel'),
+          h('button', { class: 'btn danger', type: 'button', onclick: () => { chooser.close(); removeScope(true); } }, 'This event'),
+          h('button', { class: 'btn danger', type: 'button', onclick: () => { chooser.close(); removeScope(false); } }, 'Entire series'),
+        ],
+      });
     }
 
     const sheet = openSheet({
@@ -308,7 +326,7 @@ export function createCalendarView({ store, weather }) {
     const { y, m } = parseKey(dateKey);
     if (state.y !== y || state.m !== m) { state.y = y; state.m = m; render(); }
     const selected = eventId ? state.events.find(event => event.id === eventId) : null;
-    if (selected) openEventSheet({ event: selected });
+    if (selected) openEventSheet({ event: selected, occurrenceKey: dateKey });
     else openDaySheet(dateKey);
   }
   window.addEventListener('tracker-calendar-open', handleOverviewSelection);

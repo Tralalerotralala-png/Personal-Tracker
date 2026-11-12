@@ -4,7 +4,7 @@ process.env.TZ = 'Europe/Berlin';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseRRule, buildRRule, describeRRule, occurrencesOf, groupByDay, addDaysKey, daysBetweenKeys, weekdayOfKey,
+  parseRRule, buildRRule, describeRRule, occurrencesOf, groupByDay, excludeOccurrence, addDaysKey, daysBetweenKeys, weekdayOfKey,
 } from '../js/calendar/recurrence.js';
 import { parseIcs, parseIcsDate, zonedToUtc, importIcsText, fetchIcsText } from '../js/calendar/ics.js';
 import { createStore } from '../js/data/store.js';
@@ -23,7 +23,7 @@ test('date keys: arithmetic is calendar-exact', () => {
 });
 
 test('rrule: parse, build, describe', () => {
-  assert.deepEqual(parseRRule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6'), { freq: 'WEEKLY', interval: 2, byday: [1, 3], count: 6, until: null, bymonthday: null });
+  assert.deepEqual(parseRRule('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6'), { freq: 'WEEKLY', interval: 2, byday: [1, 3], count: 6, until: null, bymonthday: null, exdates: [] });
   assert.equal(parseRRule('FREQ=YEARLY;UNTIL=20301231T000000Z').until, '2030-12-31');
   assert.equal(parseRRule('FREQ=HOURLY'), null);
   assert.equal(parseRRule(''), null);
@@ -172,4 +172,11 @@ test('ics link: explains the usual failure and rejects non-calendars', async () 
   await assert.rejects(() => fetchIcsText('https://x.test/a.ics', async () => { throw new TypeError('Failed to fetch'); }), /Download the \.ics file/);
   await assert.rejects(() => fetchIcsText('https://x.test/a.ics', async () => ({ ok: true, status: 200, text: async () => '<html>hi</html>' })), /did not return a calendar/);
   assert.match(await fetchIcsText('https://x.test/a.ics', async () => ({ ok: true, status: 200, text: async () => wrap(vevent('SUMMARY:x')) })), /VCALENDAR/);
+});
+
+test('single cancellation preserves other repeating dates',()=>{
+ const e=allDay('Weekly','2026-10-05',{rrule:'FREQ=WEEKLY;COUNT=4'});
+ const changed={...e,rrule:excludeOccurrence(e.rrule,'2026-10-12')};
+ assert.deepEqual(keys(occurrencesOf(changed,'2026-10-01','2026-11-01')),['2026-10-05','2026-10-19','2026-10-26']);
+ assert.equal(excludeOccurrence(changed.rrule,'2026-10-12'),changed.rrule);
 });

@@ -41,16 +41,19 @@ export function parseRRule(text) {
     if (m) until = `${m[1]}-${m[2]}-${m[3]}`;
   }
   const bymonthday = parts.BYMONTHDAY ? parseInt(parts.BYMONTHDAY, 10) || null : null;
-  return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday };
+  const exdates = (parts.EXDATE || '').split(',').filter(v => /^\d{8}$/.test(v)).map(v => `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`);
+  return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday, exdates };
 }
 
-export function buildRRule({ freq, interval = 1, byday = null, count = null, until = null }) {
+export function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [] }) {
   if (!FREQS.includes(freq)) return null;
   const parts = [`FREQ=${freq}`];
   if (interval > 1) parts.push(`INTERVAL=${interval}`);
   if (freq === 'WEEKLY' && byday?.length) parts.push(`BYDAY=${[...byday].sort((a, b) => a - b).map((i) => WEEKDAYS[i]).join(',')}`);
   if (count) parts.push(`COUNT=${count}`);
   if (until) parts.push(`UNTIL=${until.replaceAll('-', '')}`);
+  const exclusions = [...new Set(exdates)].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+  if (exclusions.length) parts.push(`EXDATE=${exclusions.map(k => k.replaceAll('-', '')).join(',')}`);
   return parts.join(';');
 }
 
@@ -66,6 +69,12 @@ export function describeRRule(text) {
   if (r.count) s += `, ${r.count} times`;
   if (r.until) s += `, until ${r.until}`;
   return s;
+}
+
+export function excludeOccurrence(rrule, key) {
+  const rule = parseRRule(rrule);
+  if (!rule || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return rrule;
+  return buildRRule({ ...rule, exdates: [...rule.exdates, key] });
 }
 
 // ---- events -> occurrences -------------------------------------------------------------
@@ -135,7 +144,7 @@ export function occurrencesOf(event, fromKey, toKey) {
     if (!hit) continue;
     produced += 1;
     if (rule.count && produced > rule.count) break;
-    if (touches(key)) out.push(make(key));
+    if (touches(key) && !rule.exdates.includes(key)) out.push(make(key));
     if (out.length > 800) break;
   }
   return out;
