@@ -84,3 +84,15 @@ test('game deletion checks backup index to prevent orphaned private files',()=>{
  assert.match(games,/await backups\.list\(game\.id\)/);
  assert.match(games,/Delete this game.s saved backups first/);
 });
+
+test('overview sky header remains visible and respects intensity off',()=>{
+ const css=fs.readFileSync(new URL('../css/app.css',import.meta.url),'utf8');
+ const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8');
+ assert.match(css,/:root\[data-sky-light='on'\] \.overview \.panel-head/);
+ assert.match(css,/--sky-header-opacity/);
+ assert.match(app,/sky\.opacity > 0 \?/);
+ const meter=fs.readFileSync(new URL('../js/ui/mud-format-v2.js',import.meta.url),'utf8');
+ assert.match(meter,/mud-chip-meter/);
+ assert.match(meter,/mudBar\(row\)/);
+ assert.match(css,/\.hotbar \.slot-icon \{ display: flex/);
+});

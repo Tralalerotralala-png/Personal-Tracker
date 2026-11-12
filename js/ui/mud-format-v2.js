@@ -25,7 +25,10 @@ export function mudBar(row) {
 export const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
 
 export function mudChip(row) {
-  return h('span', { class: `mud-chip ${mudClass(row.label)}` }, localizedMudLabel(row.label), h('b', {}, row.index));
+  // The number remains available to screen readers and on hover. Visually,
+  // status uses the same three-segment scale as the rest of the forecast.
+  const label = `${localizedMudLabel(row.label)} ${row.index}/100`;
+  return h('span', { class: `mud-chip mud-chip-meter ${mudClass(row.label)}`, title:label, 'aria-label':label }, mudBar(row));
 }
 
 // "Today is Muddy (62). Getting muddier, peaking Thursday at Swamp (81)."
