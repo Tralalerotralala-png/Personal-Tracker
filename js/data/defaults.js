@@ -137,7 +137,7 @@ export async function upgradeLayouts(store) {
 // anything that already exists.
 export async function ensureDefaults(store) {
   if (await store.get('settings', 'defaults_seeded')) {
-    const pharmacy = DEFAULT_CATEGORIES.find((c) => c.name === 'Farmacia');
+    const pharmacy = DEFAULT_CATEGORIES.find((c) => c.id === 'c0000000-0000-4000-8000-000000000007');
     if (!(await store.get('categories', pharmacy.id))) await store.upsert('categories', pharmacy);
     if (!(await store.get('settings', 'category_tracking_defaults'))) await store.setSetting('category_tracking_defaults', DEFAULT_SETTINGS.category_tracking_defaults);
     return false;
