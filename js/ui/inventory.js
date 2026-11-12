@@ -303,6 +303,8 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const currency = h('select', {}, ['MXN','USD','EUR','GBP'].map(c => h('option', { value:c, selected: initialMeta.currency === c }, c)));
     const purchaseDate = h('input', { type: 'date', value: initialMeta.purchase_date });
     const warrantyDate = h('input', { type: 'date', value: initialMeta.warranty_date });
+    const maintenanceDate=h('input',{type:'date',value:initialMeta.maintenance_date});
+    const maintenanceNotes=h('input',{type:'text',maxlength:300,value:initialMeta.maintenance_notes,placeholder:'Service, inspection, battery change…'});
     function catDefaults() { return categoryFields(data.categoryDefaults, category.value || null); }
     function drawTracking() {
       const flags = itemFields({ overrides }, catDefaults());
@@ -469,7 +471,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       };
       try {
         await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value });
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
@@ -503,6 +505,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       h('h3', { class:'tracking-heading' }, 'Purchase & warranty'),
       h('label', {}, t('Purchase price')), price, h('label', {}, 'Currency'), currency,
       h('label', {}, 'Purchase date'), purchaseDate, h('label', {}, t('Warranty ends')), warrantyDate,
+      h('label', {}, 'Next maintenance date'), maintenanceDate,h('label',{},'Maintenance notes'),maintenanceNotes,
       h('label', {}, 'Rarity'), h('div', { class: 'rarity-row' }, rarityBtns), meaning,
       h('label', { for: 'it-desc' }, 'Pixel art description'), desc,
       h('div', { class: 'inline-actions' },

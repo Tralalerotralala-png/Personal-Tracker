@@ -17,6 +17,7 @@ export function trackMeta(meta = {}) {
     low_stock_threshold: Number.isFinite(meta.low_stock_threshold) ? meta.low_stock_threshold : 5,
     purchase_price: Number.isFinite(meta.purchase_price) ? meta.purchase_price : null,
     purchase_date: meta.purchase_date || '', warranty_date: meta.warranty_date || '',
+    maintenance_date: meta.maintenance_date || '', maintenance_notes: meta.maintenance_notes || '',
     currency: meta.currency || 'MXN',
   };
 }
@@ -28,6 +29,13 @@ export function attentionFor(item, meta, defaults, now = new Date()) {
     const day = new Date(`${meta.expiration_date}T12:00:00`);
     const diff = (day - now) / 86400000;
     if (diff < 0) result.push('Expired'); else if (diff <= 30) result.push('Expiring soon');
+  }
+  for(const [field,label] of [['warranty_date','Warranty ending soon'],['maintenance_date','Maintenance due']]){
+    if(!meta?.[field])continue;
+    const day=new Date(meta[field]+'T12:00:00');
+    if(!Number.isFinite(day.getTime()))continue;
+    const diff=(day-now)/86400000;
+    if(diff<=30)result.push(diff<0?(field==='warranty_date'?'Warranty expired':'Maintenance overdue'):label);
   }
   if (flags.condition && ['Damaged','Needs repair'].includes(meta?.condition)) result.push('Needs attention');
   return result;
