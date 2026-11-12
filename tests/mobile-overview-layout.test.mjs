@@ -20,10 +20,12 @@ test('phone Overview uses intrinsic full-width widget heights, not sparse 12-col
   assert.match(overview, /openLayoutEditor\(\{ store, ctx, profile: p \}\)/);
 });
 
-test('phone headline widget is a short preview linking to the Feed tab', () => {
-  assert.match(registry, /onPhone \? 3 : 12/);
+test('phone headlines scroll within a compact preview and can open the full Feed', () => {
+  assert.match(registry, /onPhone \? 24 : 30/);
+  assert.match(registry, /w-feed-scroll/);
   assert.match(registry, /w-feed-more/);
   assert.match(registry, /href: '#feed'/);
+  assert.match(css, /\.overview \.ov-grid \.wd-feed \.w-feed-scroll\s*\{[^}]*max-height/);
 });
 
 test('existing phone layouts are migrated once to include all current widgets, without modifying desktop', async () => {

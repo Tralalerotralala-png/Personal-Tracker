@@ -205,12 +205,19 @@ function mountFeed(el, { feed }) {
     if (s.status === 'all-off') return replace(el, note('All feed sources are switched off.'));
     if (!s.items.length) return replace(el, note(s.status === 'empty' ? 'No headlines right now.' : 'Loading headlines...'));
     const onPhone = typeof matchMedia === 'function' && matchMedia('(max-width: 899px)').matches;
-    const limit = onPhone ? 3 : 12;
+    // Keep the dashboard compact while letting older cached stories remain
+    // accessible with a scroll. The full Feed page holds the rest.
+    const limit = onPhone ? 24 : 30;
+    const oldScroll = el.querySelector('.w-feed-scroll')?.scrollTop ?? 0;
     replace(el, h('div', { class: 'w-feed-preview' },
-      h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
-        it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
-        h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`)))),
-      onPhone && s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
+      h('div', { class: 'w-feed-scroll', tabindex: 0, role: 'region',
+        'aria-label': language() === 'es' ? 'Titulares, desplázate para ver noticias anteriores' : 'Headlines, scroll to see older stories' },
+        h('ul', { class: 'w-feed' }, s.items.slice(0, limit).map((it) => h('li', { class: it.matched?.length ? 'hit' : '' },
+          it.link && /^https?:\/\//i.test(it.link) ? h('a', { class: 'w-title w-headline-link', href: it.link, target: '_blank', rel: 'noopener noreferrer' }, it.title) : h('span', { class: 'w-title' }, it.title),
+          h('span', { class: 'w-meta' }, `${it.source_name}${it.published ? `, ${timeAgo(it.published)}` : ''}`))))),
+      s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
+    const viewport = el.querySelector('.w-feed-scroll');
+    if (viewport) viewport.scrollTop = oldScroll;
   };
   return live(render, (run) => [feed.subscribe(run)]);
 }
