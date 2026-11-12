@@ -1249,12 +1249,50 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .delete-scope-option{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--edge);cursor:pointer}
 .delete-scope-option input{flex:none}
 
-/* Center both weather time displays inside equal-width columns. */
-.w-mud-dashboard .w-weather-clock { display:grid; grid-template-columns:auto repeat(2,minmax(0,1fr)); align-items:center; gap:8px 12px; width:100%; }
-.w-mud-dashboard .w-weather-clock .w-time-unit { align-items:center; justify-content:center; text-align:center; min-width:0; }
-.w-mud-dashboard .w-weather-clock .w-time-unit strong { white-space:nowrap; }
-.w-mud-dashboard .w-weather-clock .w-analog-clock { justify-self:center; }
-@media (max-width:420px) {
-  .w-mud-dashboard .w-weather-clock { grid-template-columns:66px minmax(0,1fr); }
-  .w-mud-dashboard .w-weather-clock .w-time-unit:last-child:nth-child(3) { grid-column:1 / -1; }
+/* Analog, local, and second-zone clocks share one row, including on phones.
+   Keep label rows equal-height so both digital time values line up exactly. */
+.w-mud-dashboard .w-weather-clock {
+  display:grid;
+  grid-template-columns:clamp(44px,18cqw,66px) repeat(2,minmax(0,1fr));
+  align-items:start;
+  gap:6px;
+  width:100%;
+  min-width:0;
+}
+.w-mud-dashboard .w-weather-clock .w-analog-clock {
+  width:100%;
+  height:auto;
+  aspect-ratio:1;
+  flex:none;
+  justify-self:center;
+  align-self:center;
+}
+.w-mud-dashboard .w-weather-clock .w-time-unit {
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  align-items:center;
+  justify-content:flex-start;
+  text-align:center;
+}
+.w-mud-dashboard .w-weather-clock .w-time-unit > span {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:2.2em;
+  font-size:clamp(.58rem,2.7cqw,.72rem);
+  line-height:1.15;
+  letter-spacing:.03em;
+  overflow-wrap:anywhere;
+}
+.w-mud-dashboard .w-weather-clock .w-time-unit strong {
+  font-size:clamp(.96rem,4.3cqw,1.55rem);
+  line-height:1.1;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.w-mud-dashboard .w-weather-clock .w-clock-date {
+  font-size:clamp(.62rem,2.6cqw,.72rem);
+  white-space:nowrap;
 }
