@@ -221,7 +221,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'c0000000-0000-4000-8000-000000000004', name: 'Clothing & Gear', icon: '🥾', color: '#b07acc', sort_order: 4 },
   { id: 'c0000000-0000-4000-8000-000000000005', name: 'Household',      icon: '🏠', color: '#d97a6c', sort_order: 5 },
   { id: 'c0000000-0000-4000-8000-000000000006', name: 'Keepsakes',      icon: '⭐', color: '#e8d44d', sort_order: 6 },
-  { id: 'c0000000-0000-4000-8000-000000000007', name: 'Farmacia', icon: '💊', color: '#70b9a0', sort_order: 7 },
+  { id: 'c0000000-0000-4000-8000-000000000007', name: 'Pharmacy', icon: '💊', color: '#70b9a0', sort_order: 7 },
 ];
 
 const DEFAULT_SETTINGS = {
@@ -1323,9 +1323,143 @@ const pairs = [
  ['Notes','Notas'],['Total','Total'],['New place','Nuevo lugar'],['Save tiers','Guardar niveles'],
  ['Does not repeat','No se repite'],['Every 2 weeks','Cada 2 semanas'],
  ['Every 2 weeks','Cada 2 semanas'],['Does not repeat','No se repite'],['Every day','Cada día'],['Every week','Cada semana'],['Every month','Cada mes'],['Every year','Cada año'],['Repeats','Se repite'],['Every','Cada'],['Stop repeating after (optional)','Dejar de repetir después de (opcional)'],['Condition','Estado'],['Expiration','Caducidad'],['Durability','Durabilidad'],['Quantity','Cantidad'],['Remaining','Restantes'],['Maximum quantity','Cantidad máxima'],['Low stock threshold','Avisar cuando queden'],['Use category defaults','Usar valores predeterminados de la categoría'],['Categories','Categorías'],['Category tracking defaults','Campos predeterminados por categoría'],['Needs attention','Requiere atención'],['Low stock','Pocas unidades'],['Expiring soon','Próximo a caducar'],['Expired','Caducado'],['Good','Bueno'],['Excellent','Excelente'],['Worn','Desgastado'],['Damaged','Dañado'],['Needs repair','Necesita reparación'],['Purchase price','Precio de compra'],['Warranty ends','Fin de garantía'],['Tasks','Tareas'],['Notes','Notas'],['Expenses','Gastos'],['Notification center','Centro de avisos'],['Personal hub','Centro personal'],['Search everything','Buscar en todo'],['Save changes','Guardar cambios'],['Remaining quantity','Cantidad restante'],['Inventory tracking','Seguimiento de objetos'],['Now','Ahora'],['Local','Local'],['MUD','LODO'],['Change','Cambiar'],['Edit','Editar']
+ // Additional English ⇄ Spanish interface labels; custom user text is never bulk-translated.
+ ["All","Todos"],
+ ["pieces","unidades"],
+ ["Common","Común"],
+ ["Uncommon","Poco común"],
+ ["Rare","Raro"],
+ ["Legendary","Legendario"],
+ ["Sort: Newest","Orden: Recientes"],
+ ["Sort: Name","Orden: Nombre"],
+ ["Sort: Rarity","Orden: Rareza"],
+ ["Sort: Place","Orden: Lugar"],
+ ["Filter by category","Filtrar por categoría"],
+ ["Filter by rarity","Filtrar por rareza"],
+ ["Lost only","Solo perdidos"],
+ ["No category","Sin categoría"],
+ ["No place","Sin lugar"],
+ ["No place yet","Sin lugar todavía"],
+ ["Where is it?","¿Dónde está?"],
+ ["Where is it? Search your items","¿Dónde está? Busca tus objetos"],
+ ["Inventory sections","Secciones de la mochila"],
+ ["Inventory view","Vista de la mochila"],
+ ["Sort items","Ordenar objetos"],
+ ["Name","Nombre"],
+ ["Rarity","Rareza"],
+ ["New place","Nuevo lugar"],
+ ["Add to pack","Agregar a la mochila"],
+ ["Place","Lugar"],
+ ["Newest","Recientes"],
+ ["Lost, last seen:","Perdido, visto por última vez:"],
+ ["Lost quests","Misiones de objetos perdidos"],
+ ["Today's loot","Hallazgo de hoy"],
+ ["No items match these filters.","Ningún objeto coincide con estos filtros."],
+ ["No places yet. Add the rooms and containers where you keep things, like \"Garage\" and \"Blue bin\".","Todavía no hay lugares. Agrega habitaciones y contenedores donde guardas cosas."],
+ ["Add place","Agregar lugar"],
+ ["Add a place","Agregar un lugar"],
+ ["Edit place","Editar lugar"],
+ ["Save place","Guardar lugar"],
+ ["Delete place","Eliminar lugar"],
+ ["Place saved","Lugar guardado"],
+ ["Place added","Lugar agregado"],
+ ["Place deleted","Lugar eliminado"],
+ ["Unassigned","Sin asignar"],
+ ["Top level (not inside anything)","Nivel superior (fuera de otros lugares)"],
+ ["Kind (optional)","Tipo (opcional)"],
+ ["Inside","Dentro de"],
+ ["Notes (optional)","Notas (opcional)"],
+ ["Give this place a name.","Ponle un nombre al lugar."],
+ ["A place cannot be put inside itself.","No puedes colocar un lugar dentro de sí mismo."],
+ ["Everything stored here moves up to the place above it (or to Unassigned). Nothing else is deleted.","Todo lo guardado aquí pasará al lugar superior (o a Sin asignar). No se borrará nada más."],
+ ["Add a place inside","Agregar un lugar dentro de"],
+ ["Add a place inside ","Agregar un lugar dentro de "],
+ ["building","edificio"],
+ ["room","habitación"],
+ ["cupboard","armario"],
+ ["shelf","estante"],
+ ["drawer","cajón"],
+ ["bin","contenedor"],
+ ["box","caja"],
+ ["tray","bandeja"],
+ ["wall","pared"],
+ ["vehicle","vehículo"],
+ ["1 item","1 objeto"],
+ ["items","objetos"],
+ ["item has no place","objeto sin lugar"],
+ ["items have no place","objetos sin lugar"],
+ ["No items yet","Todavía no hay objetos"],
+ ["Item saved","Objeto guardado"],
+ ["Added to your pack","Agregado a tu mochila"],
+ ["Item deleted","Objeto eliminado"],
+ ["Edit item","Editar objeto"],
+ ["More details","Más detalles"],
+ ["Photo / pixel icon","Foto / icono de píxeles"],
+ ["Replace photo","Reemplazar foto"],
+ ["Take or choose photo","Tomar o elegir foto"],
+ ["Selected photo","Foto seleccionada"],
+ ["Next maintenance date","Fecha de próximo mantenimiento"],
+ ["Maintenance notes","Notas de mantenimiento"],
+ ["Pixel art description","Descripción del arte de píxeles"],
+ ["Suggest one","Sugerir una"],
+ ["Copy as image prompt","Copiar como instrucción de imagen"],
+ ["Rarity tiers saved","Niveles de rareza guardados"],
+ ["New category name","Nombre de nueva categoría"],
+ ["Add category","Agregar categoría"],
+ ["Category name","Nombre de categoría"],
+ ["Choose which inventory fields are enabled by default in each category. Individual items can override any checkbox. Saved values are never deleted when hidden.","Elige los campos predeterminados por categoría. Cada objeto puede modificarlos. Los valores guardados no se borran al ocultar campos."],
+ ["Category defaults saved","Valores de categoría guardados"],
+ ["Delete category","Eliminar categoría"],
+ ["Items in this category stay in your pack, with no category.","Los objetos de esta categoría permanecerán en tu mochila, sin categoría."],
+ ["Select which fields this item uses. They start with your category defaults.","Elige los campos que usa este objeto. Inicialmente heredan la configuración de su categoría."],
+ ["Customized for this item. Other fields inherit the category defaults.","Personalizado para este objeto. Los demás campos heredan los valores de la categoría."],
+ ["All fields currently inherit the category defaults.","Todos los campos usan la configuración de su categoría."],
+ ["I cannot find this (start a lost quest)","No encuentro este objeto (crear una misión de búsqueda)"],
+ ["Service, inspection, battery change…","Servicio, revisión, cambio de batería…"],
+ ["Optional","Opcional"],
+ ["One fewer","Uno menos"],
+ ["One more","Uno más"],
+ ["No matching results.","No hay resultados."],
+ ["Write or suggest a description first","Primero escribe o solicita una descripción"],
+ ["Prompt copied","Instrucción copiada"],
+ ["Press copy on your keyboard to copy the selected text","Usa Copiar en tu teclado para copiar el texto seleccionado"],
+ ["Icon creation failed","No se pudo crear el icono"],
+ ["Pixel icon ready. Save this item to apply it.","Icono de píxeles listo. Guarda el objeto para aplicarlo."],
+ ["Maximum quantity must be a whole number not smaller than remaining quantity.","La cantidad máxima debe ser un número entero no menor que las unidades restantes."],
+ ["Low-stock threshold must be zero or higher.","El límite de existencias bajas debe ser cero o mayor."],
+ ["Give the item a name.","Ponle un nombre al objeto."],
+ ["Quantity must be a whole number, 0 or more.","La cantidad debe ser un número entero de cero o más."],
+ ["It disappears from every device. Export a backup first if you might want it back.","Desaparecerá de todos los dispositivos. Exporta un respaldo si podrías necesitarlo."],
+ ["Grid view","Vista de cuadrícula"],
+ ["List view","Vista de lista"],
+ ["Easy to replace","Fácil de reemplazar"],
+ ["Useful, takes some effort to replace","Útil; requiere esfuerzo reemplazarlo"],
+ ["Hard or expensive to replace","Difícil o costoso de reemplazar"],
+ ["Irreplaceable","Irreemplazable"],
 ];
 const translations = new Map(pairs);
 const t = (value) => language() === 'es' ? translations.get(value) || value : value;
+
+/* Default categories have fixed IDs, but their saved names can be from either
+   language (especially legacy 'Farmacia'). Localize only known default names,
+   never arbitrary category names created or renamed by the user. */
+const DEFAULT_CATEGORY_LABELS = [
+  ['Tools','Herramientas'],
+  ['Electronics','Electrónica'],
+  ['Outdoor & Garden','Exterior y jardín'],
+  ['Clothing & Gear','Ropa y equipo'],
+  ['Household','Hogar'],
+  ['Keepsakes','Recuerdos'],
+  ['Pharmacy','Farmacia'],
+];
+function categoryLabel(category) {
+  const match = String(category?.id ?? '').match(/^c0000000-0000-4000-8000-00000000000([1-7])$/);
+  if (!match) return category?.name ?? '';
+  const [en, es] = DEFAULT_CATEGORY_LABELS[Number(match[1]) - 1];
+  const savedName = String(category.name ?? '').trim();
+  return savedName === en || savedName === es ? (language() === 'es' ? es : en) : savedName;
+}
+
 let observer;
 function startTranslations(root = document.body) {
   observer?.disconnect();
@@ -1356,7 +1490,7 @@ function startTranslations(root = document.body) {
   });
   observer.observe(root, { childList:true, subtree:true, characterData:true });
 }
-Object.assign(__exports, { language, locale, t, startTranslations });
+Object.assign(__exports, { language, locale, t, categoryLabel, startTranslations });
 });
 __define("js/ui/mud-format-v2.js", function (__require, __exports) {
 "use strict";
