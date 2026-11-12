@@ -38,6 +38,7 @@ function start() {
     document.documentElement.style.setProperty('--wp-scale', String(config.textScale));
     document.documentElement.style.setProperty('--wp-margin', `${config.margin}vmin`);
     document.documentElement.classList.toggle('scanlines', config.scanlines);
+    document.documentElement.classList.toggle('privacy-display',Boolean(config.privacyMode));
     if (config.accent) document.documentElement.style.setProperty('--accent', config.accent);
   }
 

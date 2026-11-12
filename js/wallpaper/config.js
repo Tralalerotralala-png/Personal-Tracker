@@ -4,7 +4,7 @@
 //   3. whatever was used last time on this device
 const SAVED_KEY = 'wp:config';
 
-export const DEFAULTS = { url: '', anonKey: '', wallpaperKey: '', refreshMinutes: 10, textScale: 1, margin: 2, scanlines: false, accent: '' };
+export const DEFAULTS = { url: '', anonKey: '', wallpaperKey: '', refreshMinutes: 10, textScale: 1, margin: 2, scanlines: false, accent: '', privacyMode:false };
 
 const clampNum = (v, min, max, fallback) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback; };
 
@@ -35,6 +35,7 @@ export function fromProperties(props) {
   if (v('textscale') !== undefined) out.textScale = clampNum(v('textscale'), 0.7, 2, 1);
   if (v('margin') !== undefined) out.margin = clampNum(v('margin'), 0, 8, DEFAULTS.margin);
   if (v('scanlines') !== undefined) out.scanlines = Boolean(v('scanlines'));
+  if (v('privacymode') !== undefined) out.privacyMode = Boolean(v('privacymode'));
   if (v('accentcolor') !== undefined) out.accent = colorToHex(v('accentcolor'));
   return out;
 }
@@ -50,6 +51,7 @@ export function fromAddress(search = '', hash = '') {
   if (get('refresh')) out.refreshMinutes = clampNum(get('refresh'), 2, 120, DEFAULTS.refreshMinutes);
   if (get('scale')) out.textScale = clampNum(get('scale'), 0.7, 2, 1);
   if (get('scanlines')) out.scanlines = get('scanlines') === '1' || get('scanlines') === 'true';
+  if (get('privacy')) out.privacyMode = get('privacy') === '1' || get('privacy') === 'true';
   return out;
 }
 

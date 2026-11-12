@@ -264,7 +264,7 @@ const searchWrap = h('div', { class: 'global-search-wrap', 'data-open': 'false' 
 const openSearch = () => { searchWrap.dataset.open = 'true'; searchToggle.setAttribute('aria-expanded','true'); globalSearchInput.focus(); };
 const closeSearch = () => { searchWrap.dataset.open = 'false'; searchToggle.setAttribute('aria-expanded','false'); searchResults.hidden = true; globalSearchInput.value = ''; };
 searchToggle.addEventListener('click', () => searchWrap.dataset.open === 'true' ? closeSearch() : openSearch());
-document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); } else if (e.key === 'Escape' && searchWrap.dataset.open === 'true') closeSearch(); });
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); } else if (e.key === 'Escape' && searchWrap.dataset.open === 'true') closeSearch(); });
 let searchSeq = 0;
 async function renderGlobalSearch() {
   const seq = ++searchSeq;
@@ -339,9 +339,23 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();openQuickCapture({store});
   }
 });
+// A device-local display mask, never stored as a cloud setting or sent to the
+// wallpaper. This hides visible dashboard details, but is not data encryption.
+const PRIVACY_DISPLAY_KEY='tracker-privacy-display-v1';
+const privateDisplay=(()=>{try{return localStorage.getItem(PRIVACY_DISPLAY_KEY)==='1';}catch{return false;}})();
+const privacyButton=h('button',{class:'btn small ghost privacy-toggle',type:'button',
+  'aria-label':locale().startsWith('es')?'Ocultar datos del panel':'Hide dashboard details',onclick:()=>{
+    const enabled=!document.documentElement.classList.contains('privacy-display');
+    document.documentElement.classList.toggle('privacy-display',enabled);
+    privacyButton.setAttribute('aria-pressed',String(enabled));
+    privacyButton.textContent=enabled?'Reveal':'Hide';
+    try{localStorage.setItem(PRIVACY_DISPLAY_KEY,enabled?'1':'0');}catch{}
+  }},privateDisplay?'Reveal':'Hide');
+document.documentElement.classList.toggle('privacy-display',privateDisplay);
+privacyButton.setAttribute('aria-pressed',String(privateDisplay));
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
-  searchWrap, captureButton, h('span', { class: 'spacer' }), skyBadge, pill,
+  searchWrap, captureButton, h('span', { class: 'spacer' }), privacyButton, skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 

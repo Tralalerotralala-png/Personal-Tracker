@@ -1220,3 +1220,27 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .wx-forecast-review summary{cursor:pointer}
 .wx-forecast-review p{margin:8px 0;line-height:1.5}
 .wx-viewing-guide{font-size:.88rem;line-height:1.55}
+
+/* Privacy display mode masks visible dashboard details. This is a presentation
+   feature, not encryption or an access-control boundary. */
+.privacy-display .overview .wd-calendar,
+.privacy-display .overview .wd-loot,
+.privacy-display .overview .wd-stats,
+.privacy-display .overview .wd-currency,
+.privacy-display .overview .wd-recent,
+.privacy-display .overview .wd-games,
+.privacy-display .wp-grid .wd-calendar,
+.privacy-display .wp-grid .wd-loot,
+.privacy-display .wp-grid .wd-stats,
+.privacy-display .wp-grid .wd-currency,
+.privacy-display .wp-grid .wd-recent,
+.privacy-display .wp-grid .wd-games {position:relative}
+.privacy-display .overview :is(.wd-calendar,.wd-loot,.wd-stats,.wd-currency,.wd-recent,.wd-games) .widget-body,
+.privacy-display .wp-grid :is(.wd-calendar,.wd-loot,.wd-stats,.wd-currency,.wd-recent,.wd-games) .widget-body {visibility:hidden;pointer-events:none}
+.privacy-display .overview :is(.wd-calendar,.wd-loot,.wd-stats,.wd-currency,.wd-recent,.wd-games)::after,
+.privacy-display .wp-grid :is(.wd-calendar,.wd-loot,.wd-stats,.wd-currency,.wd-recent,.wd-games)::after {
+  content:'Hidden in privacy mode';position:absolute;top:55%;left:10px;right:10px;
+  text-align:center;color:var(--ink-dim);font-size:.8rem;pointer-events:none
+}
+.privacy-toggle[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+@media(max-width:480px){.privacy-toggle{padding:4px 6px;font-size:.72rem}}
