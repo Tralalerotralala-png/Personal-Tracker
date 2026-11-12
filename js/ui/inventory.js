@@ -9,7 +9,7 @@ import {
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor } from '../data/tracking.js';
-import { t, locale } from './language.js';
+import { t, locale, language, categoryLabel } from './language.js';
 import { uuid } from '../data/util.js';
 import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 
@@ -47,7 +47,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
   const ctx = () => ({ items: data.items, locations: data.locations, categories: data.categories });
   const catById = () => indexById(data.categories);
-  const rarityLabel = (r) => data.rarityLabels?.[r]?.label ?? r;
+  const rarityLabel = (r) => t(data.rarityLabels?.[r]?.label ?? r);
   const pathOf = (item) => locationPath(data.locations, item.location_id);
   const metaOf = item => data.tracking[item.id] || {};
   const fieldsOf = item => itemFields(metaOf(item), categoryFields(data.categoryDefaults, item.category_id));
@@ -122,7 +122,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       h('span', { class: 'row-text' },
         h('span', { class: 'row-name' }, item.name,
           item.quantity > 1 && fieldsOf(item).quantity ? h('span', { class: 'row-qty' }, ` x${item.quantity}`) : null),
-        item.is_lost ? h('span', { class: 'lost-tag' }, 'Lost, last seen:') : null,
+        item.is_lost ? h('span', { class: 'lost-tag' }, t('Lost, last seen:')) : null,
         breadcrumb(item), barFor(item)));
   }
 
@@ -147,7 +147,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const stat = (value, label, cls = '') => h('div', { class: `stat ${cls}` }, h('b', {}, value), h('span', {}, label));
     statsEl.replaceChildren(
       stat(live.length, 'kinds'),
-      stat(pieces, 'pieces'),
+      stat(pieces, t('pieces')),
       stat(lost, 'lost', lost ? 'warn' : ''),
       stat(top, rarityLabel('legendary').toLowerCase(), 'gold'));
   }
@@ -170,14 +170,14 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         h('ul', {}, lost.slice(0, 3).map((i) => h('li', {},
           h('button', { class: 'quest', type: 'button', onclick: () => openItemSheet(i) },
             h('span', { class: 'quest-name' }, i.name),
-            h('span', { class: 'quest-meta' }, `lost ${daysSince(i.lost_since) ?? '?'} days, last seen: ${pathOf(i)}`))))),
+            h('span', { class: 'quest-meta' }, language() === 'es' ? `perdido hace ${daysSince(i.lost_since) ?? '?'} días, visto por última vez en: ${pathOf(i)}` : `lost ${daysSince(i.lost_since) ?? '?'} days, last seen: ${pathOf(i)}`))))),
         lost.length > 3 ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { state.lostOnly = true; renderAll(); } }, `Show all ${lost.length} lost items`) : null));
     }
     if (showing && loot) {
       blocks.push(h('button', { class: `loot r-${loot.rarity}`, type: 'button', onclick: () => openItemSheet(loot) },
         h('span', { class: 'loot-art' }, art(loot, 'art')),
         h('span', { class: 'loot-text' },
-          h('span', { class: 'loot-title' }, "Today's loot"),
+          h('span', { class: 'loot-title' }, t("Today's loot")),
           h('span', { class: 'loot-name' }, loot.name),
           breadcrumb(loot))));
     }
@@ -191,7 +191,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const catRow = h('div', { class: 'chip-row', role: 'group', 'aria-label': 'Filter by category' },
       chip('All', !state.category, () => { state.category = null; renderAll(); }),
-      data.categories.map((c) => chip(`${c.icon ? `${c.icon} ` : ''}${c.name}`, state.category === c.id,
+      data.categories.map((c) => chip(`${c.icon ? `${c.icon} ` : ''}${categoryLabel(c)}`, state.category === c.id,
         () => { state.category = state.category === c.id ? null : c.id; renderAll(); })));
 
     const rarityRow = h('div', { class: 'chip-row', role: 'group', 'aria-label': 'Filter by rarity' },
@@ -203,7 +203,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const placeChip = state.placeId
       ? h('button', { class: 'chip on place-chip', type: 'button', onclick: () => { state.placeId = null; renderAll(); } },
-        state.placeId === 'none' ? 'No place' : `In: ${locationPath(data.locations, state.placeId)}`, ' ×')
+        state.placeId === 'none' ? t('No place') : `${language() === 'es' ? 'En' : 'In'}: ${locationPath(data.locations, state.placeId)}`, ' ×')
       : null;
 
     replace(filtersEl, catRow, rarityRow, placeChip ? h('div', { class: 'filter-foot' }, placeChip) : null);
@@ -283,7 +283,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const category = h('select', { id: 'it-cat' },
       h('option', { value: '' }, 'No category'),
-      data.categories.map((c) => h('option', { value: c.id }, `${c.icon ? `${c.icon} ` : ''}${c.name}`)));
+      data.categories.map((c) => h('option', { value: c.id }, `${c.icon ? `${c.icon} ` : ''}${categoryLabel(c)}`)));
     category.value = existing?.category_id ?? '';
 
     // Checkbox values inherit the category unless the item explicitly overrides them.
