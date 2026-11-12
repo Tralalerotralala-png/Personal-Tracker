@@ -81,7 +81,7 @@ function buildPersonalHub({store, host}) {
   const wrap=h('div',{class:'hub'}), tabs=h('div',{class:'hub-tabs'}), panel=h('div',{class:'hub-panel'});
   wrap.append(tabs,panel);
   let active='alerts'; let hub, context, gamesLibrary, otherMedia;
-  const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',search:'Search',insights:'Insights',timeline:'Activity'};
+  const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',search:'Search',insights:'Insights',timeline:'Activity',review:'Weekly review'};
   host.append(wrap);
   async function reload() {
     hub=await loadHub(store);
@@ -216,7 +216,35 @@ function buildPersonalHub({store, host}) {
         h('strong',{},row.title),h('span',{class:'hint'},row.kind))),
       !rows.length?empty(es?'Todavía no hay actividad fechada.':'No dated activity yet.'):null];
   }
-  function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():active==='timeline'?drawTimeline():drawEntries(active)));}
+  function drawWeeklyReview(){
+    const es=locale().startsWith('es');
+    const now=new Date();
+    const today=[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
+    const since=new Date(now);since.setDate(since.getDate()-6);
+    const weekStart=[since.getFullYear(),String(since.getMonth()+1).padStart(2,'0'),String(since.getDate()).padStart(2,'0')].join('-');
+    const until=new Date(now);until.setDate(until.getDate()+7);
+    const nextWeek=[until.getFullYear(),String(until.getMonth()+1).padStart(2,'0'),String(until.getDate()).padStart(2,'0')].join('-');
+    const tasksDone=hub.task.filter(x=>x.done && (x.lastChangedAt||'').slice(0,10)>=weekStart).length;
+    const tasksOpen=hub.task.filter(x=>!x.done&&x.due&&x.due<=nextWeek).length;
+    const weekCosts=new Map();
+    for(const x of hub.expense)if(x.due>=weekStart&&x.due<=today)weekCosts.set(x.currency||'MXN',(weekCosts.get(x.currency||'MXN')||0)+(Number(x.amount)||0));
+    const games=(Array.isArray(gamesLibrary?.games)?gamesLibrary.games:[]).filter(x=>(x.lastOpened||'').slice(0,10)>=weekStart&&(x.lastOpened||'').slice(0,10)<=today);
+    const upcoming=context.events.filter(x=>!x.deleted_at&&(x.starts_at||'').slice(0,10)>=today&&(x.starts_at||'').slice(0,10)<=nextWeek);
+    return [h('h3',{},es?'Resumen semanal':'Weekly review'),
+      h('p',{class:'hint'},(es?'Últimos 7 días,':'Last 7 days,')+' '+weekStart+' – '+today),
+      h('div',{class:'hub-insights'},
+        ...[[es?'Tareas terminadas':'Tasks completed',tasksDone],[es?'Tareas pendientes':'Tasks due soon',tasksOpen],[es?'Juegos abiertos':'Games opened',games.length],[es?'Próximos eventos':'Upcoming events',upcoming.length]].map(([label,value])=>h('div',{class:'hub-stat'},h('b',{},value),h('span',{},label)))),
+      h('h4',{},es?'Gastos por moneda':'Expenses by currency'),
+      ...[...weekCosts].map(([currency,total])=>h('p',{},`${currency}: ${total.toLocaleString(locale(),{minimumFractionDigits:2,maximumFractionDigits:2})}`)),
+      !weekCosts.size?h('p',{class:'hint'},es?'Sin gastos registrados esta semana.':'No expenses recorded this week.'):null,
+      h('h4',{},es?'Juegos recientes':'Recently opened games'),
+      ...games.slice(0,8).map(x=>h('p',{},x.title)),
+      !games.length?h('p',{class:'hint'},es?'No hay juegos abiertos recientemente.':'No recently opened games.'):null,
+      h('h4',{},es?'Próximos eventos':'Coming up'),
+      ...upcoming.slice(0,8).map(x=>h('p',{},(x.starts_at||'').slice(0,10)+' · '+x.title)),
+      h('p',{class:'hint'},es?'El resumen usa registros existentes. No rastrea el tiempo de juego real ni convierte monedas.':'This uses existing records. It does not measure actual playtime or convert currencies.')];
+  }
+  function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():active==='timeline'?drawTimeline():active==='review'?drawWeeklyReview():drawEntries(active)));}
   reload().catch(error=>replace(panel,h('p',{class:'form-error'},error.message)));
   return {refresh:reload};
 }

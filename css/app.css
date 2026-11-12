@@ -1209,3 +1209,9 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .w-feed li {position:relative;padding-right:26px}
 .w-feed-save {position:absolute;right:0;top:0;padding:0 3px;border:0;background:transparent;color:var(--accent);font-size:1.05rem;cursor:pointer}
 .w-feed-save:focus-visible{outline:2px solid var(--accent)}
+
+.quick-capture-trigger {min-width:36px;padding-inline:10px;font-size:1.3rem}
+.quick-capture-form .quick-capture-money {display:flex;gap:10px;align-items:end}
+.quick-capture-money[hidden]{display:none}
+.quick-capture-money label{flex:1}
+@media(max-width:550px){.quick-capture-trigger{min-width:32px;padding-inline:5px}}

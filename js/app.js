@@ -22,6 +22,7 @@ import { loadHub, openPersonalHub, createPersonalHubView, startBrowserReminders 
 import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings } from './ui/settings.js';
+import { openQuickCapture } from './ui/quick-capture.js';
 
 const root = document.getElementById('app');
 let ctx;
@@ -330,9 +331,17 @@ document.addEventListener('keydown', e=>{
 });
 document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.target)) closeSearch(); });
 
+const captureButton = h('button',{class:'btn small ghost quick-capture-trigger',type:'button',
+  title:'Quick Capture (Ctrl+Shift+K)','aria-label':locale().startsWith('es')?'Captura rápida':'Quick Capture',
+  onclick:()=>openQuickCapture({store})},'+');
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='k'){
+    e.preventDefault();openQuickCapture({store});
+  }
+});
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
-  searchWrap, h('span', { class: 'spacer' }), skyBadge, pill,
+  searchWrap, captureButton, h('span', { class: 'spacer' }), skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
