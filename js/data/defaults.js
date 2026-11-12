@@ -12,7 +12,7 @@ export const DEFAULT_CATEGORIES = [
   { id: 'c0000000-0000-4000-8000-000000000004', name: 'Clothing & Gear', icon: '🥾', color: '#b07acc', sort_order: 4 },
   { id: 'c0000000-0000-4000-8000-000000000005', name: 'Household',      icon: '🏠', color: '#d97a6c', sort_order: 5 },
   { id: 'c0000000-0000-4000-8000-000000000006', name: 'Keepsakes',      icon: '⭐', color: '#e8d44d', sort_order: 6 },
-  { id: 'c0000000-0000-4000-8000-000000000007', name: 'Farmacia', icon: '💊', color: '#70b9a0', sort_order: 7 },
+  { id: 'c0000000-0000-4000-8000-000000000007', name: 'Pharmacy', icon: '💊', color: '#70b9a0', sort_order: 7 },
 ];
 
 export const DEFAULT_SETTINGS = {
