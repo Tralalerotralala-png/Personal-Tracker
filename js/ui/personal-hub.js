@@ -4,7 +4,7 @@ import { h, replace, openSheet, confirmDialog, toast } from './dom.js';
 import { uuid } from '../data/util.js';
 import { TRACKING_KEY, itemFields, categoryFields, attentionFor } from '../data/tracking.js';
 import { groupByDay, addDaysKey } from '../calendar/recurrence.js';
-import { t, locale } from './language.js';
+import { t, locale, categoryLabel } from './language.js';
 const TYPES = ['task','note','expense'];
 const keyFor = (type, id) => `hub_${type}:${id}`;
 const dateNow = () => new Date().toLocaleDateString('en-CA');
@@ -181,7 +181,7 @@ function buildPersonalHub({store, host}) {
   }
   function drawInsights(){
     const costs=hub.expense.reduce((n,row)=>n+(row.currency==='MXN'?Number(row.amount)||0:0),0);
-    const byCat=new Map();for(const row of context.items){const category=context.categories.get(row.category_id)?.name||'Uncategorized';byCat.set(category,(byCat.get(category)||0)+1);}
+    const byCat=new Map();for(const row of context.items){const category=categoryLabel(context.categories.get(row.category_id))||t('Uncategorized');byCat.set(category,(byCat.get(category)||0)+1);}
     return [h('h3',{},'Insights'),h('div',{class:'hub-insights'},
       ...[['Inventory items',context.items.length],['Tasks open',hub.task.filter(x=>!x.done).length],['Notes',hub.note.length],['Alerts',context.alerts.length],['Expenses tracked (MXN)',costs.toLocaleString('es-MX',{style:'currency',currency:'MXN'})]].map(([label,value])=>h('div',{class:'hub-stat'},h('b',{},value),h('span',{},label)))),
       h('h3',{},'Items by category'),...Array.from(byCat,([label,count])=>h('div',{class:'hub-row'},label,h('b',{},count))),
