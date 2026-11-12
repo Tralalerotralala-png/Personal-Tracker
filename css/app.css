@@ -1169,3 +1169,7 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .wx-sky-card .wx-event-symbol svg { width:22px;height:22px; }
 .wx-sky-card p { margin:9px 0; }
 .wx-sky-card a { color:var(--accent); }
+
+.backup-vault-overview { border:1px solid var(--edge);background:var(--panel);padding:10px;margin:10px 0; }
+.backup-vault-overview p { margin:6px 0;overflow-wrap:anywhere; }
+.backup-vault-overview a { color:var(--accent); }

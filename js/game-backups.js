@@ -83,5 +83,5 @@ export function createGameBackupService({client, store}) {
     if(error)throw new Error(`Could not delete backup: ${error.message}`);
     await store.setSetting(META_KEY,(await listAll()).filter(x=>x.id!==entry.id));
   }
-  return {userId,list,checkReady,upload,download,remove,storageUsed:async()=> (await listAll()).reduce((s,x)=>s+(Number(x.size)||0),0)};
+  return {userId,list,listAll,checkReady,upload,download,remove,storageUsed:async()=> (await listAll()).reduce((s,x)=>s+(Number(x.size)||0),0)};
 }

@@ -104,3 +104,11 @@ test('weather data confidence and expandable sky event details',()=>{
  assert.match(mud,/wx-sky-card/);
  assert.match(mud,/skyEventIconSvg\(kind\)/);
 });
+
+test('backup index can summarize tracked files without exposing true quota as a guess',()=>{
+ const panel=fs.readFileSync(new URL('../js/ui/game-backup-panel.js',import.meta.url),'utf8');
+ const service=fs.readFileSync(new URL('../js/game-backups.js',import.meta.url),'utf8');
+ assert.match(panel,/backup-vault-overview/);
+ assert.match(panel,/not all Supabase storage/);
+ assert.match(service,/return \{userId,list,listAll/);
+});

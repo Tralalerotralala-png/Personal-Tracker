@@ -18,7 +18,7 @@ export function createGameBackupPanel({backups,gameId}) {
  async function refresh(){
    try {
      await backups.checkReady(gameId); upload.disabled=false;
-     const rows=await backups.list(gameId);const used=await backups.storageUsed();
+     const rows=await backups.list(gameId);const all=await backups.listAll();const used=await backups.storageUsed();
      replace(entries,...(rows.length?rows.map(entry=>h('div',{class:'backup-entry'},
        h('div',{class:'backup-entry-meta'},h('strong',{},entry.name),h('small',{},`${entry.category} · ${size(entry.size)} · ${new Date(entry.createdAt).toLocaleString(language()==='es'?'es-MX':'en-US')}`),entry.notes?h('p',{},entry.notes):null),
        h('div',{class:'inline-actions'},
@@ -33,6 +33,16 @@ export function createGameBackupPanel({backups,gameId}) {
            if(!await confirmDialog({title:tr('Delete backup?','¿Eliminar copia?'),message:entry.name,confirmLabel:tr('Delete permanently','Eliminar para siempre'),danger:true}))return;
            try{await backups.remove(entry);status.textContent=tr('Backup deleted.','Copia eliminada.');await refresh();}catch(err){status.textContent=err.message;}
          }},tr('Delete','Eliminar'))))):[h('p',{class:'hint'},tr('No backups for this game yet.','Todavía no hay copias de este juego.'))]));
+     const summary=section.querySelector('.backup-vault-overview');
+     if(summary){
+       const biggest=[...all].sort((a,b)=>(Number(b.size)||0)-(Number(a.size)||0)).slice(0,3);
+       replace(summary,
+         h('strong',{},tr('Backup storage overview','Resumen de almacenamiento')),
+         h('p',{},tr(`${all.length} recorded backups · ${size(used)} total`,`${all.length} copias registradas · ${size(used)} en total`)),
+         biggest.length?h('p',{class:'hint'},tr('Largest: ','Más grandes: ')+biggest.map(x=>`${x.name} (${size(x.size)})`).join(' · ')):null,
+         h('p',{class:'hint'},tr('This counts indexed backups, not all Supabase storage. Check your actual quota in Supabase.','Esto solo cuenta las copias registradas, no todo el almacenamiento de Supabase. Consulta tu cuota real en Supabase.')),
+         h('a',{href:'https://supabase.com/dashboard',target:'_blank',rel:'noopener noreferrer'},tr('Open Supabase usage','Consultar uso en Supabase')));
+     }
      const usage=section.querySelector('.backup-usage');if(usage)usage.textContent=tr(`Tracked backups: ${size(used)}. Supabase plan quota is shared with other buckets.`,`Copias registradas: ${size(used)}. El espacio de Supabase se comparte con otros archivos.`);
    }catch(err){upload.disabled=true;status.textContent=err.message;}
  }
@@ -45,7 +55,7 @@ export function createGameBackupPanel({backups,gameId}) {
  });
  replace(section,h('h3',{},tr('Game save backups','Copias de partidas')),
    h('p',{class:'hint'},tr('Private Supabase Storage · versioned files · verified SHA-256 downloads. Files are not added to GitHub.','Almacenamiento privado de Supabase · versiones · descargas verificadas con SHA-256. Los archivos no se suben a GitHub.')),
-   h('p',{class:'backup-usage hint'}),entries,
+   h('div',{class:'backup-vault-overview'}),h('p',{class:'backup-usage hint'}),entries,
    h('div',{class:'backup-upload'},h('label',{},tr('File (25 MB max)','Archivo (máx. 25 MB)'),file),h('label',{},tr('Category','Categoría'),cat),notes,upload),status);
  refresh();
  return section;
