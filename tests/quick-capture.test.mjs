@@ -15,3 +15,8 @@ test('quick capture validates an expense amount',async()=>{
  const store=createStore({adapter:createMemoryAdapter()});
  await assert.rejects(saveQuickCapture(store,{kind:'expense',title:'Bad',date:'2026-11-12',amount:-1}),/valid amount/);
 });
+
+test('quick capture rejects blank expense amounts',async()=>{
+ const store=createStore({adapter:createMemoryAdapter()});
+ await assert.rejects(saveQuickCapture(store,{kind:'expense',title:'Unpriced',date:'2026-11-12',amount:''}),/valid amount/);
+});

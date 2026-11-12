@@ -8,7 +8,7 @@ export async function saveQuickCapture(store,{kind,title,body='',date,amount=nul
   if(!name)throw new Error('Enter a title.');
   if(!/^(task|note|expense|event)$/.test(kind))throw new Error('Unknown capture type.');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))throw new Error('Choose a valid date.');
-  if(kind==='expense'&&(!Number.isFinite(Number(amount))||Number(amount)<0))throw new Error('Enter a valid amount.');
+  if(kind==='expense'&&(amount===null||amount===''||!Number.isFinite(Number(amount))||Number(amount)<0))throw new Error('Enter a valid amount.');
   if(kind==='event')return store.upsert('events',{
     title:name,starts_at:date+'T00:00:00.000Z',ends_at:null,all_day:true,notes:String(body).slice(0,5000)||null,rrule:null
   });

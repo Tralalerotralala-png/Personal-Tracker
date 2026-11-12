@@ -46,11 +46,12 @@ export function parseRRule(text) {
   return { freq, interval, byday: byday?.length ? byday : null, count, until, bymonthday, exdates, exbefore };
 }
 
-export function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [], exbefore = null }) {
+export function buildRRule({ freq, interval = 1, byday = null, count = null, until = null, exdates = [], exbefore = null, bymonthday = null }) {
   if (!FREQS.includes(freq)) return null;
   const parts = [`FREQ=${freq}`];
   if (interval > 1) parts.push(`INTERVAL=${interval}`);
   if (freq === 'WEEKLY' && byday?.length) parts.push(`BYDAY=${[...byday].sort((a, b) => a - b).map((i) => WEEKDAYS[i]).join(',')}`);
+  if (bymonthday && freq === 'MONTHLY') parts.push(`BYMONTHDAY=${bymonthday}`);
   if (count) parts.push(`COUNT=${count}`);
   if (until) parts.push(`UNTIL=${until.replaceAll('-', '')}`);
   const exclusions = [...new Set(exdates)].filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();

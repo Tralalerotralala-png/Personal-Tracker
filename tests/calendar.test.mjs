@@ -193,3 +193,10 @@ test('delete from date retains earlier dates and original recurrence anchor',()=
  assert.deepEqual(occurrencesOf(limited,'2026-10-01','2026-10-15').map(o=>o.key),['2026-10-01','2026-10-02','2026-10-03','2026-10-04']);
  assert.equal(parseRRule(limited.rrule).until,'2026-10-04');
 });
+
+test('excluding dates keeps imported BYMONTHDAY monthly rules',()=>{
+ const original='FREQ=MONTHLY;BYMONTHDAY=15;COUNT=6';
+ const changed=excludeThrough(original,'2026-11-15');
+ assert.equal(parseRRule(changed).bymonthday,15);
+ assert.equal(parseRRule(changed).count,6);
+});
