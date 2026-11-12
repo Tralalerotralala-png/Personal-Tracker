@@ -11,6 +11,7 @@ import { openMudSettings } from './mud-settings.js';
 import { openSourcesSheet } from './feed.js';
 import { openLayoutEditor } from './layout-editor.js';
 import { openWallpaperSettings } from './wallpaper-settings.js';
+import { skyLighting } from '../weather/environment.js';
 
 export async function openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) {
   const { store, auth, mode } = ctx;
@@ -245,9 +246,58 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('label',{},language()==='es'?'Intensidad':'Glow intensity'),glowSlider,
     h('label',{class:'check'},skySmooth,language()==='es'?'Transiciones suaves':'Smooth transitions'),
     h('label',{class:'check'},skyEvents,language()==='es'?'Destacar eventos celestes':'Highlight sky events'));
+  // A sample palette and sky-light preview. No saved preference changes
+  // until Apply is pressed; the sample events are not local visibility claims.
+  const previewPalette=h('select',{'aria-label':'Preview palette'},
+    Object.entries(presets).map(([id,p])=>h('option',{value:id,selected:id===(presets[ui?.theme_preset]?'': 'classic')},p.name)));
+  previewPalette.value=presets[ui?.theme_preset]?ui.theme_preset:'classic';
+  const previewScene=h('select',{'aria-label':'Preview sky condition'},
+    [['current','Current sky'],['dawn','Dawn'],['day','Daylight'],['dusk','Sunset'],['night','Moonlight'],['meteor','Meteor shower'],['eclipse','Eclipse accent'],['off','No lighting']]
+      .map(([id,label])=>h('option',{value:id},label)));
+  const previewCard=h('div',{class:'theme-live-preview'},
+    h('div',{class:'theme-preview-panel'},
+      h('strong',{},language()==='es'?'Vista de ejemplo':'Example panel'),
+      h('p',{},language()==='es'?'Así se verían los colores y la iluminación.':'A sample of the colors and lighting.'),
+      h('span',{class:'theme-preview-action'},language()==='es'?'Botón':'Button')));
+  function updateThemePreview(){
+    const palette=presets[previewPalette.value]||presets.classic;
+    const scene=previewScene.value;
+    const dates={dawn:'2026-11-11T06:20:00Z',day:'2026-11-11T12:00:00Z',dusk:'2026-11-11T18:00:00Z',
+      night:'2026-11-11T23:00:00Z',meteor:'2026-11-17T23:00:00Z',eclipse:'2027-02-06T12:00:00Z'};
+    const date=new Date(dates[scene]||Date.now());
+    const key=date.toISOString().slice(0,10);
+    const simulated={place:{timezone:'UTC'},rows:[{date:key,raw:{sunrise:key+'T06:20',sunset:key+'T18:00'}}],
+      current:{is_day:scene==='night'||scene==='meteor'?0:1,cloud_cover:5,weather_code:0}};
+    const result=skyLighting(scene==='current'?weather.getState():simulated,
+      {sky_lighting_mode:scene==='off'?'off':'auto',sky_lighting_intensity:70},date);
+    const strength=result.opacity>0?Math.min(.55,.15+result.opacity*3):0;
+    previewCard.style.background=`radial-gradient(ellipse at 95% 8%,rgb(${result.rgb} / ${strength}),transparent 85%),${palette.background_color}`;
+    previewCard.style.setProperty('--preview-panel',palette.panel_color);
+    previewCard.style.setProperty('--preview-border',palette.border_color);
+    previewCard.style.setProperty('--preview-text',palette.text_color);
+    previewCard.style.setProperty('--preview-accent',palette.accent_color);
+  }
+  previewPalette.addEventListener('change',updateThemePreview);
+  previewScene.addEventListener('change',updateThemePreview);
+  updateThemePreview();
+  const applyThemePreview=h('button',{class:'btn small primary',type:'button',onclick:async()=>{
+    const id=previewPalette.value,preset=presets[id];
+    if(!preset)return;
+    await store.setSetting('ui',{...(await store.getSetting('ui')), ...Object.fromEntries(Object.entries(preset).filter(([k])=>k!=='name')),theme_preset:id});
+    accentColor.value=preset.accent_color;
+    customColors.forEach((field,i)=>{field.querySelector('input').value=preset[paletteColors[i][1]];});
+    window.dispatchEvent(new Event('tracker-theme-refresh'));updateChoices(id);
+    toast(language()==='es'?'Tema aplicado':'Theme applied');
+  }},language()==='es'?'Aplicar este tema':'Apply this theme');
+  const previewBlock=h('div',{class:'theme-preview-block'},
+    h('h4',{},language()==='es'?'Vista previa sin guardar':'Preview without saving'),
+    h('p',{class:'hint'},language()==='es'?'Cambia los ejemplos sin modificar tu tema actual.':'Try colors and sky effects without changing your saved theme.'),
+    h('div',{class:'theme-preview-controls'},previewPalette,previewScene),
+    previewCard,applyThemePreview);
+
   const display = h('section', { class: 'set-block' },
     h('h3', {}, 'Display'),
-    h('label', {}, t('Theme presets')), presetChoices, presetName, h('h4',{},language()==='es'?'Mis temas':'My saved themes'),savedThemes,saveTheme,
+    h('label', {}, t('Theme presets')), presetChoices, presetName, previewBlock, h('h4',{},language()==='es'?'Mis temas':'My saved themes'),savedThemes,saveTheme,
     h('label', {}, 'Desktop layout width'), layoutWidth,skyControls,
     h('label', {}, 'Accent color'), accentColor,
     h('p', { class: 'hint' }, 'Customize each part of the palette. Changes sync with your account.'), ...customColors,

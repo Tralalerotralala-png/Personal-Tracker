@@ -137,3 +137,11 @@ test('hub activity timeline excludes private logs and uses saved timestamps',()=
  assert.match(hub,/game\.lastOpened/);
  assert.match(hub,/item\.updated_at/);
 });
+
+test('appearance sample preview is not saved until user applies it',()=>{
+ const settings=fs.readFileSync(new URL('../js/ui/settings.js',import.meta.url),'utf8');
+ assert.match(settings,/Preview without saving/);
+ assert.match(settings,/updateThemePreview/);
+ assert.match(settings,/Apply this theme/);
+ assert.match(settings,/skyLighting\(scene==='current'/);
+});

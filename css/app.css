@@ -1181,3 +1181,11 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .hub-timeline-row time { font-size:.8rem;color:var(--ink-dim); }
 .hub-timeline-row strong { min-width:0;overflow-wrap:anywhere; }
 @media(max-width:650px){ .hub-timeline-row { grid-template-columns:1fr;gap:4px; } }
+
+.theme-preview-block {margin:12px 0;padding:12px;border:1px solid var(--edge); }
+.theme-preview-controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0; }
+.theme-live-preview {padding:14px;min-height:130px;border:1px solid var(--preview-border,var(--edge));color:var(--preview-text,var(--ink)); }
+.theme-preview-panel {padding:12px;background:var(--preview-panel,var(--panel));border:2px solid var(--preview-border,var(--edge)); }
+.theme-preview-panel p {margin:6px 0 10px;font-size:.85rem; }
+.theme-preview-action {display:inline-block;padding:5px 10px;background:var(--preview-accent,var(--accent));color:var(--preview-panel,var(--panel)); }
+@media(max-width:650px){.theme-preview-controls {grid-template-columns:1fr;}}
