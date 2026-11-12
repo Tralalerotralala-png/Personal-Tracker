@@ -120,3 +120,12 @@ test('read-only settings diagnostics never display credentials or personal recor
  assert.match(settings,/Private access check passed/);
  assert.match(settings,/\['diagnostics', 'Diagnostics'/);
 });
+
+test('search includes games and other media and supports keyboard navigation',()=>{
+ const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8');
+ assert.match(app,/game_library_v1/);
+ assert.match(app,/other_media_library_v1/);
+ assert.match(app,/searchResults\.querySelector\('button'\)/);
+ assert.match(app,/Keyboard shortcuts/);
+ assert.match(app,/Alt \+ 1/);
+});

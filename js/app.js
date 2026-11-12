@@ -269,8 +269,12 @@ async function renderGlobalSearch() {
   const seq = ++searchSeq;
   const query = globalSearchInput.value.trim().toLocaleLowerCase();
   if (!query) { searchResults.hidden = true; searchResults.replaceChildren(); return; }
-  const [items, events, places, hub] = await Promise.all([store.list('items'), store.list('events'), store.list('places'), loadHub(store)]);
+  const [items, events, places, hub, gameLibrary, otherMedia] = await Promise.all([
+    store.list('items'),store.list('events'),store.list('places'),loadHub(store),
+    store.getSetting('game_library_v1'),store.getSetting('other_media_library_v1')
+  ]);
   if (seq !== searchSeq) return;
+  const languageLabel=(en,es)=>locale().startsWith('es')?es:en;
   const entries = [
     ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory' })),
     ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar' })),
@@ -278,16 +282,52 @@ async function renderGlobalSearch() {
     ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', hub: true })),
     ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', hub: true })),
     ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', target: 'expenses' })),
+    ...(Array.isArray(gameLibrary?.games)?gameLibrary.games:[]).map(x=>({
+      type:languageLabel('Game','Juego'),title:x.title,detail:[x.platform,x.notes,x.status].filter(Boolean).join(' '),target:'games'
+    })),
+    ...['books','films','albums'].flatMap(kind=>(Array.isArray(otherMedia?.[kind])?otherMedia[kind]:[]).map(x=>({
+      type:languageLabel(kind==='books'?'Book':kind==='films'?'Film':'Album',kind==='books'?'Libro':kind==='films'?'Película':'Álbum'),
+      title:x.title,detail:[x.creator,x.notes,x.status].filter(Boolean).join(' '),target:'games'
+    }))),
   ];
   const found = entries.filter(x => `${x.title || ''} ${x.detail} ${x.type}`.toLocaleLowerCase().includes(query)).slice(0, 12);
   searchResults.replaceChildren(...(found.length ? found.map(entry => h('button', { class: 'global-search-result', type: 'button', role: 'option', onclick: () => {
-    searchResults.hidden = true; globalSearchInput.value = '';
+    closeSearch();
     if (entry.hub) openPersonalHub({ store }); else location.hash = `#${entry.target}`;
   } }, h('span', {}, entry.title || entry.type), h('small', {}, entry.type))) : [h('p', { class: 'hint' }, t('No matching results.'))]));
   searchResults.hidden = false;
 }
 globalSearchInput.addEventListener('input', () => { renderGlobalSearch().catch(() => { searchResults.hidden = true; }); });
-globalSearchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.hidden = true; globalSearchInput.blur(); } });
+globalSearchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeSearch(); globalSearchInput.blur(); }
+  if (e.key === 'Enter' && !searchResults.hidden) { e.preventDefault(); searchResults.querySelector('button')?.click(); }
+  if (e.key === 'ArrowDown' && !searchResults.hidden) { e.preventDefault(); searchResults.querySelector('button')?.focus(); }
+});
+searchResults.addEventListener('keydown', e=>{
+  if(!['ArrowUp','ArrowDown'].includes(e.key))return;
+  e.preventDefault();
+  const buttons=[...searchResults.querySelectorAll('button')];
+  const index=buttons.indexOf(document.activeElement);
+  const next=e.key==='ArrowDown'?index+1:index-1;
+  if(next<0){globalSearchInput.focus();return;}
+  buttons[Math.min(next,buttons.length-1)]?.focus();
+});
+document.addEventListener('keydown', e=>{
+  if(e.defaultPrevented||e.ctrlKey||e.metaKey)return;
+  const target=e.target;
+  if(target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+  if(document.querySelector('dialog[open]'))return;
+  if(e.altKey&&/^[1-9]$/.test(e.key)){
+    const page=NAV[Number(e.key)-1]?.[0];
+    if(page){e.preventDefault();location.hash='#'+page;}
+  }else if(!e.altKey&&e.key==='?'){
+    e.preventDefault();
+    openSheet({title:locale().startsWith('es')?'Atajos de teclado':'Keyboard shortcuts',size:'small',body:h('div',{class:'prose'},
+      h('p',{},'Ctrl/⌘ + K: ',locale().startsWith('es')?'Buscar':'Search'),
+      h('p',{},'Alt + 1–9: ',locale().startsWith('es')?'Abrir una sección de la barra lateral':'Open the corresponding navigation section'),
+      h('p',{},'Esc: ',locale().startsWith('es')?'Cerrar búsqueda':'Close search'))});
+  }
+});
 document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.target)) closeSearch(); });
 
 const header = h('header', { class: 'top' },
