@@ -339,36 +339,14 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();openQuickCapture({store});
   }
 });
-// A device-local display mask, never stored as a cloud setting or sent to the
-// wallpaper. This hides visible dashboard details, but is not data encryption.
-const PRIVACY_DISPLAY_KEY='tracker-privacy-display-v1';
-const privateDisplay=(()=>{try{return localStorage.getItem(PRIVACY_DISPLAY_KEY)==='1';}catch{return false;}})();
-const privacyNotice=h('p',{class:'privacy-notice',role:'status',hidden:!privateDisplay},locale().startsWith('es')?'Contenido oculto. Pulsa Mostrar contenido para volver.':'Content hidden. Select Show content to return.');
-function applyPrivacy(enabled){
-  document.documentElement.classList.toggle('privacy-display',enabled);
-  main.inert=enabled;
-  main.setAttribute('aria-hidden',String(enabled));
-  searchWrap.inert=enabled;
-  privacyNotice.hidden=!enabled;
-  const label=locale().startsWith('es')?(enabled?'Mostrar contenido':'Ocultar contenido'):(enabled?'Show content':'Hide content');
-  privacyButton.textContent=label;
-  privacyButton.setAttribute('aria-label',label);
-  privacyButton.setAttribute('aria-pressed',String(enabled));
-}
-const privacyButton=h('button',{class:'btn small ghost privacy-toggle',type:'button',
-  title:'Hide page content on this screen; this does not lock or encrypt your data.',onclick:()=>{
-    const enabled=!document.documentElement.classList.contains('privacy-display');
-    applyPrivacy(enabled);
-    try{localStorage.setItem(PRIVACY_DISPLAY_KEY,enabled?'1':'0');}catch{}
-  }});
-applyPrivacy(privateDisplay);
+try { localStorage.removeItem('tracker-privacy-display-v1'); } catch {}
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
-  searchWrap, captureButton, h('span', { class: 'spacer' }), privacyButton, skyBadge, pill,
+  searchWrap, captureButton, h('span', { class: 'spacer' }), skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-root.replaceChildren(header, privacyNotice, main, nav);
+root.replaceChildren(header, main, nav);
 startTranslations(document.body);
 
 const mounted = new Set();

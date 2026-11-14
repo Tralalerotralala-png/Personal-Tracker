@@ -1242,8 +1242,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
   content:'Hidden in privacy mode';position:absolute;top:55%;left:10px;right:10px;
   text-align:center;color:var(--ink-dim);font-size:.8rem;pointer-events:none
 }
-.privacy-toggle[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
-@media(max-width:480px){.privacy-toggle{padding:4px 6px;font-size:.72rem}}
 
 .delete-scope-choices{display:grid;gap:7px;margin:12px 0}
 .delete-scope-option{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--edge);cursor:pointer}
@@ -1361,8 +1359,3 @@ html[data-layout-width="compact"] main{max-width:1100px}
 
 .health-panel form{display:grid;gap:12px;margin-bottom:24px}.health-panel label{display:grid;gap:6px}.health-panel input,.health-panel select{max-width:100%;min-width:0}.health-dose{padding:12px 0;border-bottom:1px solid currentColor;overflow-wrap:anywhere}.health-dose .btn{margin:4px}
 
-/* App-wide screen privacy; wallpaper retains its selective widget mask. */
-.privacy-display #main{visibility:hidden;pointer-events:none}
-.privacy-display .global-search{visibility:hidden;pointer-events:none}
-.privacy-notice{padding:24px;text-align:center;border:1px solid var(--edge);margin:16px}
-.privacy-notice[hidden]{display:none}
