@@ -348,29 +348,50 @@ export function glyphSvg(name) {
 export function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
   const kind = weatherGlyph(code).glyph;
   const px = (x,y,w,h,color,cls='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"${cls?` class="${cls}"`:''}/>`;
-  const sun = [px(5,1,4,3,'#ffc75b'),px(3,5,8,7,'#ffd875'),px(0,7,2,2,'#ffb446'),px(5,14,4,2,'#ffb446'),px(12,7,2,2,'#ffb446'),px(6,0,2,1,'#ffb446')].join('');
+  // A layered 24px pixel sun: crisp stepped circular disk, warm orange rim,
+  // bright golden center and eight separate chunky rays.
+  const sunRays = [
+    px(11,0,3,3,'#ffad22'),px(12,0,2,2,'#ffda38'),
+    px(11,21,3,3,'#ffad22'),px(12,21,2,2,'#ffda38'),
+    px(0,11,3,3,'#ffad22'),px(0,12,2,2,'#ffda38'),
+    px(21,11,3,3,'#ffad22'),px(21,12,2,2,'#ffda38'),
+    px(3,3,4,3,'#ffa524'),px(4,3,2,3,'#ffd52c'),
+    px(17,3,4,3,'#ffa524'),px(18,3,2,3,'#ffd52c'),
+    px(3,18,4,3,'#ffa524'),px(4,18,2,3,'#ffd52c'),
+    px(17,18,4,3,'#ffa524'),px(18,18,2,3,'#ffd52c')
+  ].join('');
+  const sunDiskRows = [
+    [5,7,10],[6,5,14],[7,4,16],[8,3,18],[9,3,18],
+    [10,2,20],[11,2,20],[12,2,20],[13,2,20],
+    [14,3,18],[15,3,18],[16,4,16],[17,5,14],[18,7,10]
+  ];
+  const sunDisk = sunDiskRows.map(([y,x,w]) =>
+    px(x,y,w,1,'#f4a323') +
+    px(x+1,y,Math.max(1,w-2),1,'#ffcb29') +
+    (y>=8 && y<=15 ? px(x+3,y,Math.max(1,w-7),1,'#ffda37') : '')
+  ).join('');
+  const sun = `<g class="wx-sun-art">${sunRays}${sunDisk}</g>`;
   const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="16" height="16" ');
   const cloud = `<g class="wx-cloud-layer">${[px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('')}</g>`;
   const drizzle = [0,1,2].map((i)=>px(12+i*6,20+(i%2),2,3,'#6fb9e9','wx-rain-drop')).join('');
   const storm = px(17,17,4,3,'#ffe183')+px(15,20,3,4,'#ffd15b');
-  const rays = [px(5,1,4,3,'#ffd166'),px(3,5,8,7,'#ffe08d'),px(1,7,2,2,'#f9a442'),px(13,7,2,2,'#f9a442'),px(6,15,2,2,'#f9a442')].join('');
   const fog = `<g class="wx-fog-layer">${[8,12,16].map((y,i)=>px(5+(i%2),y,22,2,'#abaed5')).join('')}</g>`;
   const bg = night ? moon : sun;
   let content = '';
   if (kind==='sun') content=bg;
-  else if (kind==='partly') content=bg+cloud;
+  else if (kind==='partly') content=(night ? moon : `<g transform="translate(0 0) scale(.72)">${sun}</g>`)+cloud;
   else if (kind==='cloud') content=cloud;
   else if (kind==='fog') content=fog;
   else if (kind==='rain') content=cloud+drizzle;
   else if (kind==='storm') content=cloud+storm+drizzle;
   else if (kind==='snow') content=cloud+[0,1,2].map(i=>px(13+i*6,21,2,2,'#eff8ff')).join('');
-  else content=rays;
+  else content=night ? moon : sun;
   // All symbols share one 32x26 artboard. Center the *visible* rectangles,
   // not just the SVG element: clouds, fog, sun and rain have different bounds.
   // Moon contains its own SVG and already uses the 16px coordinate system.
   const bounds = {
-    sun: [0, 0, night ? 16 : 14, night ? 16 : 16],
-    partly: [0, 0, 28, 19],
+    sun: [0, 0, night ? 16 : 24, night ? 16 : 24],
+    partly: [0, 0, 28, 24],
     cloud: [8, 5, 28, 19],
     fog: [5, 8, 27, 18],
     rain: [8, 5, 28, 24],
