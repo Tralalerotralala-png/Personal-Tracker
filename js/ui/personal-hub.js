@@ -14,7 +14,11 @@ const REMINDER_KEY='notification_preferences';
 const notificationDay=(d)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
 export function dueBrowserReminders({tasks=[],events=[],now=new Date(),leadMinutes=10}={}){
   const result=[],ms=now.getTime(),lead=Math.max(0,Math.min(120,Number(leadMinutes)||0))*60000;
-  for(const event of events){
+  const day=notificationDay(now);
+  const expanded=groupByDay(events,addDaysKey(day,-1),addDaysKey(day,1));
+  const occurrences=[...expanded.values()].flat();
+  for(const occurrence of occurrences){
+    const event={...occurrence.event,starts_at:occurrence.start.toISOString()};
     const start=Date.parse(event.starts_at||'');
     if(!event.all_day&&!event.deleted_at&&Number.isFinite(start)&&ms>=start-lead&&ms<start+300000)result.push({key:'event:'+event.id+':'+event.starts_at,kind:'event'});
   }

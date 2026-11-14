@@ -205,6 +205,18 @@ function groupByDay(events, fromKey, toKey) {
 }
 Object.assign(__exports, { keyOf, todayKeyLocal, parseKey, addDaysKey, weekdayOfKey, daysBetweenKeys, parseRRule, buildRRule, describeRRule, excludeOccurrence, excludeThrough, excludeFrom, startParts, occurrencesOf, groupByDay });
 });
+__define("js/data/daily-loot.js", function (__require, __exports) {
+"use strict";
+// Stable civil-day rotation: each available item appears once per cycle.
+// Sorting IDs makes the result independent of database query ordering.
+function dailyLoot(items, date = new Date()) {
+  const pool = items.filter(i => !i.is_lost && !i.deleted_at).slice().sort((a,b) => String(a.id).localeCompare(String(b.id)));
+  if (!pool.length) return null;
+  const day = Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()) / 86400000);
+  return pool[((day % pool.length) + pool.length) % pool.length];
+}
+Object.assign(__exports, { dailyLoot });
+});
 __define("js/data/defaults.js", function (__require, __exports) {
 "use strict";
 const { DEFAULT_MUD_PARAMS } = __require("js/weather/mud.js");
@@ -1476,12 +1488,13 @@ function startTranslations(root = document.body) {
   observer?.disconnect();
   const visit = node => {
     if (node.nodeType === 3) {
+      if(node.parentElement?.closest('[data-user-content]')) return;
       const original = node.__originalEnglish ?? node.nodeValue;
       if (!node.__originalEnglish) node.__originalEnglish = original;
       const trimmed = original.trim();
       if (translations.has(trimmed)) node.nodeValue = original.replace(trimmed, t(trimmed));
     } else if (node.nodeType === 1) {
-      if (['SCRIPT','STYLE','TEXTAREA'].includes(node.tagName)) return;
+      if (['SCRIPT','STYLE','TEXTAREA'].includes(node.tagName) || node.hasAttribute('data-user-content')) return;
       for (const attr of ['placeholder','aria-label','title']) {
         const key = '__original_' + attr;
         const original = node[key] || node.getAttribute(attr);
@@ -3331,7 +3344,7 @@ const { mountCurrency } = __require("js/widgets/currency.js");
 const { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
-const { hash32 } = __require("js/ui/pixel-icon.js");
+const { dailyLoot } = __require("js/data/daily-loot.js");
 const { timeAgo } = __require("js/ui/format.js");
 const { articleKey, readingIndex, updateReading } = __require("js/feed/reading.js");
 const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
@@ -3344,15 +3357,23 @@ const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui
 // Render now, and again (at most once per frame) whenever something it
 // depends on changes. `subscribe(run)` returns the unsubscribe functions.
 function live(render, subscribe) {
-  let dead = false;
-  let queued = false;
+  let dead = false, queued = false, running = false, dirty = false;
   const run = () => {
-    if (dead || queued) return;
+    if (dead) return;
+    if (running) { dirty = true; return; }
+    if (queued) return;
     queued = true;
-    requestAnimationFrame(async () => { queued = false; if (!dead) await render(); });
+    requestAnimationFrame(async () => {
+      queued = false;
+      if (dead) return;
+      running = true;
+      try { await render(); }
+      catch (error) { console.warn('Widget refresh failed', error); }
+      finally { running = false; if (dirty) { dirty = false; run(); } }
+    });
   };
   const unsubs = subscribe(run) ?? [];
-  Promise.resolve(render());
+  run();
   return { destroy() { dead = true; unsubs.forEach((u) => u && u()); }, refresh: run };
 }
 
@@ -3473,22 +3494,16 @@ function mountCalendar(el, { store, weather }) {
 
 // ---- loot and lost quests --------------------------------------------------------------------
 
-function mountLoot(el, { store, showPlaces = true }) {
+function mountLoot(el, { store, showPlaces = true, interactive = false }) {
   const render = async () => {
     const [items, locations] = await Promise.all([store.list('items'), store.list('locations')]);
     const lost = items.filter((i) => i.is_lost);
-    const pool = items.filter((i) => !i.is_lost);
-    const key = todayKeyLocal();
-    const todayIndex = pool.length ? hash32(`loot-${key}`) % pool.length : -1;
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
-    const previousIndex = pool.length ? hash32(`loot-${yesterdayKey}`) % pool.length : -1;
-    const loot = pool.length ? pool[pool.length > 1 && todayIndex === previousIndex ? (todayIndex + 1) % pool.length : todayIndex] : null;
+    const loot = dailyLoot(items);
     if (!items.length) return replace(el, note('No items yet. Add some in the Pack tab.'));
     // On the wallpaper, where things are stored is hidden unless you turned that on.
     const where = (i) => (showPlaces ? locationPath(locations, i.location_id) : null);
     replace(el, h('div', { class: 'w-loot' },
-      loot ? h('div', { class: `w-loot-today r-${loot.rarity}` }, h('span', { class: 'w-k' }, "Today's loot"), h('b', {}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
+      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, "Today's loot"), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
       lost.length ? h('div', { class: 'w-lost' }, h('span', { class: 'w-k warn' }, lost.length === 1 ? '1 lost quest' : `${lost.length} lost quests`),
         lost.slice(0, 3).map((i) => {
           const days = daysSince(i.lost_since);
@@ -3628,7 +3643,7 @@ function createWidgetCard(id, ctx, { link = false } = {}) {
       ? h('button', { class: 'widget-title widget-title-action', type: 'button', onclick: openPhraseHistory }, def.title)
       : h('span', { class: 'widget-title' }, def.title);
   const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title), body);
-  const inst = mountWidget(id, body, ctx);
+  const inst = mountWidget(id, body, { ...ctx, interactive: link });
   return { el, destroy: () => inst.destroy() };
 }
 Object.assign(__exports, { mountWidget, createWidgetCard });

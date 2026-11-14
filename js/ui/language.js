@@ -217,12 +217,13 @@ export function startTranslations(root = document.body) {
   observer?.disconnect();
   const visit = node => {
     if (node.nodeType === 3) {
+      if(node.parentElement?.closest('[data-user-content]')) return;
       const original = node.__originalEnglish ?? node.nodeValue;
       if (!node.__originalEnglish) node.__originalEnglish = original;
       const trimmed = original.trim();
       if (translations.has(trimmed)) node.nodeValue = original.replace(trimmed, t(trimmed));
     } else if (node.nodeType === 1) {
-      if (['SCRIPT','STYLE','TEXTAREA'].includes(node.tagName)) return;
+      if (['SCRIPT','STYLE','TEXTAREA'].includes(node.tagName) || node.hasAttribute('data-user-content')) return;
       for (const attr of ['placeholder','aria-label','title']) {
         const key = '__original_' + attr;
         const original = node[key] || node.getAttribute(attr);

@@ -1,7 +1,8 @@
+import { dailyLoot } from '../data/daily-loot.js';
 // The Inventory tab: "Where is it?" search, lost-item quests, the slot grid,
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
-import { pixelIconSvg, hash32 } from './pixel-icon.js';
+import { pixelIconSvg } from './pixel-icon.js';
 import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
   searchItems, locationPath, locationPathParts, indexById, descendantIds,
@@ -155,13 +156,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   function renderQuests() {
     const lost = data.items.filter((i) => i.is_lost);
     const showing = !state.q && !state.category && !state.rarities.size && !state.placeId && !state.lostOnly;
-    const live = data.items.filter((i) => !i.is_lost);
-    const day = todayKeyLocal();
-    const todayIndex = live.length ? hash32(`loot-${day}`) % live.length : -1;
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = todayKeyLocal(yesterday);
-    const previousIndex = live.length ? hash32(`loot-${yesterdayKey}`) % live.length : -1;
-    const loot = live.length ? live[live.length > 1 && todayIndex === previousIndex ? (todayIndex + 1) % live.length : todayIndex] : null;
+    const loot = dailyLoot(data.items);
 
     const blocks = [];
     if (showing && lost.length) {
@@ -178,7 +173,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         h('span', { class: 'loot-art' }, art(loot, 'art')),
         h('span', { class: 'loot-text' },
           h('span', { class: 'loot-title' }, t("Today's loot")),
-          h('span', { class: 'loot-name' }, loot.name),
+          h('span', { class: 'loot-name', 'data-user-content':'true' }, loot.name),
           breadcrumb(loot))));
     }
     questsEl.replaceChildren(...blocks);
@@ -592,9 +587,20 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     requestAnimationFrame(async () => { queued = false; await refresh(); });
   });
 
+  let lastDay = todayKeyLocal();
+  function checkDay() { const day=todayKeyLocal(); if(day!==lastDay && el.isConnected && !el.hidden){lastDay=day;renderQuests();} }
+  const dayTimer=setInterval(checkDay,30000);
+  window.addEventListener('focus',checkDay);
+  async function show() {
+    await refresh(); renderPane(); checkDay();
+    const id=sessionStorage.getItem('tracker-open-item');
+    if(id){sessionStorage.removeItem('tracker-open-item');const item=data.items.find(i=>i.id===id);if(item)openItemSheet(item);}
+  }
   return {
     el,
-    async mount() { await refresh(); renderPane(); },
+    mount: show,
+    show,
+    destroy(){clearInterval(dayTimer);window.removeEventListener('focus',checkDay);},
     focusSearch: () => searchInput.focus(),
   };
 }

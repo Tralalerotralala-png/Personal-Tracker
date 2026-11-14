@@ -59,10 +59,12 @@ test('config: the property names match the project file Wallpaper Engine reads',
   const probe = Object.fromEntries(Object.keys(props).map((k) => [k, { value: props[k].value }]));
   const parsed = fromProperties(probe);
   // every property in the file must be understood by the code
-  for (const k of ['supabaseurl', 'anonkey', 'wallpaperkey', 'refreshminutes', 'textscale', 'margin', 'scanlines', 'accentcolor']) {
+  for (const k of ['supabaseurl', 'anonkey', 'wallpaperkey', 'refreshminutes', 'textscale', 'margin', 'scanlines', 'accentcolor', 'privacymode']) {
     assert.ok(k in props, `project.json is missing ${k}`);
   }
-  assert.equal(Object.keys(props).length, 8);
+  assert.equal(Object.keys(props).length, 9);
+  assert.equal(parsed.privacyMode, false);
+  assert.equal(fromProperties({privacymode:{value:true}}).privacyMode,true);
   assert.equal(parsed.refreshMinutes, 10);
   assert.equal(parsed.accent, '#43b9ad');
   const orders = Object.values(props).map((p) => p.order);

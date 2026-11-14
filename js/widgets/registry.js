@@ -9,7 +9,7 @@ import { mountCurrency } from './currency.js';
 import { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
 import { locationPath } from '../data/inventory-logic.js';
-import { hash32 } from '../ui/pixel-icon.js';
+import { dailyLoot } from '../data/daily-loot.js';
 import { timeAgo } from '../ui/format.js';
 import {articleKey,readingIndex,updateReading} from '../feed/reading.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
@@ -22,15 +22,23 @@ import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily
 // Render now, and again (at most once per frame) whenever something it
 // depends on changes. `subscribe(run)` returns the unsubscribe functions.
 function live(render, subscribe) {
-  let dead = false;
-  let queued = false;
+  let dead = false, queued = false, running = false, dirty = false;
   const run = () => {
-    if (dead || queued) return;
+    if (dead) return;
+    if (running) { dirty = true; return; }
+    if (queued) return;
     queued = true;
-    requestAnimationFrame(async () => { queued = false; if (!dead) await render(); });
+    requestAnimationFrame(async () => {
+      queued = false;
+      if (dead) return;
+      running = true;
+      try { await render(); }
+      catch (error) { console.warn('Widget refresh failed', error); }
+      finally { running = false; if (dirty) { dirty = false; run(); } }
+    });
   };
   const unsubs = subscribe(run) ?? [];
-  Promise.resolve(render());
+  run();
   return { destroy() { dead = true; unsubs.forEach((u) => u && u()); }, refresh: run };
 }
 
@@ -151,22 +159,16 @@ function mountCalendar(el, { store, weather }) {
 
 // ---- loot and lost quests --------------------------------------------------------------------
 
-function mountLoot(el, { store, showPlaces = true }) {
+function mountLoot(el, { store, showPlaces = true, interactive = false }) {
   const render = async () => {
     const [items, locations] = await Promise.all([store.list('items'), store.list('locations')]);
     const lost = items.filter((i) => i.is_lost);
-    const pool = items.filter((i) => !i.is_lost);
-    const key = todayKeyLocal();
-    const todayIndex = pool.length ? hash32(`loot-${key}`) % pool.length : -1;
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
-    const previousIndex = pool.length ? hash32(`loot-${yesterdayKey}`) % pool.length : -1;
-    const loot = pool.length ? pool[pool.length > 1 && todayIndex === previousIndex ? (todayIndex + 1) % pool.length : todayIndex] : null;
+    const loot = dailyLoot(items);
     if (!items.length) return replace(el, note('No items yet. Add some in the Pack tab.'));
     // On the wallpaper, where things are stored is hidden unless you turned that on.
     const where = (i) => (showPlaces ? locationPath(locations, i.location_id) : null);
     replace(el, h('div', { class: 'w-loot' },
-      loot ? h('div', { class: `w-loot-today r-${loot.rarity}` }, h('span', { class: 'w-k' }, "Today's loot"), h('b', {}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
+      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, "Today's loot"), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
       lost.length ? h('div', { class: 'w-lost' }, h('span', { class: 'w-k warn' }, lost.length === 1 ? '1 lost quest' : `${lost.length} lost quests`),
         lost.slice(0, 3).map((i) => {
           const days = daysSince(i.lost_since);
@@ -306,6 +308,6 @@ export function createWidgetCard(id, ctx, { link = false } = {}) {
       ? h('button', { class: 'widget-title widget-title-action', type: 'button', onclick: openPhraseHistory }, def.title)
       : h('span', { class: 'widget-title' }, def.title);
   const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title), body);
-  const inst = mountWidget(id, body, ctx);
+  const inst = mountWidget(id, body, { ...ctx, interactive: link });
   return { el, destroy: () => inst.destroy() };
 }

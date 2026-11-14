@@ -1,3 +1,4 @@
+import { openMedications } from './medications.js';
 // The Calendar tab: a month grid with a mud dot on every day that has a
 // forecast, the next two weeks as a list, and add / edit / import of events.
 import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
@@ -109,7 +110,7 @@ export function createCalendarView({ store, weather }) {
           h('button', { class: 'btn small', type: 'button', 'aria-label': 'Next month', onclick: () => shift(1) }, 'Next'))),
       h('div', { class: 'inline-actions' },
         h('button', { class: 'btn primary', type: 'button', onclick: () => openEventSheet({ dateKey: todayKey() }) }, 'Add event'),
-        h('button', { class: 'btn', type: 'button', onclick: openImportSheet }, 'Import calendar')),
+        h('button', { class: 'btn', type: 'button', onclick: openImportSheet }, 'Import calendar'), h('button', {class:'btn', type:'button', onclick:()=>openMedications(store)}, 'Medications & health')),
       monthGrid(),
       h('p', { class: 'cal-legend' }, 'Coloured squares show the mud forecast: ',
         ['Dry', 'Tacky', 'Muddy', 'Swamp'].map((l) => h('span', { class: `legend ${mudClass(l)}` }, h('i', {}), l))),
