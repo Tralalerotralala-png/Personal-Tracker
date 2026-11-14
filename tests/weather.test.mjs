@@ -10,6 +10,7 @@ import {
   todayInTimezone, WeatherError, PAST_DAYS, FORECAST_DAYS, DAILY_VARS, SOIL_VARS,
 } from '../js/weather/open-meteo.js';
 import { createWeatherService } from '../js/weather/service.js';
+import { moonPhaseSvg } from '../js/weather/moon-phase.js';
 import { createStore } from '../js/data/store.js';
 import { createMemoryAdapter } from '../js/data/adapters.js';
 
@@ -383,4 +384,21 @@ test('service: changing the place fetches again', async () => {
   const n = fetchImpl.calls.length;
   await svc.setPlace({ ...berlin, name: 'Hamburg', label: 'Hamburg, Germany', lat: 53.55, lon: 9.99 });
   assert.equal(fetchImpl.calls.length, n + 2);
+});
+
+test('moon icons: new is dark, full is bright, and quarters light opposite sides', () => {
+  const ref = Date.UTC(2000, 0, 6, 18, 14);
+  const synodic = 29.530588853 * 86400000;
+  const icon = (fraction) => moonPhaseSvg(new Date(ref + fraction * synodic));
+  const illuminated = (svg) => [...svg.matchAll(/<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="1"/g)]
+    .map(([, x, y, width]) => ({ x: Number(x), y: Number(y), width: Number(width) }));
+  const newMoon = illuminated(icon(0));
+  const fullMoon = illuminated(icon(0.5));
+  const firstQuarter = illuminated(icon(0.25));
+  const lastQuarter = illuminated(icon(0.75));
+  assert.equal(newMoon.length, 0, 'new moon should have no illuminated pixels');
+  assert.ok(fullMoon.reduce((sum, row) => sum + row.width, 0) > 100, 'full moon should be bright');
+  assert.ok(firstQuarter.every(row => row.x >= 8), 'waxing quarter should light the right');
+  assert.ok(lastQuarter.every(row => row.x + row.width <= 8), 'waning quarter should light the left');
+  assert.ok(illuminated(icon(0.125)).length < fullMoon.length, 'crescent should be less illuminated than full');
 });
