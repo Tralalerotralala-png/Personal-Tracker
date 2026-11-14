@@ -1298,7 +1298,7 @@ const pairs = [
  ['Sunny','Soleado'],['Clear sky','Cielo despejado'],['Partly cloudy','Parcialmente nublado'],
  ['Cloudy','Nublado'],['Overcast','Cubierto'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
  ['Snow','Nieve'],['Thunderstorm','Tormenta eléctrica'],['Fog','Niebla'],['Storms','Tormentas'],
- ['Mud forecast','Pronóstico del terreno'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['LOCAL TIME','HORA LOCAL'],
+ ['Mud forecast','Pronóstico del terreno'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
  ['Change place','Cambiar lugar'],['Choose a place','Elegir lugar'],['Refresh','Actualizar'],
  ['Items','Objetos'],['Places','Lugares'],['Add an item','Agregar objeto'],['Add item','Agregar objeto'],
  ['Clear filters','Borrar filtros'],['No items match these filters.','Ningún objeto coincide con estos filtros.'],
@@ -3461,12 +3461,12 @@ function mountMud(el, { weather, store }) {
             h('span', { class: 'w-forecast-condition' }, localizedWeather(icon.text)),
             h('strong', {}, temperature),
             h('small', {}, precipitation),
-            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`),mudBar(r));
+            h('small', { class: 'w-forecast-ground' }, `${localizedMudLabel(r.label)} ${r.index}/100`), (() => { const meter = mudBar(r); for (const fill of meter.querySelectorAll('.blk-fill')) fill.style.setProperty('--segment-fill', (parseFloat(fill.style.width) || 0) / 100); return meter; })());
         })));
     })();
     replace(el, h('div', { class: 'w-mud w-mud-dashboard' },
       h('div', { class: 'w-weather-top' }, localClock, wx),
-      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, t('MUD OUTLOOK')), forecast)));
+      h('div', { class: 'w-mud-bottom' }, h('span', { class: 'w-section-label' }, t('WEATHER OUTLOOK')), forecast)));
   };
   let run = () => {};
   const inst = live(render, (trigger) => {
@@ -3506,7 +3506,8 @@ function mountCalendar(el, { store, weather }) {
           dm ? h('button', { type:'button', class: 'w-agenda-ground',
             title: `${localizedMudLabel(dm.label)} ${dm.index}/100`,
             'aria-label': `${localizedMudLabel(dm.label)} ${dm.index} ${language()==='es' ? 'de' : 'out of'} 100. ${language()==='es' ? 'Abrir día' : 'Open day'} ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) }, mudBar(dm)) : null),
+            onclick: () => openCalendarSelection({ dateKey: key }) },
+            h('span', { class: 'w-agenda-weather', 'aria-hidden': 'true', html: weatherIconSvg(dm.raw?.weather_code, { date: new Date(key + 'T12:00:00') }) }), mudBar(dm)) : null),
         byDay.get(key).map((o) => h('button', { type: 'button', class: 'w-ev w-event-link',
           title: `${language()==='es' ? 'Abrir evento' : 'Open event'}: ${o.event.title}`,
           'aria-label': `${language()==='es' ? 'Abrir evento' : 'Open event'} ${o.event.title} · ${dayTitle}`,
