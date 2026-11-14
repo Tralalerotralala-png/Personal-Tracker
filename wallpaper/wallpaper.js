@@ -2476,15 +2476,21 @@ function moonPhaseSvg(date = new Date()) {
   const phase = moonPhase(date);
   const n = phase.fraction, waxing = n <= 0.5;
   const lit = (1 - Math.cos(n * 2 * Math.PI)) / 2;
-  // SVG lit shape: curved day/night terminator, different sides for waxing and waning.
-  const r = 7, cx = 8, cy = 8;
-  const offset = 7 * Math.abs(1 - 2 * lit);
-  const central = lit < 0.5 ? (waxing ? 1 : 0) : (waxing ? 0 : 1);
-  const side = waxing ? 1 : 0;
-  const path = lit < 0.5
-    ? `M8 1 A7 7 0 0 ${side} 8 15 A${Math.max(0.05,offset)} 7 0 0 ${central} 8 1 Z`
-    : `M8 1 A7 7 0 0 ${side} 8 15 A${Math.max(0.05,offset)} 7 0 0 ${central} 8 1 Z`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="geometricPrecision" aria-label="${phase.label}" role="img"><circle cx="8" cy="8" r="7" fill="#544c63"/><path d="${path}" fill="#eadfc4"/></svg>`;
+  // Pixel-aligned scanlines make the lit fraction explicit: new is dark,
+  // full is bright, waxing lights the right and waning lights the left.
+  // The terminator follows the projected ellipse of the Moon's day/night edge.
+  const rows = [];
+  for (let y = 1; y < 15; y++) {
+    const dy = y + 0.5 - 8;
+    const halfWidth = Math.sqrt(Math.max(0, 49 - dy * dy));
+    const left = Math.max(1, Math.ceil(8 - halfWidth));
+    const right = Math.min(15, Math.floor(8 + halfWidth));
+    const terminator = 8 + (waxing ? 1 : -1) * (1 - 2 * lit) * halfWidth;
+    const start = waxing ? Math.max(left, Math.ceil(terminator)) : left;
+    const end = waxing ? right : Math.min(right, Math.floor(terminator));
+    if (end > start) rows.push(`<rect x="${start}" y="${y}" width="${end - start}" height="1"/>`);
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><circle cx="8" cy="8" r="7" fill="#544c63" stroke="#857e98" stroke-width=".35"/><g fill="#eadfc4">${rows.join('')}</g></svg>`;
 }
 function isNightAtLocation(current, date = new Date()) {
   if (current?.is_day === 0) return true;
