@@ -1507,3 +1507,43 @@ html[data-layout-width="compact"] main{max-width:1100px}
     gap:clamp(5px,1.5cqw,12px);
   }
 }
+
+
+/* Compact forecast tiles: larger pixel weather art, centered text, vertical ground gauge. */
+.w-day .w-agenda-ground { gap:5px; padding:2px 4px; }
+.w-agenda-weather { display:inline-flex; width:22px; height:18px; flex:none; align-items:center; justify-content:center; }
+.w-agenda-weather svg { width:100%; height:100%; }
+.widget .w-mud-dashboard .w-forecast-day {
+  position:relative; box-sizing:border-box; padding:3px 14px; gap:2px;
+  justify-content:center; border-color:color-mix(in srgb,var(--edge) 65%,transparent);
+  background:color-mix(in srgb,var(--panel-2) 55%,transparent);
+}
+.widget .w-mud-dashboard .w-forecast-day.today { border-color:var(--accent); }
+.widget .w-mud-dashboard .w-forecast-icon {
+  width:clamp(24px,min(7cqw,12cqh),58px);
+  height:clamp(20px,min(6cqw,10cqh),48px);
+}
+.widget .w-mud-dashboard .w-forecast-icon svg { width:100%;height:100%; }
+.widget .w-mud-dashboard .w-forecast-day strong { font-size:1.12em; line-height:1.15; }
+.widget .w-mud-dashboard .w-forecast-condition { color:var(--ink); line-height:1.15; }
+.widget .w-mud-dashboard .w-forecast-day small { line-height:1.15; }
+.widget .w-mud-dashboard .w-forecast-day .mud-bar {
+  position:absolute; inset:8px 4px 8px auto; display:flex; flex-direction:column-reverse;
+  width:7px; height:auto; min-height:0; gap:2px; 
+}
+.widget .w-mud-dashboard .w-forecast-day .mud-bar .blk {
+  position:relative; flex:1; min-height:0; border-color:var(--edge-hi);
+  background:color-mix(in srgb,var(--edge) 45%,var(--bg));
+}
+.widget .w-mud-dashboard .w-forecast-day .mud-bar .blk-fill {
+  position:absolute; inset:0 auto 0 0; width:100%!important; height:100%;
+  transform:scaleY(var(--segment-fill,0)); transform-origin:bottom;
+}
+@container widget (max-height:330px) {
+  .widget .w-mud-dashboard .w-forecast-icon { width:clamp(22px,10cqh,38px);height:clamp(18px,8cqh,32px); }
+  .widget .w-mud-dashboard .w-forecast-day { gap:1px; padding-block:2px; }
+}
+@container widget (max-width:650px) {
+  .widget .w-mud-dashboard .w-forecast-day { padding-inline:10px; }
+  .widget .w-mud-dashboard .w-forecast-day .mud-bar { width:5px;right:2px;top:5px;bottom:5px; }
+}
