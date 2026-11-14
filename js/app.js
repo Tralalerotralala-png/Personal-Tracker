@@ -210,10 +210,21 @@ const applySidebarWidth = value => {
 };
 try { applySidebarWidth(localStorage.getItem(sidebarWidthKey)); } catch { applySidebarWidth(sidebarDefault); }
 const sidebarGrip = h('div', { class: 'sidebar-resize-grip', role: 'separator', tabindex: '0',
-  'aria-label': 'Resize sidebar', 'aria-orientation': 'vertical', title: 'Drag to resize; double-click to reset' });
+  'aria-label': 'Resize sidebar', 'aria-orientation': 'vertical', title: 'Drag to resize; double-click to hide' });
 nav.append(sidebarGrip);
+const sidebarHiddenKey = 'tracker-sidebar-hidden';
+let sidebarHidden = false;
+const setSidebarHidden = (hidden, persist = true) => {
+  sidebarHidden = Boolean(hidden);
+  document.documentElement.classList.toggle('sidebar-collapsed', sidebarHidden);
+  const es = locale() === 'es-MX';
+  sidebarGrip.title = sidebarHidden ? (es ? 'Doble clic o Intro para mostrar la barra lateral' : 'Double-click or press Enter to show sidebar') : (es ? 'Arrastra para ajustar; doble clic o Intro para ocultar' : 'Drag to resize; double-click or press Enter to hide sidebar');
+  sidebarGrip.setAttribute('aria-label', sidebarGrip.title);
+  if (persist) { try { localStorage.setItem(sidebarHiddenKey, String(sidebarHidden)); } catch {} }
+};
+try { setSidebarHidden(localStorage.getItem(sidebarHiddenKey) === 'true', false); } catch { setSidebarHidden(false, false); }
 sidebarGrip.addEventListener('pointerdown', event => {
-  if (event.button !== 0 || matchMedia('(max-width: 899px)').matches) return;
+  if (sidebarHidden || event.button !== 0 || matchMedia('(max-width: 899px)').matches) return;
   event.preventDefault();
   sidebarGrip.setPointerCapture(event.pointerId);
   const move = e => applySidebarWidth(e.clientX);
@@ -227,12 +238,13 @@ sidebarGrip.addEventListener('pointerdown', event => {
   sidebarGrip.addEventListener('pointerup', stop);
   sidebarGrip.addEventListener('pointercancel', stop);
 });
-sidebarGrip.addEventListener('dblclick', () => {
-  applySidebarWidth(sidebarDefault);
-  try { localStorage.setItem(sidebarWidthKey, String(sidebarDefault)); } catch {}
+sidebarGrip.addEventListener('dblclick', event => {
+  event.preventDefault();
+  if (!matchMedia('(max-width: 899px)').matches) setSidebarHidden(!sidebarHidden);
 });
 sidebarGrip.addEventListener('keydown', e => {
-  if (!['ArrowLeft','ArrowRight','Home'].includes(e.key)) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSidebarHidden(!sidebarHidden); return; }
+  if (sidebarHidden || !['ArrowLeft','ArrowRight','Home'].includes(e.key)) return;
   e.preventDefault();
   const current = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'),10) || sidebarDefault;
   const next = applySidebarWidth(e.key === 'Home' ? sidebarDefault : current + (e.key === 'ArrowRight' ? 12 : -12));
