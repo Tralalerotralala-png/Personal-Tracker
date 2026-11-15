@@ -85,7 +85,7 @@ export function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
 // ---- navigation glyphs (drawn in currentColor) ------------------------------
 
 const GLYPHS = {
-  expenses: ["....###.....","..#####.##..",".######.###.",".######.####","#######.####","#######.####","#######.####","######......",".####.#####.",".###.######.","..#.######..","....####...."],
+  expenses: ["........................","........########........","......############......",".....##############.....","....################....","...##################...","...##################...","..####################..","..####################..","..####################..",".######################.",".######################.",".######################.",".######################.",".######################.","..####################..","..####################..","..####################..","...##################...","...##################...","....################....",".....##############.....",".......##########.......",".........######........."],
   pack: [
       "....................",
       ".......######.......",
@@ -341,6 +341,11 @@ export function glyphNames() { return Object.keys(GLYPHS); }
 export function glyphRows(name) { return GLYPHS[name] ?? null; }
 
 export function glyphSvg(name) {
+  if(name==='expenses'){
+    const rows=["........................","........AAAAAAAA........","......AABBBAACCCAA......",".....AABBBBAACCCCAA.....","....ABBBBBBAACCCCCCA....","...ABBBBBBBAACCCCCCCA...","...ABBBBBBBAACCCDDDCA...","..ABBBBBBBBAACDDDDDDCA..","..ABBBBBBBBAADDDDDDDCA..","..ABBBBBBBEAADDDDDDDCA..",".ABBBBBBEEEEDDDDDDDDDCA.",".AFBBEEEEEEEDDDDDDDDDGA.",".AFEEEEEAAAHIAADDDDDDGA.",".AAFEEAAAHHAAIIAAADDGAA.",".AAFAAHHHHHAAIIIIAAAGAA.","..AAHHHHHHHAAIIIIIIAAA..","..AAJHHHHHHAAIIIIIIKAA..","..AAJJHHHHHAAIIIIIKKAA..","...AAJJHHHHAAIIIIKKAA...","...AAAAJJHHAAIIKKAAAA...","....AAAAJJJAAKKKAAAA....",".....AAAAAAAAAAAAAA.....",".......AAAAAAAAAA.......",".........AAAAAA........."],palette=["#26354d","#b1f1cb","#fff0a5","#f0b959","#70cbb3","#3f917c","#b87530","#e98299","#a48ae5","#a74662","#6953ab"];
+    const rects=rows.flatMap((row,y)=>[...row].flatMap((c,x)=>c==='.'?[]:[`<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[c.charCodeAt(0)-65]}"/>`])).join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${rects}</svg>`;
+  }
   if (name === 'pack') {
     // Monochrome navigation art inherits the active/idle theme color.
     const rows = ["....................",".......hhhhhh.......","......ssssssss......","......ss....ss......",".....ssssssssss.....","....sshhhhhhhhss....","...ssmmmmmmmmmmss...","...sshhhhhhhhhhss...","...sshhhhhhhhhhss...",".ssssddddddddddssss.",".smmsmmddmmddmmsmms.",".smmsmmddmmddmmsmms.",".smmsmddddddddmsmms.",".smmsmdhhhhhhdmsmms.",".smmsmdmmbbmmdmsmms.",".ssssmdmmmmmmdmssss.","...sssddddddddsss...","....sdddddddddds....",".....ssssssssss.....","...................."];

@@ -39,7 +39,7 @@ test('Open-Meteo includes required sky lighting fields',()=>{
 
 test('upload validates size, extension, path traversal and protects identity',()=>{
  assert.equal(validateBackupFile({name:'SAVE.SAV',size:500}),'sav');
- assert.throws(()=>validateBackupFile({name:'setup.exe',size:100}),/Choose a game save/);
+ assert.equal(validateBackupFile({name:'setup.exe',size:100}),'exe');
  assert.throws(()=>validateBackupFile({name:'save.zip',size:27000000}),/Maximum file size/);
  assert.throws(()=>backupPath('../x','game-id-123','file-id-456','zip'),/Invalid backup path/);
  assert.match(backupPath('user-12345','game-12345','uuid-12345','zip'),/^user-12345\//);
@@ -63,6 +63,7 @@ test('backup service versions uploads, verifies downloads, and deletes objects',
  const service=createGameBackupService({client,store});
  const file=new File(['hello save data'],'save.SAV',{type:'application/octet-stream'});
  const entry=await service.upload(game,file,{category:'Save',notes:'checkpoint'});
+ assert.match(entry.path,/\.bin$/);
  assert.equal((await service.list(game)).length,1);assert.equal((await service.list('elsewhere')).length,0);
  assert.equal((await service.download(entry)).filename,'save.SAV');
  assert.equal((await service.storageUsed()),file.size);

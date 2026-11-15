@@ -1,6 +1,6 @@
 // One library with four shelves. Game records stay under game_library_v1,
 // preserving existing entries and widgets; other media share a compact generic editor.
-import { h, replace, confirmDialog, toast } from './dom.js';
+import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGamesView } from './games.js';
@@ -63,7 +63,7 @@ export function createMediaLibraryView({store,backups=null}) {
    function updateResults(){
      const filtered=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
      const names=[...new Set(filtered.map(x=>x.shelf||'Collection'))];
-     replace(results,filtered.length?h('div',{class:'game-shelves '+(!shelfMode?'game-library-grid':'')},names.map(s=>h('section',{class:'game-shelf'},h('h3',{},s),h('div',{class:'game-cover-grid'},filtered.filter(x=>(x.shelf||'Collection')===s).map(x=>h('button',{class:'game-book',onclick:()=>show(x)},cover(x),h('span',{},x.title))))))):h('p',{class:'empty'},language()==='es'?'No hay resultados.':'No matching entries.'));
+     replace(results,filtered.length?h('div',{class:'game-shelves '+(!shelfMode?'game-library-grid':'')},names.map(s=>h('section',{class:'game-shelf'},h('h3',{},s),h('div',{class:'game-cover-grid'},filtered.filter(x=>(x.shelf||'Collection')===s).map(x=>libraryCoverButton(cover(x),x.title,()=>show(x),el)))))):h('p',{class:'empty'},language()==='es'?'No hay resultados.':'No matching entries.'));
    }
    const search=h('input',{type:'search',value:query,placeholder:language()==='es'?'Buscar en la colección':'Search this collection','aria-label':'Search collection',oninput:e=>{query=e.target.value;updateResults();}});
    const filter=h('select',{'aria-label':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));

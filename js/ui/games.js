@@ -1,6 +1,6 @@
 // A small, synced personal game library. Reuses the existing settings store;
 // no new database tables, dependencies or private tokens.
-import { h, replace, confirmDialog, toast } from './dom.js';
+import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGameBackupPanel } from './game-backup-panel.js';
@@ -67,7 +67,7 @@ export function createGamesView({store,backups=null}){
  const results=h('div',{class:'game-filter-results'});
  function updateResults(){
   const found=state.games.filter(g=>(gameFilter==='all'||g.status===gameFilter)&&(!query||`${g.title} ${g.platform} ${g.notes||''} ${g.shelf}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
-  const sections=state.shelves.map(name=>{const games=found.filter(g=>g.shelf===name);if(!games.length)return null;return h('section',{class:'game-shelf'},h('div',{class:'game-shelf-head'},h('h3',{},name),h('small',{},String(games.length))),h('div',{class:'game-cover-grid'},games.map(g=>h('button',{class:'game-book',onclick:()=>detail(g)},cover(g),h('span',{},g.title)))),h('div',{class:'game-wood'}));});
+  const sections=state.shelves.map(name=>{const games=found.filter(g=>g.shelf===name);if(!games.length)return null;return h('section',{class:'game-shelf'},h('div',{class:'game-shelf-head'},h('h3',{},name),h('small',{},String(games.length))),h('div',{class:'game-cover-grid'},games.map(g=>libraryCoverButton(cover(g),g.title,()=>detail(g),el))),h('div',{class:'game-wood'}));});
   replace(results,found.length?h('div',{class:`game-shelves ${state.mode==='grid'?'game-library-grid':''}`},sections):h('p',{class:'empty'},state.games.length?(language()==='es'?'Sin resultados.':'No matching games.'):L().empty));
  }
  const search=h('input',{type:'search',placeholder:language()==='es'?'Buscar juegos':'Search games',value:query,'aria-label':'Search games',oninput:e=>{query=e.target.value;updateResults();}});

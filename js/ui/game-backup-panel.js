@@ -83,7 +83,7 @@ export function createGameBackupPanel({backups,gameId}) {
  });
  replace(section,h('h3',{},tr('Game save backups','Copias de partidas')),
    h('p',{class:'hint'},tr('Private Supabase Storage · versioned files · verified SHA-256 downloads. Files are not added to GitHub.','Almacenamiento privado de Supabase · versiones · descargas verificadas con SHA-256. Los archivos no se suben a GitHub.')),
-   h('div',{class:'backup-upload'},h('label',{},tr('File (25 MB max)','Archivo (máx. 25 MB)'),file),h('label',{},tr('Category','Categoría'),cat),notes,upload),status,
+   h('div',{class:'backup-upload'},h('label',{},tr('Any file (25 MB max)','Cualquier archivo (máx. 25 MB)'),file),h('label',{},tr('Category','Categoría'),cat),notes,upload),status,
    h('div',{class:'backup-vault-overview'}),h('p',{class:'backup-usage hint'}),entries,
    h('div',{class:'backup-comparison-panel'},h('h4',{},tr('Compare backup versions','Comparar versiones de copias')),
       h('p',{class:'hint'},tr('Compare metadata and SHA-256, not the contents of save files.','Compara fechas, tamaños y SHA-256, no el contenido del archivo.')),

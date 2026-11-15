@@ -17,8 +17,10 @@ test('legacy single box keeps previously saved stock',()=>{
  assert.deepEqual(primaryBox(17,{max_quantity:50}),{current:17,maximum:50});
  assert.deepEqual(trackMeta({}).extra_boxes,[]);
 });
-test('extensionless game saves are accepted without allowing executable extensions',()=>{
+test('extensionless and arbitrary backup files are accepted as opaque binary data',()=>{
  assert.equal(validateBackupFile({name:'userdata0004',size:123}),'bin');
- assert.throws(()=>validateBackupFile({name:'setup.exe',size:123}),/Choose a game save/);
+ assert.equal(validateBackupFile({name:'setup.exe',size:123}),'exe');
+ assert.equal(validateBackupFile({name:'save.unusual-format',size:123}),'bin');
+ assert.equal(validateBackupFile({name:'save.custom123',size:123}),'custom123');
 });
 test('expense icon differs from the pack',()=>assert.notEqual(glyphSvg('expenses'),glyphSvg('pack')));

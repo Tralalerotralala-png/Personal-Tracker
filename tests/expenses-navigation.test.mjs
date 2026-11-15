@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import {weatherIconSvg,glyphSvg} from '../js/ui/pixel-icon.js';
 import { normalizeTransaction, summarizeTransactions, calculateBill, exportTransactionsCsv, importTransactionsCsv, parseCsv } from '../js/ui/expenses.js';
 const code = path => readFileSync(new URL(`../${path}`, import.meta.url),'utf8');
 test('Personal Hub and Expenses are real main-area routes',()=>{
@@ -31,8 +32,11 @@ test('CSV escaping, export and import for old and new transactions',()=>{
   assert.throws(()=>importTransactionsCsv('date,title,amount,currency\n2026-11-04,A,notanumber,USD'));
   assert.match(exportTransactionsCsv([{...rows[0],title:'=1+1'}]),/"'=1\+1"/);
 });
-test('weather renderer centers all art variants in a shared canvas',()=>{
-  const pixel=code('js/ui/pixel-icon.js');
-  assert.match(pixel,/const bounds = \{/);
-  assert.match(pixel,/transform="translate\(\$\{dx\} \$\{dy\}\)"/);
+test('weather renderer uses the shared 40 pixel canvas',()=>{
+ for(const c of [0,2,3,45,51,61,71,95])assert.match(weatherIconSvg(c),/viewBox="0 0 40 40"/);
+});
+test('expense chart is a detailed full color icon',()=>{
+ const svg=glyphSvg('expenses');
+ assert.match(svg,/viewBox="0 0 24 24"/);
+ assert.ok(new Set([...svg.matchAll(/fill="(#[0-9a-f]+)"/g)].map(m=>m[1])).size>=10);
 });

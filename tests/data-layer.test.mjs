@@ -559,11 +559,12 @@ test('pixel icon: svg is well formed and refuses unsafe colours', () => {
   assert.ok(evil.includes('#c9b58a'));
 });
 
-test('glyphs: every nav glyph is 12x12 and renders', () => {
+test('glyphs: nav glyphs are square and render', () => {
   for (const name of glyphNames()) {
     const rows = glyphRows(name);
-    assert.equal(rows.length, 12, name);
-    assert.ok(rows.every((r) => r.length === 12), name);
+    const size=name==='pack'?20:name==='expenses'?24:12;
+    assert.equal(rows.length,size,name);
+    assert.ok(rows.every(r=>r.length===size),name);
     assert.match(glyphSvg(name), /<rect/);
   }
   assert.equal(glyphSvg('nope'), '');

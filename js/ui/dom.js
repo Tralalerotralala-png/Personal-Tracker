@@ -86,3 +86,45 @@ export function daysSince(iso) {
   if (!iso) return null;
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
 }
+
+/** Cover buttons tilt toward the pointer and share their cover with the detail
+ * view when the browser supports View Transitions. Keyboard and touch use the
+ * same action; reduced-motion mode skips both the tilt and transition. */
+export function libraryCoverButton(art,title,open,host){
+  const reduced=()=>document.documentElement.classList.contains('reduce-animations')||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const button=h('button',{class:'game-book',type:'button'},art,h('span',{},title));
+  art.classList.add('library-cover-art');
+  button.addEventListener('pointermove',e=>{
+    if(e.pointerType!=='mouse'||reduced())return;
+    const r=button.getBoundingClientRect();
+    const x=Math.max(-1,Math.min(1,2*(e.clientX-r.left)/Math.max(1,r.width)-1));
+    const y=Math.max(-1,Math.min(1,2*(e.clientY-r.top)/Math.max(1,r.height)-1));
+    button.style.setProperty('--cover-rx',(-y*11)+'deg');
+    button.style.setProperty('--cover-ry',(x*15)+'deg');
+    button.style.setProperty('--cover-rz',(x*3)+'deg');
+  });
+  button.addEventListener('pointerleave',()=>{
+    for(const key of ['--cover-rx','--cover-ry','--cover-rz'])button.style.removeProperty(key);
+  });
+  button.addEventListener('click',()=>{
+    if(reduced()||!document.startViewTransition||document.documentElement.classList.contains('library-cover-transition')){open();return;}
+    const root=document.documentElement;
+    let target;
+    art.style.viewTransitionName='tracker-library-cover';
+    root.classList.add('library-cover-transition');
+    const cleanup=()=>{
+      art.style.removeProperty('view-transition-name');
+      target?.style.removeProperty('view-transition-name');
+      root.classList.remove('library-cover-transition');
+    };
+    try{
+      const t=document.startViewTransition(()=>{
+        open();
+        target=host.querySelector('.media-case-front > img,.media-case-front > .game-placeholder');
+        if(target)target.style.viewTransitionName='tracker-library-cover';
+      });
+      t.finished.then(cleanup,cleanup);
+    }catch{cleanup();open();}
+  });
+  return button;
+}

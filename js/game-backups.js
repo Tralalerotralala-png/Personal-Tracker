@@ -6,20 +6,20 @@ import { uuid } from './data/util.js';
 export const GAME_BACKUP_BUCKET = 'game-backups';
 export const GAME_BACKUP_LIMIT = 25 * 1024 * 1024; // reliable simple uploads on phones
 const META_KEY = 'game_backup_index_v1';
-const EXTENSIONS = new Set(['zip','7z','rar','sav','dat','bin','bak','cfg','ini','json','txt','xml','vdf','db','sqlite','srm','state','sgm','save','mcr','gme','sl2','co2','dsv','profile']);
 const cleanFilename = name => String(name ?? '').split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g,'').slice(0,160);
 export function validateBackupFile(file) {
   if (!file || !file.name || !Number.isFinite(file.size) || file.size <= 0) throw new Error('Choose a non-empty backup file.');
   if (file.size > GAME_BACKUP_LIMIT) throw new Error('Maximum file size is 25 MB for reliable browser uploads.');
   const filename=cleanFilename(file.name);
-  // Preserve extensionless console saves by using a private opaque .bin object.
-  const ext=filename.includes('.')?filename.split('.').pop().toLowerCase():'bin';
-  if (!EXTENSIONS.has(ext)) throw new Error('Choose a game save, ZIP archive, or configuration file (not an executable).');
-  return ext;
+  // Accept arbitrary save formats, including extensionless and unfamiliar names.
+  // Only a short alphanumeric suffix may enter the object path; the original
+  // filename is recorded separately and restored on download.
+  const suffix=filename.includes('.')?filename.split('.').pop().toLowerCase():'';
+  return /^[a-z0-9]{1,16}$/.test(suffix)?suffix:'bin';
 }
 export function backupPath(userId, gameId, fileId, ext) {
   for (const v of [userId, gameId, fileId]) if (!/^[\da-z-]{8,64}$/i.test(v || '')) throw new Error('Invalid backup path.');
-  if (!EXTENSIONS.has(ext)) throw new Error('Unsupported file type.');
+  if (!/^[a-z0-9]{1,16}$/.test(ext||'')) throw new Error('Invalid backup path suffix.');
   return `${userId}/${gameId}/${fileId}.${ext}`;
 }
 async function sha256(file) {
@@ -50,9 +50,10 @@ export function createGameBackupService({client, store}) {
   }
   async function upload(gameId, file, {category='Save', notes=''} = {}) {
     const uid = await userId();
-    const ext = validateBackupFile(file);
+    validateBackupFile(file);
     const id = uuid();
-    const path = backupPath(uid, gameId, id, ext);
+    // All new objects are opaque binary files, never served as active content.
+    const path = backupPath(uid, gameId, id, 'bin');
     // Check the bucket is configured before reading a potentially large file.
     await checkReady(gameId);
     const checksum = await sha256(file);
@@ -76,7 +77,7 @@ export function createGameBackupService({client, store}) {
     const {data,error}=await client.storage.from(GAME_BACKUP_BUCKET).download(entry.path);
     if (error || !data) throw new Error(error?.message || 'Download failed.');
     if (await sha256(data) !== entry.hash) throw new Error('File checksum mismatch. Download cancelled.');
-    return {blob:data,filename:cleanFilename(entry.name) || 'backup.bin'};
+    return {blob:new Blob([data],{type:'application/octet-stream'}),filename:cleanFilename(entry.name) || 'backup.bin'};
   }
   async function remove(entry) {
     const uid=await userId();

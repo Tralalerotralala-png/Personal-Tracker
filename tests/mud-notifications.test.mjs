@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const source = p => readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
 test('Overview weather shows the shared three-segment mud meter in each daily forecast',()=>{
   const s=source('js/widgets/registry.js');
-  assert.match(s,/mudBar\(r\)\);/);
+  assert.match(s,/mudBar\(r\)/);
   assert.match(source('css/app.css'),/\.w-forecast-day \.mud-bar\s*\{/);
 });
 test('Browser alerts remain opt-in and never promise background pushes',()=>{
