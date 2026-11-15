@@ -3,7 +3,7 @@ import { resolveDailyLoot } from '../data/daily-loot.js';
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
 import { pixelIconSvg } from './pixel-icon.js';
-import { PHARMACY_PRESETS, isPharmacyCategory, defaultMedicinePreset, defaultMedicineColor, medicinePreset, medicineColor, pharmacyIconSvg } from './pharmacy-icons.js';
+import { PHARMACY_PRESETS, MEDICINE_COLOR_DEFAULTS, isPharmacyCategory, defaultMedicinePreset, defaultMedicineColor, medicinePreset, medicineColor, pharmacyIconSvg } from './pharmacy-icons.js';
 import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
   searchItems, locationPath, locationPathParts, indexById, descendantIds,
@@ -276,6 +276,10 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const initialMeta = trackMeta(existing ? metaOf(existing) : {});
     draft.iconPreset = medicinePreset(initialMeta.icon_preset);
     draft.iconColor = initialMeta.icon_color || defaultMedicineColor(name.value);
+    draft.iconBodyColor = initialMeta.icon_body_color;
+    draft.iconPaperColor = initialMeta.icon_paper_color;
+    draft.iconDoseColor = initialMeta.icon_dose_color;
+    draft.iconColorEdited = Boolean(initialMeta.icon_color);
     draft.previewUrl = null;
     const field = (label, control) => h('label', { class: 'item-field' }, h('span', {}, t(label)), control);
     const qty = h('input', { type: 'number', id: 'it-qty', min: 0, step: 1, inputmode: 'numeric', value: existing?.quantity ?? 1 });
@@ -358,22 +362,56 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const photoBox = h('div', { class: 'photo-box' });
     const presetPanel = h('div', { class: 'pharmacy-presets' });
-    const presetNames = {auto:'Automatic / photo',bottle:'Medicine bottle','bottle-pills':'Bottle and pills',spray:'Squeeze nasal spray',symbol:'Generic pixel icon'};
-    const colorInput = h('input', { type:'color', value:draft.iconColor, 'aria-label':t('Icon color') });
+    const presetNames = {auto:'Automatic / photo',bottle:'Medicine bottle','bottle-pill':'Bottle with capsule','bottle-tablet':'Bottle with tablet',spray:'Squeeze nasal spray',symbol:'Generic pixel icon'};
     const presetButtons = h('div', { class:'pharmacy-preset-grid', role:'group', 'aria-label':t('Pharmacy icon presets') });
-    const drawMedicineOptions = () => {
-      const cat = catById().get(category.value);
-      presetPanel.hidden = !isPharmacyCategory(cat) && defaultMedicinePreset(name.value,cat)==='symbol' && draft.iconPreset==='auto';
-      colorInput.value = draft.iconColor;
-      replace(presetButtons, PHARMACY_PRESETS.map(key => {
-        const svg = pharmacyIconSvg(name.value,cat,{icon_preset:key,icon_color:draft.iconColor}) || pixelIconSvg(id, {color:cat?.color || FALLBACK_COLOR});
-        return h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===key?' on':''}`,'aria-pressed':String(draft.iconPreset===key),onclick:()=>{draft.iconPreset=key;drawMedicineOptions();renderPhoto();}},h('span',{class:'pharmacy-preset-preview',html:svg}),h('span',{},t(presetNames[key])));
+    const iconMeta = (key = draft.iconPreset) => ({
+      icon_preset:key, icon_color:draft.iconColor, icon_body_color:draft.iconBodyColor,
+      icon_paper_color:draft.iconPaperColor, icon_dose_color:draft.iconDoseColor,
+    });
+    const activeKind = () => draft.iconPreset === 'auto' ? defaultMedicinePreset(name.value,catById().get(category.value)) : draft.iconPreset;
+    const doseDefault = () => activeKind()==='bottle-tablet' ? MEDICINE_COLOR_DEFAULTS.tablet : draft.iconColor;
+    const colorControls = [
+      {key:'iconColor',label:'Cross / accent',fallback:()=>defaultMedicineColor(name.value)},
+      {key:'iconBodyColor',label:'Bottle color',fallback:()=>MEDICINE_COLOR_DEFAULTS.body},
+      {key:'iconPaperColor',label:'Cap and label',fallback:()=>activeKind()==='spray'?'#f2dfb5':MEDICINE_COLOR_DEFAULTS.paper},
+      {key:'iconDoseColor',label:'Capsule / tablet color',fallback:doseDefault},
+    ].map(option=>{
+      const input=h('input',{type:'color','aria-label':t(option.label),value:option.fallback()});
+      const label=h('label',{class:'item-color'},t(option.label),input);
+      input.addEventListener('input',()=>{
+        draft[option.key]=medicineColor(input.value,option.fallback());
+        if(option.key==='iconColor')draft.iconColorEdited=true;
+        if(draft.iconPreset==='auto')draft.iconPreset=activeKind();
+        drawMedicineOptions();renderPhoto();
+      });
+      return {...option,input,label};
+    });
+    const resetColors=h('button',{type:'button',class:'btn small ghost',onclick:()=>{
+      draft.iconColor=defaultMedicineColor(name.value);draft.iconColorEdited=false;
+      draft.iconBodyColor=draft.iconPaperColor=draft.iconDoseColor=null;
+      drawMedicineOptions();renderPhoto();
+    }},t('Reset icon colors'));
+    function drawMedicineOptions() {
+      const cat=catById().get(category.value),kind=activeKind();
+      presetPanel.hidden=!isPharmacyCategory(cat)&&defaultMedicinePreset(name.value,cat)==='symbol'&&draft.iconPreset==='auto';
+      for(const control of colorControls){
+        const value=medicineColor(draft[control.key],control.fallback());
+        if(control.input.value!==value)control.input.value=value;
+        control.label.hidden=kind==='symbol'||(control.key==='iconBodyColor'&&kind==='spray')||
+          (control.key==='iconDoseColor'&&!['bottle-pill','bottle-tablet'].includes(kind));
+      }
+      resetColors.hidden=kind==='symbol';
+      replace(presetButtons,PHARMACY_PRESETS.map(key=>{
+        const svg=pharmacyIconSvg(name.value,cat,iconMeta(key))||pixelIconSvg(id,{color:cat?.color||FALLBACK_COLOR});
+        return h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===key?' on':''}`,'aria-pressed':String(draft.iconPreset===key),onclick:()=>{
+          draft.iconPreset=key;drawMedicineOptions();renderPhoto();
+        }},h('span',{class:'pharmacy-preset-preview',html:svg}),h('span',{},t(presetNames[key])));
       }));
-    };
-    colorInput.addEventListener('input',()=>{draft.iconColor=medicineColor(colorInput.value);if(draft.iconPreset==='auto')draft.iconPreset=defaultMedicinePreset(name.value,catById().get(category.value));drawMedicineOptions();renderPhoto();});
-    presetPanel.append(h('div',{class:'pharmacy-preset-head'},h('strong',{},t('Pharmacy icon presets')),h('label',{class:'item-color'},t('Icon color'),colorInput)),presetButtons);
+    }
+    presetPanel.append(h('div',{class:'pharmacy-preset-head'},h('strong',{},t('Pharmacy icon presets')),resetColors),presetButtons,
+      h('div',{class:'pharmacy-color-grid'},colorControls.map(c=>c.label)));
     category.addEventListener('change',()=>{drawMedicineOptions();renderPhoto();});
-    name.addEventListener('change',()=>{if(draft.iconPreset==='auto'&&!initialMeta.icon_color)draft.iconColor=defaultMedicineColor(name.value);drawMedicineOptions();renderPhoto();});
+    name.addEventListener('change',()=>{if(!draft.iconColorEdited)draft.iconColor=defaultMedicineColor(name.value);drawMedicineOptions();renderPhoto();});
     const fileInput = h('input', {
       type: 'file', accept: 'image/*', class: 'visually-hidden', id: 'it-photo',
       onchange: (e) => {
@@ -392,7 +430,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       const showing = previewUrl || null;
       const preview = h('span', { class: 'photo-preview' });
       const cat = catById().get(category.value);
-      preview.innerHTML = pharmacyIconSvg(name.value,cat,{icon_preset:draft.iconPreset,icon_color:draft.iconColor}) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
+      preview.innerHTML = pharmacyIconSvg(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
       if (draft.iconPreset === 'auto' && showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
       else if (draft.iconPreset === 'auto' && hasExisting) photos.urlFor(existing).then(url=>{if(url && preview.isConnected)preview.replaceChildren(h('img',{src:url,alt:''}));}).catch(()=>{});
       photoBox.replaceChildren(preview,
@@ -501,7 +539,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       };
       try {
         await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
