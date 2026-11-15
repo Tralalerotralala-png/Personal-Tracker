@@ -1693,3 +1693,17 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .reduce-animations .game-book .library-cover-art{transition:none!important;transform:none!important;}
 .hotbar .slot[data-route="expenses"] .slot-icon svg{width:32px;height:32px;}
 @media(max-width:480px){.hotbar .slot[data-route="expenses"] .slot-icon svg{width:25px;height:25px;}}
+
+/* Previous-night context is displayed only inside the unlocked journal. */
+.dream-night-panel{display:grid;gap:9px;border:1px solid var(--edge);background:var(--panel-2);padding:12px;min-width:0;}
+.dream-night-panel h3,.dream-night-panel p{margin:0;}
+.dream-night-panel>button{justify-self:start;}
+.dream-night-sky{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.dream-night-icon{width:44px;height:44px;flex:0 0 44px;display:inline-flex;align-items:center;justify-content:center;}
+.dream-night-icon svg{width:100%;height:100%;}
+.dream-night-sky p,.dream-night-event small{font-size:.78rem;color:var(--ink-dim);}
+.dream-night-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;font-size:.82rem;}
+.dream-night-event{display:flex;align-items:center;gap:8px;}
+.dream-night-event small{display:block;}
+.dream-night-hour{display:grid;grid-template-columns:48px minmax(0,1fr) 64px 60px;gap:5px;padding:4px 0;font-size:.75rem;border-bottom:1px solid var(--edge);}
+.journal-entry>.dream-night-card-summary{color:var(--accent);font-size:.75rem;}
