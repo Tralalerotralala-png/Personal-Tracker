@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {lessonForDate} from '../js/ui/daily-phrases.js';
 import {parseHourly,buildForecastUrl} from '../js/weather/open-meteo.js';
 import {upcomingSkyEvents} from '../js/weather/sky-events.js';
-import {weatherIconSvg} from '../js/ui/pixel-icon.js';
+import {weatherIconSvg,glyphSvg,glyphRows} from '../js/ui/pixel-icon.js';
 const src=p=>readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
 test('phrase date rollover does not duplicate the previous day',()=>{
   const prior=lessonForDate(new Date(2026,10,3));
@@ -47,4 +47,30 @@ test('Logs drafts remain inside journal encryption, with unsaved warning',()=>{
   assert.match(diary,/session\.data\.drafts/);
   assert.match(diary,/persistDraft\(\)/);
   assert.match(diary,/beforeunload/);
+});
+
+test('pack navigation is a detailed, theme-colored 20-pixel backpack',()=>{
+ const svg=glyphSvg('pack');
+ assert.match(svg,/viewBox="0 0 20 20"/);
+ assert.match(svg,/fill="currentColor"/);
+ assert.ok(new Set([...svg.matchAll(/opacity="([^"]+)"/g)].map(m=>m[1])).size>=3);
+ assert.equal(glyphRows('pack').length,20);
+ assert.ok(glyphRows('pack').every(row=>row.length===20));
+});
+test('all weather conditions share detailed 40-pixel art, distinct silhouettes and safe bounds',()=>{
+ const kinds=[0,2,3,45,51,61,71,95];
+ const date=new Date('2026-11-14T20:00:00Z');
+ const art=kinds.map(code=>weatherIconSvg(code,{date}));
+ assert.equal(new Set(art).size,art.length);
+ for(const svg of art){
+   assert.match(svg,/viewBox="0 0 40 40"/);
+   assert.ok(new Set([...svg.matchAll(/fill="(#[0-9a-f]+)"/g)].map(m=>m[1])).size>=3);
+   for(const [,x,y,w,h] of svg.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)){
+     assert.ok(+x>=0&&+y>=0&&+x+ +w<=40&&+y+ +h<=40);
+   }
+ }
+ assert.match(weatherIconSvg(95),/wx-lightning/);
+ assert.match(weatherIconSvg(61),/wx-rain-drop/);
+ assert.match(weatherIconSvg(0,{night:true,date}),/data-part="illuminated"/);
+ assert.match(weatherIconSvg(2,{night:true,date}),/data-part="illuminated"/);
 });

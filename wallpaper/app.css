@@ -1640,3 +1640,9 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .widget .w-mud-dashboard .w-weather-glyph.w-weather-moon svg {
   width:clamp(30px,9cqh,42px);height:clamp(30px,9cqh,42px);
 }
+
+/* A full-size square weather sprite, matching the detailed moon artwork. */
+.w-weather-glyph {display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.widget .w-mud-dashboard .w-weather-glyph svg {width:clamp(30px,9cqh,42px);height:clamp(30px,9cqh,42px);}
+.hotbar .slot[data-route="inventory"] .slot-icon svg {width:30px;height:30px;}
+@media(max-width:480px){.hotbar .slot[data-route="inventory"] .slot-icon svg{width:23px;height:23px;}}

@@ -1713,18 +1713,26 @@ function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
 
 const GLYPHS = {
   pack: [
-    '....####....',
-    '...######...',
-    '..##....##..',
-    '..########..',
-    '.##########.',
-    '.##########.',
-    '.####..####.',
-    '.####..####.',
-    '.##########.',
-    '.##########.',
-    '.##########.',
-    '..########..',
+      "....................",
+      ".......######.......",
+      "......########......",
+      "......##....##......",
+      ".....##########.....",
+      "....############....",
+      "...##############...",
+      "...##############...",
+      "...##############...",
+      ".##################.",
+      ".##################.",
+      ".##################.",
+      ".##################.",
+      ".##################.",
+      ".##################.",
+      ".##################.",
+      "...##############...",
+      "....############....",
+      ".....##########.....",
+      "...................."
   ],
   games: [
     '............',
@@ -1959,6 +1967,13 @@ function glyphNames() { return Object.keys(GLYPHS); }
 function glyphRows(name) { return GLYPHS[name] ?? null; }
 
 function glyphSvg(name) {
+  if (name === 'pack') {
+    // Monochrome navigation art inherits the active/idle theme color.
+    const rows = ["....................",".......hhhhhh.......","......ssssssss......","......ss....ss......",".....ssssssssss.....","....sshhhhhhhhss....","...ssmmmmmmmmmmss...","...sshhhhhhhhhhss...","...sshhhhhhhhhhss...",".ssssddddddddddssss.",".smmsmmddmmddmmsmms.",".smmsmmddmmddmmsmms.",".smmsmddddddddmsmms.",".smmsmdhhhhhhdmsmms.",".smmsmdmmbbmmdmsmms.",".ssssmdmmmmmmdmssss.","...sssddddddddsss...","....sdddddddddds....",".....ssssssssss.....","...................."];
+    const shades = {s:.4,m:.77,h:1,d:.23,b:1};
+    const out=rows.flatMap((row,y)=>[...row].flatMap((c,x)=>shades[c]?[`<rect x="${x}" y="${y}" width="1" height="1" opacity="${shades[c]}"/>`]:[])).join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${out}</svg>`;
+  }
   const rows = GLYPHS[name];
   if (!rows) return '';
   const rects = [];
@@ -1974,63 +1989,102 @@ function glyphSvg(name) {
 // The colored sun/cloud layers and animated rain are inline SVG: no image assets.
 function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
   const kind = weatherGlyph(code).glyph;
-  // A clear nighttime sky uses the entire square icon, not a tiny nested moon.
   if (night && kind === 'sun') return moonPhaseSvg(date);
-  const px = (x,y,w,h,color,cls='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"${cls?` class="${cls}"`:''}/>`;
-  // A layered 24px pixel sun: crisp stepped circular disk, warm orange rim,
-  // bright golden center and eight separate chunky rays.
-  const sunRays = [
-    px(11,0,3,3,'#ffad22'),px(12,0,2,2,'#ffda38'),
-    px(11,21,3,3,'#ffad22'),px(12,21,2,2,'#ffda38'),
-    px(0,11,3,3,'#ffad22'),px(0,12,2,2,'#ffda38'),
-    px(21,11,3,3,'#ffad22'),px(21,12,2,2,'#ffda38'),
-    px(3,3,4,3,'#ffa524'),px(4,3,2,3,'#ffd52c'),
-    px(17,3,4,3,'#ffa524'),px(18,3,2,3,'#ffd52c'),
-    px(3,18,4,3,'#ffa524'),px(4,18,2,3,'#ffd52c'),
-    px(17,18,4,3,'#ffa524'),px(18,18,2,3,'#ffd52c')
-  ].join('');
-  const sunDiskRows = [
-    [5,7,10],[6,5,14],[7,4,16],[8,3,18],[9,3,18],
-    [10,2,20],[11,2,20],[12,2,20],[13,2,20],
-    [14,3,18],[15,3,18],[16,4,16],[17,5,14],[18,7,10]
-  ];
-  const sunDisk = sunDiskRows.map(([y,x,w]) =>
-    px(x,y,w,1,'#f4a323') +
-    px(x+1,y,Math.max(1,w-2),1,'#ffcb29') +
-    (y>=8 && y<=15 ? px(x+3,y,Math.max(1,w-7),1,'#ffda37') : '')
-  ).join('');
-  const sun = `<g class="wx-sun-art">${sunRays}${sunDisk}</g>`;
-  const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="23" height="23" ');
-  const cloud = `<g class="wx-cloud-layer">${[px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('')}</g>`;
-  const drizzle = [0,1,2].map((i)=>px(12+i*6,20+(i%2),2,3,'#6fb9e9','wx-rain-drop')).join('');
-  const storm = px(17,17,4,3,'#ffe183')+px(15,20,3,4,'#ffd15b');
-  const fog = `<g class="wx-fog-layer">${[8,12,16].map((y,i)=>px(5+(i%2),y,22,2,'#abaed5')).join('')}</g>`;
-  const bg = night ? moon : sun;
-  let content = '';
-  if (kind==='sun') content=bg;
-  else if (kind==='partly') content=(night ? moon : `<g transform="translate(0 0) scale(.72)">${sun}</g>`)+cloud;
-  else if (kind==='cloud') content=cloud;
-  else if (kind==='fog') content=fog;
-  else if (kind==='rain') content=cloud+drizzle;
-  else if (kind==='storm') content=cloud+storm+drizzle;
-  else if (kind==='snow') content=cloud+[0,1,2].map(i=>px(13+i*6,21,2,2,'#eff8ff')).join('');
-  else content=night ? moon : sun;
-  // All symbols share one 32x26 artboard. Center the *visible* rectangles,
-  // not just the SVG element: clouds, fog, sun and rain have different bounds.
-  // A partly cloudy moon is drawn in a 23px nested square; clear moons return above.
-  const bounds = {
-    sun: [0, 0, 24, 24],
-    partly: [0, 0, 28, 24],
-    cloud: [8, 5, 28, 19],
-    fog: [5, 8, 27, 18],
-    rain: [8, 5, 28, 24],
-    storm: [8, 5, 28, 24],
-    snow: [8, 5, 28, 23]
-  };
-  const [left, top, right, bottom] = bounds[kind] || bounds.cloud;
-  const dx = Math.round(16 - (left + right)/2);
-  const dy = Math.round(13 - (top + bottom)/2);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 26" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><g transform="translate(${dx} ${dy})">${content}</g></svg>`;
+  // Every condition uses the same high-resolution pixel grid as the moon.
+  // Signed distances define rounded silhouettes without vector antialiasing.
+  const size=40;
+  const pixel=(x,y,w,h,color)=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+color+'"/>';
+  function layer(sample) {
+    const rows=[];
+    for(let y=0;y<size;y++)for(let x=0;x<size;){
+      const color=sample(x+.5,y+.5);
+      let end=x+1;while(end<size&&sample(end+.5,y+.5)===color)end++;
+      if(color)rows.push(pixel(x,y,end-x,1,color));
+      x=end;
+    }
+    return rows.join('');
+  }
+  function sun(cx,cy,r) {
+    const face=layer((x,y)=>{
+      const dx=x-cx,dy=y-cy,d=Math.hypot(dx,dy);
+      if(d<=r){
+        if(d>r-1.2)return '#b66b23';
+        if(d>r-2.5)return dy<0?'#ffbf53':'#ed9632';
+        const lit=Math.hypot(dx+2.6,dy+3.2);
+        return lit<r*.48?'#fff0a5':lit<r*.8?'#ffd875':'#ffc04d';
+      }
+      const a=Math.atan2(dy,dx);
+      const rayAngle=Math.round(a/(Math.PI/4))*(Math.PI/4);
+      const along=dx*Math.cos(rayAngle)+dy*Math.sin(rayAngle);
+      const across=Math.abs(-dx*Math.sin(rayAngle)+dy*Math.cos(rayAngle));
+      if(along>=r+2&&along<=r+6&&across<1.6)return across<.7?'#ffe19a':'#e9a443';
+      return null;
+    });
+    return '<g class="wx-sun-art">'+face+'</g>';
+  }
+  function cloud(puffs,storm=false) {
+    const depth=(x,y)=>Math.max(...puffs.map(([cx,cy,rx,ry])=>(1-Math.hypot((x-cx)/rx,(y-cy)/ry))*Math.min(rx,ry)));
+    return layer((x,y)=>{
+      const d=depth(x,y);if(d<0)return null;
+      // Layered lobes shaded from above-left, with lit tops and blue-violet undersides.
+      const up=depth(x,y-1.2),down=depth(x,y+1.5);
+      if(d<.75)return storm?'#454b6d':'#687496';
+      if(down<.6)return storm?'#5c6487':'#8996b7';
+      if(up<1.0)return storm?'#b2b8d4':'#f4f0f3';
+      const top=puffs.some(([cx,cy,rx,ry])=>y<cy-ry*.15&&Math.hypot((x-cx+1.2)/rx,(y-cy+1.3)/ry)<.81);
+      const lower=puffs.some(([cx,cy,rx,ry])=>y>cy+ry*.23&&Math.hypot((x-cx)/rx,(y-cy)/ry)<.91);
+      return storm?(top?'#a0a9cb':lower?'#6d779e':'#8590b3'):(top?'#e5e8f3':lower?'#b1bdd7':'#c9d3e6');
+    });
+  }
+  const precip=kind==='rain'||kind==='snow'||kind==='storm';
+  const partly=kind==='partly';
+  const puffs=partly?[[16,23,9,7],[23,18,9,11],[31,24,8,8],[23,28,15,5]]:
+    precip?[[11,15,9,7],[20,10,10,8],[30,15,8,8],[20,19,17,6]]:
+    [[10,22,8,8],[17,16,10,12],[28,20,10,10],[20,26,18,8]];
+  let content='';
+  if(kind==='sun')content=sun(20,20,12);
+  else if(partly){
+    content=night?moonPhaseSvg(date).replace('<svg ','<svg x="1" y="1" width="25" height="25" '):sun(13,12,7);
+    content+='<g class="wx-cloud-layer">'+cloud(puffs)+'</g>';
+  }else if(kind==='fog'){
+    content='<g class="wx-fog-layer">'+layer((x,y)=>{
+      const strips=[[13,4,33],[20,1,37],[27,6,35],[33,10,30]];
+      for(const [cy,left,right] of strips){
+        if(x>=left&&x<right&&Math.abs(y-cy)<2.5){
+          if(x<left+2||x>right-2)return '#8597af';
+          return y<cy-.5?'#dde4ed':y<cy+1?'#bccbd8':'#899eb7';
+        }
+      }
+      return null;
+    })+'</g>';
+    content='<g opacity=".85">'+cloud([[12,10,8,5],[20,7,9,6],[28,11,9,5],[20,12,14,4]])+'</g>'+content;
+  }else{
+    content='<g class="wx-cloud-layer">'+cloud(puffs,kind==='storm')+'</g>';
+    if(kind==='rain'||kind==='storm'){
+      const drops=kind==='storm'?[[8,28],[15,33]]:Number(code)<60?[[10,28],[20,31],[30,28]]:[[8,29],[17,34],[26,28],[33,33]];
+      content+=drops.map(([cx,cy],i)=>{
+        const art=layer((x,y)=>{
+          const dx=x-cx,dy=y-cy;
+          if(dy>=-4&&dy<=3&&Math.abs(dx+.35*dy)<1.6)return dy<-1?'#a5e7ff':dx<0?'#6ebfe8':'#4594ca';
+          return null;
+        });
+        return '<g class="wx-rain-drop" style="animation-delay:'+(i*-.22)+'s">'+art+'</g>';
+      }).join('');
+    }
+    if(kind==='storm'){
+      const bolt=[[24,22,7,3],[22,25,7,3],[20,28,12,3],[25,31,4,3],[23,34,3,3],[22,37,2,2]];
+      content+='<g class="wx-lightning">'+bolt.map(([x,y,w,h])=>pixel(x,y,w,h,'#ecad45')+pixel(x+1,y,Math.max(1,w-2),Math.max(1,h-1),'#fff0a5')).join('')+'</g>';
+    }
+    if(kind==='snow'){
+      for(const [cx,cy] of [[9,29],[21,34],[32,28]]){
+        content+=layer((x,y)=>{
+          const dx=x-cx,dy=y-cy,ax=Math.abs(dx),ay=Math.abs(dy);
+          return (ax<.8&&ay<4.2||ay<.8&&ax<4.2||Math.abs(ax-ay)<.7&&ax<2.8&&ay<2.8)?(ax+ay<2?'#fff5ed':'#b4ddf2'):null;
+        });
+      }
+    }
+  }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>';
 }
 Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, glyphSvg, weatherIconSvg });
 });
