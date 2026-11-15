@@ -111,3 +111,29 @@ test('capsule is a single rounded symmetric pixel shape with an unbroken outline
   assert.ok(x>=0&&x<32&&y>=0&&y<32,'capsule fits within icon bounds');
  }
 });
+
+import { quantityDisplay, quantityMeter } from '../js/data/tracking.js';
+import { INVENTORY_ASSETS, ASSET_GROUPS, inventoryAssetSvg, assetGroup } from '../js/ui/inventory-assets.js';
+test('quantity meter is independent of item and global maximum visibility',()=>{
+ const meta={max_quantity:100,quantity_percent:true};
+ assert.equal(quantityDisplay(94,meta),'94%');
+ assert.equal(quantityDisplay(94,{...meta,show_max_quantity:false}),'94');
+ assert.equal(quantityDisplay(94,meta,false),'94');
+ assert.equal(quantityMeter(94,{...meta,show_max_quantity:false}),94);
+ assert.equal(quantityDisplay(17,{max_quantity:50}),'17/50');
+ assert.equal(quantityMeter(17,{max_quantity:50}),34);
+ assert.equal(quantityMeter(0,{max_quantity:0}),0);
+ assert.equal(trackMeta({}).show_max_quantity,true);
+ assert.equal(trackMeta({show_max_quantity:false}).show_max_quantity,false);
+});
+test('each built-in category has sixteen distinct hand-drawn objects',()=>{
+ assert.equal(ASSET_GROUPS.length,7);
+ assert.equal(INVENTORY_ASSETS.length,112);
+ assert.equal(new Set(INVENTORY_ASSETS.map(a=>a.id)).size,112);
+ assert.equal(new Set(INVENTORY_ASSETS.map(a=>inventoryAssetSvg(a.id))).size,112);
+ for(const group of ASSET_GROUPS)assert.equal(INVENTORY_ASSETS.filter(a=>a.group===group.id).length,16);
+ for(const a of INVENTORY_ASSETS){assert.match(inventoryAssetSvg(a.id),/shape-rendering="crispEdges"/);assert.ok(a.spanish);}
+ assert.equal(assetGroup({name:'Pharmacy'}),'pharmacy');
+ assert.equal(assetGroup({name:'Custom category'}),'all');
+ assert.equal(inventoryAssetSvg('invalid'),'');
+});

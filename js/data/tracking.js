@@ -14,6 +14,7 @@ export function trackMeta(meta = {}) {
     overrides: meta.overrides || {}, durability: Number.isFinite(meta.durability) ? meta.durability : 100,
     max_quantity: Number.isFinite(meta.max_quantity) ? meta.max_quantity : null,
     quantity_percent: meta.quantity_percent === true,
+    show_max_quantity: meta.show_max_quantity !== false,
     icon_preset: typeof meta.icon_preset === 'string' ? meta.icon_preset : 'auto',
     icon_color: /^#[0-9a-f]{6}$/i.test(String(meta.icon_color || '')) ? meta.icon_color : null,
     icon_body_color: /^#[0-9a-f]{6}$/i.test(String(meta.icon_body_color || '')) ? meta.icon_body_color : null,
@@ -51,6 +52,14 @@ export function attentionFor(item, meta, defaults, now = new Date()) {
 export function quantityDisplay(quantity, meta = {}, showMax = true) {
   const count = Math.max(0, Number(quantity) || 0);
   const max = Math.max(count, Number.isFinite(meta.max_quantity) ? meta.max_quantity : count);
+  if (!showMax || meta.show_max_quantity === false) return String(count);
   if (meta.quantity_percent) return `${max > 0 ? Math.round(count / max * 100) : 0}%`;
-  return showMax ? `${count}/${max}` : String(count);
+  return `${count}/${max}`;
+}
+
+// Visibility never changes the underlying capacity or meter fill.
+export function quantityMeter(quantity, meta = {}) {
+  const count = Math.max(0, Number(quantity) || 0);
+  const max = Math.max(count, Number.isFinite(meta.max_quantity) ? meta.max_quantity : count);
+  return max > 0 ? Math.min(100, Math.max(0, count / max * 100)) : 0;
 }

@@ -54,16 +54,16 @@ const BOTTLE = [
 // and a continuous outline keep the capsule recognizable at inventory size.
 const CAPSULE = [
   '............',
-  '......DDDDD.',
+  '......DDDD..',
   '.....DQQPPD.',
   '....DQQPPPD.',
-  '...DQQPPPND.',
-  '..DXXPPPNND.',
-  '.DXXXXPNND..',
-  '.DXXXXYND...',
-  '.DXXXYYD....',
-  '.DXXYYD.....',
-  '.DDDDD......',
+  '...DQQPPPPD.',
+  '..DXXPPPPND.',
+  '.DXXXXPPND..',
+  '.DXXXXXND...',
+  '.DXXXXYD....',
+  '.DXXXYD.....',
+  '..DDDD......',
   '............',
 ];
 const TABLET = [
@@ -116,7 +116,7 @@ function renderBottle(kind, accent, meta) {
     return out;
   }).join('');
   const bottle=grid(BOTTLE,8,3);
-  const overlay=kind==='bottle-pill'?grid(CAPSULE,17,19):isTablet?grid(TABLET,18,22):'';
+  const overlay=kind==='bottle-pill'?grid(CAPSULE,19,19):isTablet?grid(TABLET,20,21):'';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true"><g data-part="bottle">${bottle}</g><g data-part="dose">${overlay}</g></svg>`;
 }
 

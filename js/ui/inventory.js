@@ -3,6 +3,7 @@ import { resolveDailyLoot } from '../data/daily-loot.js';
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
 import { pixelIconSvg } from './pixel-icon.js';
+import { INVENTORY_ASSETS, ASSET_GROUPS, assetGroup, isAssetPreset, inventoryAssetSvg } from './inventory-assets.js';
 import { PHARMACY_PRESETS, MEDICINE_COLOR_DEFAULTS, isPharmacyCategory, defaultMedicinePreset, defaultMedicineColor, medicinePreset, medicineColor, pharmacyIconSvg } from './pharmacy-icons.js';
 import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
@@ -10,13 +11,14 @@ import {
 } from '../data/inventory-logic.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
-import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor, quantityDisplay } from '../data/tracking.js';
+import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor, quantityDisplay, quantityMeter } from '../data/tracking.js';
 import { t, locale, language, categoryLabel } from './language.js';
 import { uuid } from '../data/util.js';
 import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 
 const RARITY_RANK = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
 const FALLBACK_COLOR = '#c9b58a';
+const inventoryPreset = value => isAssetPreset(value) ? value : medicinePreset(value);
 export function createInventoryView({ store, photos, auth = null, config = {} }) {
   const state = {
     pane: 'items', // 'items' | 'places'
@@ -60,7 +62,14 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       parts.push(h('span', { class: 'track-readout' }, `${t('Durability')} ${n}%`));
       parts.push(h('span', { class: 'track-meter', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(n), 'aria-label': t('Durability') }, h('span', { style: `width:${n}%;--meter-color:${n<=25?'#d9604c':n<=50?'#e0a23a':'#7fb356'}` })));
     }
-    if (enabled.quantity) parts.push(h('span', { class: 'track-readout' }, quantityText(item)));
+    if (enabled.quantity) {
+      const n = quantityMeter(item.quantity, meta);
+      const label = quantityText(item);
+      const color = item.quantity <= (meta.low_stock_threshold ?? 5) ? '#d9604c' : n <= 50 ? '#e0a23a' : '#7fb356';
+      parts.push(h('span', { class: 'quantity-track' },
+        h('span', { class: 'track-readout' }, label),
+        h('span', { class: 'track-meter quantity-meter', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(n), 'aria-valuetext': label, 'aria-label': t('Quantity') }, h('span', { style: `width:${n}%;--meter-color:${color}` }))));
+    }
     if (enabled.condition) parts.push(h('span', { class: 'track-chip' }, t(meta.condition || 'Good')));
     if (enabled.expiration && meta.expiration_date) parts.push(h('span', { class: 'track-chip' }, `${t('Expiration')}: ${meta.expiration_date}`));
     const alerts = attentionFor(item, meta, categoryFields(data.categoryDefaults, item.category_id));
@@ -84,8 +93,8 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   function art(item, cls = 'art') {
     const cat = catById().get(item.category_id);
     const meta = metaOf(item);
-    const box = h('span', { class: cls, html: pharmacyIconSvg(item.name, cat, meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
-    if (item.photo_path && medicinePreset(meta.icon_preset) === 'auto') {
+    const box = h('span', { class: cls, html: inventoryAssetSvg(meta.icon_preset) || pharmacyIconSvg(item.name, cat, meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
+    if (item.photo_path && inventoryPreset(meta.icon_preset) === 'auto') {
       photos.urlFor(item).then((url) => {
         if (url && box.isConnected !== false) box.replaceChildren(h('img', { src: url, alt: '', loading: 'lazy' }));
       });
@@ -112,7 +121,6 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     },
     h('span', { class: 'tile-frame' },
       art(item, 'art'),
-      fieldsOf(item).quantity && (item.quantity > 1 || metaOf(item).quantity_percent) ? h('span', { class: 'qty' }, metaOf(item).quantity_percent ? quantityText(item) : item.quantity) : null,
       item.is_lost ? h('span', { class: 'lost-mark', 'aria-hidden': 'true' }, '?') : null),
     h('span', { class: 'tile-name' }, item.name), barFor(item));
   }
@@ -121,8 +129,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     return h('button', { class: `row-item r-${item.rarity}`, type: 'button', onclick: () => openItemSheet(item) },
       h('span', { class: 'row-art' }, art(item, 'art')),
       h('span', { class: 'row-text' },
-        h('span', { class: 'row-name' }, item.name,
-          fieldsOf(item).quantity && (item.quantity > 1 || metaOf(item).quantity_percent) ? h('span', { class: 'row-qty' }, metaOf(item).quantity_percent ? ` ${quantityText(item)}` : ` x${item.quantity}`) : null),
+        h('span', { class: 'row-name' }, item.name),
         item.is_lost ? h('span', { class: 'lost-tag' }, t('Lost, last seen:')) : null,
         breadcrumb(item), barFor(item)));
   }
@@ -274,7 +281,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const name = h('input', { type: 'text', id: 'it-name', value: existing?.name ?? preset.name ?? '', maxlength: 200, autocomplete: 'off' });
     const initialMeta = trackMeta(existing ? metaOf(existing) : {});
-    draft.iconPreset = medicinePreset(initialMeta.icon_preset);
+    draft.iconPreset = inventoryPreset(initialMeta.icon_preset);
     draft.iconColor = initialMeta.icon_color || defaultMedicineColor(name.value);
     draft.iconBodyColor = initialMeta.icon_body_color;
     draft.iconPaperColor = initialMeta.icon_paper_color;
@@ -306,6 +313,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const maximum = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.max_quantity ?? Math.max(1, Number(qty.value) || 1) });
     const threshold = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.low_stock_threshold });
     const quantityPercent = h('input', { type: 'checkbox', checked: initialMeta.quantity_percent });
+    const showMaximum = h('input', { type: 'checkbox', checked: initialMeta.show_max_quantity });
     const condition = h('select', {}, CONDITIONS.map(x => h('option', { value:x, selected: initialMeta.condition === x }, t(x))));
     const expiration = h('input', { type: 'date', value: initialMeta.expiration_date });
     const price = h('input', { type: 'number', min: 0, step: '0.01', value: initialMeta.purchase_price ?? '', placeholder: 'Optional' });
@@ -324,7 +332,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       qtyGroup.hidden = !flags.quantity;
       replace(trackingInputs,
         qtyGroup,
-        flags.quantity ? field('Maximum quantity', maximum) : null,
+        flags.quantity ? h('div', {class:'tracking-control'}, field('Maximum quantity', maximum), h('label', {class:'check item-percent'}, showMaximum, t('Show maximum quantity'))) : null,
         flags.quantity ? field('Low stock threshold', threshold) : null,
         flags.quantity ? h('label', { class:'check item-percent' }, quantityPercent, t('Show quantity as percentage')) : null,
         flags.durability ? h('div', { class:'tracking-control item-full' }, h('label', {}, t('Durability')), h('div', { class:'track-slider' }, durability, durabilityValue)) : null,
@@ -362,6 +370,21 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const photoBox = h('div', { class: 'photo-box' });
     const presetPanel = h('div', { class: 'pharmacy-presets' });
+    const catalogPanel = h('div', { class: 'pharmacy-presets asset-panel' });
+    let catalogGroup = assetGroup(catById().get(category.value));
+    const catalogSearch = h('input',{type:'search',placeholder:t('Search icon assets'),'aria-label':t('Search icon assets')});
+    const catalogFilter = h('select',{'aria-label':t('Icon category')},h('option',{value:'all'},t('All')),ASSET_GROUPS.map(g=>h('option',{value:g.id},language()==='es'?g.es:g.en)));
+    catalogFilter.value=catalogGroup;
+    const catalogButtons = h('div',{class:'pharmacy-preset-grid asset-grid',role:'group','aria-label':t('Inventory icon assets')});
+    function drawCatalog(){
+      const q=catalogSearch.value.trim().toLowerCase();
+      const assets=INVENTORY_ASSETS.filter(a=>(catalogGroup==='all'||a.group===catalogGroup||a.id===draft.iconPreset)&&(!q||(`${a.name} ${a.spanish} ${a.id}`).toLowerCase().includes(q)||a.id===draft.iconPreset));
+      replace(catalogButtons,assets.map(a=>h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===a.id?' on':''}`,'aria-pressed':String(draft.iconPreset===a.id),onclick:()=>{draft.iconPreset=a.id;drawMedicineOptions();renderPhoto();}},h('span',{class:'pharmacy-preset-preview',html:inventoryAssetSvg(a.id)}),h('span',{},language()==='es'?a.spanish:a.name))),assets.length?null:h('span',{class:'hint'},t('No matching icons')));
+    }
+    catalogFilter.addEventListener('change',()=>{catalogGroup=catalogFilter.value;drawCatalog();});
+    catalogSearch.addEventListener('input',drawCatalog);
+    const clearAsset=h('button',{type:'button',class:'btn small ghost',onclick:()=>{draft.iconPreset='auto';drawMedicineOptions();renderPhoto();}},t('Automatic / photo'));
+    catalogPanel.append(h('div',{class:'pharmacy-preset-head'},h('strong',{},t('Inventory icon assets')),clearAsset),h('div',{class:'asset-filters'},catalogFilter,catalogSearch),catalogButtons);
     const presetNames = {auto:'Automatic / photo',bottle:'Medicine bottle','bottle-pill':'Bottle with capsule','bottle-tablet':'Bottle with tablet',spray:'Squeeze nasal spray',symbol:'Generic pixel icon'};
     const presetButtons = h('div', { class:'pharmacy-preset-grid', role:'group', 'aria-label':t('Pharmacy icon presets') });
     const iconMeta = (key = draft.iconPreset) => ({
@@ -393,14 +416,16 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     }},t('Reset icon colors'));
     function drawMedicineOptions() {
       const cat=catById().get(category.value),kind=activeKind();
-      presetPanel.hidden=!isPharmacyCategory(cat)&&defaultMedicinePreset(name.value,cat)==='symbol'&&draft.iconPreset==='auto';
+      presetPanel.hidden=!isPharmacyCategory(cat)&&defaultMedicinePreset(name.value,cat)==='symbol'&&!PHARMACY_PRESETS.slice(1).includes(draft.iconPreset);
+      const customAsset=isAssetPreset(kind);
       for(const control of colorControls){
         const value=medicineColor(draft[control.key],control.fallback());
         if(control.input.value!==value)control.input.value=value;
-        control.label.hidden=kind==='symbol'||(control.key==='iconBodyColor'&&kind==='spray')||
+        control.label.hidden=customAsset||kind==='symbol'||(control.key==='iconBodyColor'&&kind==='spray')||
           (control.key==='iconDoseColor'&&!['bottle-pill','bottle-tablet'].includes(kind));
       }
-      resetColors.hidden=kind==='symbol';
+      resetColors.hidden=customAsset||kind==='symbol';
+      drawCatalog();
       replace(presetButtons,PHARMACY_PRESETS.map(key=>{
         const svg=pharmacyIconSvg(name.value,cat,iconMeta(key))||pixelIconSvg(id,{color:cat?.color||FALLBACK_COLOR});
         return h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===key?' on':''}`,'aria-pressed':String(draft.iconPreset===key),onclick:()=>{
@@ -410,7 +435,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     }
     presetPanel.append(h('div',{class:'pharmacy-preset-head'},h('strong',{},t('Pharmacy icon presets')),resetColors),presetButtons,
       h('div',{class:'pharmacy-color-grid'},colorControls.map(c=>c.label)));
-    category.addEventListener('change',()=>{drawMedicineOptions();renderPhoto();});
+    category.addEventListener('change',()=>{catalogGroup=assetGroup(catById().get(category.value));catalogFilter.value=catalogGroup;drawMedicineOptions();renderPhoto();});
     name.addEventListener('change',()=>{if(!draft.iconColorEdited)draft.iconColor=defaultMedicineColor(name.value);drawMedicineOptions();renderPhoto();});
     const fileInput = h('input', {
       type: 'file', accept: 'image/*', class: 'visually-hidden', id: 'it-photo',
@@ -430,7 +455,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       const showing = previewUrl || null;
       const preview = h('span', { class: 'photo-preview' });
       const cat = catById().get(category.value);
-      preview.innerHTML = pharmacyIconSvg(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
+      preview.innerHTML = inventoryAssetSvg(draft.iconPreset) || pharmacyIconSvg(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
       if (draft.iconPreset === 'auto' && showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
       else if (draft.iconPreset === 'auto' && hasExisting) photos.urlFor(existing).then(url=>{if(url && preview.isConnected)preview.replaceChildren(h('img',{src:url,alt:''}));}).catch(()=>{});
       photoBox.replaceChildren(preview,
@@ -539,7 +564,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       };
       try {
         await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, show_max_quantity: showMaximum.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
@@ -585,7 +610,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         h('div',{class:'item-field-grid'},field('Category',category),locationField),
         h('section',{class:'item-section item-tracking'},h('h3',{},t('Inventory tracking')),trackingInputs,trackingOptions),
         h('section',{class:'item-section'},h('h3',{},t('Rarity')),h('div',{class:'rarity-row'},rarityBtns),meaning),
-        h('section',{class:'item-section'},h('h3',{},t('Photo / pixel icon')),photoBox,fileInput,presetPanel,iconTools),
+        h('section',{class:'item-section'},h('h3',{},t('Photo / pixel icon')),photoBox,fileInput,presetPanel,catalogPanel,iconTools),
         purchase,extra,error,
         h('button',{type:'submit',class:'visually-hidden'},'Save')),
       footer: [
