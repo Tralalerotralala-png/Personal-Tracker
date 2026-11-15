@@ -114,7 +114,7 @@ test('quantity meter is independent of item and global maximum visibility',()=>{
  const meta={max_quantity:100,quantity_percent:true};
  assert.equal(quantityDisplay(94,meta),'94%');
  assert.equal(quantityDisplay(94,{...meta,show_max_quantity:false}),'94');
- assert.equal(quantityDisplay(94,meta,false),'94');
+ assert.equal(quantityDisplay(94,meta,false),'94%');
  assert.equal(quantityMeter(94,{...meta,show_max_quantity:false}),94);
  assert.equal(quantityDisplay(17,{max_quantity:50}),'17/50');
  assert.equal(quantityMeter(17,{max_quantity:50}),34);

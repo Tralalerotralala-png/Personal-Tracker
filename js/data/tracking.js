@@ -52,9 +52,9 @@ export function attentionFor(item, meta, defaults, now = new Date()) {
 export function quantityDisplay(quantity, meta = {}, showMax = true) {
   const count = Math.max(0, Number(quantity) || 0);
   const max = Math.max(count, Number.isFinite(meta.max_quantity) ? meta.max_quantity : count);
-  if (!showMax || meta.show_max_quantity === false) return String(count);
+  if (meta.show_max_quantity === false) return String(count);
   if (meta.quantity_percent) return `${max > 0 ? Math.round(count / max * 100) : 0}%`;
-  return `${count}/${max}`;
+  return showMax ? `${count}/${max}` : String(count);
 }
 
 // Visibility never changes the underlying capacity or meter fill.
