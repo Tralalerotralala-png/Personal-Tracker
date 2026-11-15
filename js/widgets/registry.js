@@ -9,7 +9,7 @@ import { mountCurrency } from './currency.js';
 import { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
 import { locationPath } from '../data/inventory-logic.js';
-import { dailyLoot } from '../data/daily-loot.js';
+import { resolveDailyLoot } from '../data/daily-loot.js';
 import { timeAgo } from '../ui/format.js';
 import {articleKey,readingIndex,updateReading} from '../feed/reading.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
@@ -164,12 +164,12 @@ function mountLoot(el, { store, showPlaces = true, interactive = false }) {
   const render = async () => {
     const [items, locations] = await Promise.all([store.list('items'), store.list('locations')]);
     const lost = items.filter((i) => i.is_lost);
-    const loot = dailyLoot(items);
+    const loot = await resolveDailyLoot(store, items);
     if (!items.length) return replace(el, note('No items yet. Add some in the Pack tab.'));
     // On the wallpaper, where things are stored is hidden unless you turned that on.
     const where = (i) => (showPlaces ? locationPath(locations, i.location_id) : null);
     replace(el, h('div', { class: 'w-loot' },
-      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, "Today's loot"), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
+      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, t("Today's loot")), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
       lost.length ? h('div', { class: 'w-lost' }, h('span', { class: 'w-k warn' }, lost.length === 1 ? '1 lost quest' : `${lost.length} lost quests`),
         lost.slice(0, 3).map((i) => {
           const days = daysSince(i.lost_since);
@@ -177,7 +177,7 @@ function mountLoot(el, { store, showPlaces = true, interactive = false }) {
           return h('p', {}, h('b', {}, i.name), h('span', { class: 'w-path' }, detail));
         })) : null));
   };
-  const inst = live(render, (run) => [storeTables(store, ['items', 'locations'], run)]);
+  const inst = live(render, (run) => [storeTables(store, ['items', 'locations', 'settings'], run)]);
   let lastDay = todayKeyLocal();
   const checkDay = () => { const next = todayKeyLocal(); if (next !== lastDay) { lastDay = next; inst.refresh(); } };
   const timer = setInterval(checkDay, 30_000);
