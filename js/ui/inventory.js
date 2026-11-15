@@ -3,6 +3,7 @@ import { resolveDailyLoot } from '../data/daily-loot.js';
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
 import { pixelIconSvg } from './pixel-icon.js';
+import { PHARMACY_PRESETS, isPharmacyCategory, defaultMedicinePreset, defaultMedicineColor, medicinePreset, medicineColor, pharmacyIconSvg } from './pharmacy-icons.js';
 import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
   searchItems, locationPath, locationPathParts, indexById, descendantIds,
@@ -16,30 +17,6 @@ import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 
 const RARITY_RANK = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
 const FALLBACK_COLOR = '#c9b58a';
-const methotrexateIcon = './icons/inventory/methotrexate-16.png';
-const isMethotrexate = name => /^methotrexate(?:\b|$)/i.test((name || '').trim());
-
-const medicineSprites = {
-  montelukast: [
-    '................','.....dddddd.....','....dccccccd....','....dchchchd....','....dddddddd....','.....oooooo.....','....obbbbbb o....'.replace(' ',''),'...obbbbbbbo....','...obwwwwwbo....','...obwgggwbo....','...obwwwwwbo....','...obwgggwbo....','...obwwwwwbo....','...obbbbbbbo....','....ooooooo.....','................'
-  ],
-  loratadine: [
-    '................','.....dddddd.....','....dccccccd....','....dchchchd....','....dddddddd....','.....oooooo.....','....obbbbbbo....','...obbbbbbbo....','...obwwwwwbo....','...obwpppwbo....','...obwwwwwbo....','...obwpppwbo....','...obwwwwwbo....','...obbbbbbbo....','....ooooooo.....','................'
-  ],
-  oximetazoline: [
-    '.......dd.......','.......dcdd.....','.......dccd.....','.......dcdd.....','......dwwd......','.....dddddd.....','.....dchhcd.....','....dwwwwwwd....','...dwwwwwwwwd...','...dwwgggwwwd...','...dwwgggwwwd...','....dwwwwwwd....','....dwwggwwd....','....dwwwwwwd....','.....dddddd.....','................'
-  ]
-};
-const medicinePalette = {d:'#59432f',c:'#e5c58c',h:'#fff2cd',o:'#92552b',b:'#d58a40',w:'#f4ead3',g:'#54b5a0',p:'#a39bdc'};
-function medicineIcon(name) {
-  const key = Object.keys(medicineSprites).find(k => String(name || '').trim().toLowerCase().split(/[^a-z]/)[0] === k);
-  if (!key) return '';
-  const pixels = medicineSprites[key].flatMap((row,y) => [...row].map((c,x) => medicinePalette[c] ? `<rect x="${x}" y="${y}" width="1" height="1" fill="${medicinePalette[c]}"/>` : '')).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${pixels}</svg>`;
-}
-
-
-
 export function createInventoryView({ store, photos, auth = null, config = {} }) {
   const state = {
     pane: 'items', // 'items' | 'places'
@@ -106,9 +83,9 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
   function art(item, cls = 'art') {
     const cat = catById().get(item.category_id);
-    const box = h('span', { class: cls, html: medicineIcon(item.name) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
-    if (!item.photo_path && isMethotrexate(item.name)) box.replaceChildren(h('img', { src: methotrexateIcon, alt: '', class: 'pixel-inventory-icon' }));
-    if (item.photo_path) {
+    const meta = metaOf(item);
+    const box = h('span', { class: cls, html: pharmacyIconSvg(item.name, cat, meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
+    if (item.photo_path && medicinePreset(meta.icon_preset) === 'auto') {
       photos.urlFor(item).then((url) => {
         if (url && box.isConnected !== false) box.replaceChildren(h('img', { src: url, alt: '', loading: 'lazy' }));
       });
@@ -297,6 +274,10 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
     const name = h('input', { type: 'text', id: 'it-name', value: existing?.name ?? preset.name ?? '', maxlength: 200, autocomplete: 'off' });
     const initialMeta = trackMeta(existing ? metaOf(existing) : {});
+    draft.iconPreset = medicinePreset(initialMeta.icon_preset);
+    draft.iconColor = initialMeta.icon_color || defaultMedicineColor(name.value);
+    draft.previewUrl = null;
+    const field = (label, control) => h('label', { class: 'item-field' }, h('span', {}, t(label)), control);
     const qty = h('input', { type: 'number', id: 'it-qty', min: 0, step: 1, inputmode: 'numeric', value: existing?.quantity ?? 1 });
     const stepQty = (d) => { qty.value = Math.max(0, (parseInt(qty.value, 10) || 0) + d); if (Number(qty.value)>Number(maximum.value)) maximum.value=qty.value; };
     const qtyGroup = h('div', { class:'tracking-control' }, h('label', { for:'it-qty' }, t('Remaining quantity')),
@@ -313,7 +294,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     // The 'Reset to category defaults' button restores inheritance without deleting values.
     const overrides = { ...(initialMeta.overrides || {}) };
     const fieldChecks = {};
-    const trackingInputs = h('div', { class: 'tracking-inputs' });
+    const trackingInputs = h('div', { class: 'tracking-inputs item-field-grid' });
     const trackingNote = h('p', { class: 'hint' });
     const durability = h('input', { type: 'range', min: 0, max: 100, step: 1, value: initialMeta.durability });
     const durabilityValue = h('output', {}, `${initialMeta.durability}%`);
@@ -337,11 +318,14 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         fieldChecks[field].dataset.inherited = String(typeof overrides[field] !== 'boolean');
       }
       qtyGroup.hidden = !flags.quantity;
-      trackingInputs.replaceChildren(
-        flags.durability ? h('div', { class:'tracking-control' }, h('label', {}, t('Durability')), h('div', { class:'track-slider' }, durability, durabilityValue)) : null,
-        flags.quantity ? h('div', { class:'tracking-control' }, h('label', {}, t('Maximum quantity')), maximum, h('label', {}, t('Low stock threshold')), threshold, h('label', { class:'check' }, quantityPercent, t('Show quantity as percentage'))) : null,
-        flags.condition ? h('div', { class:'tracking-control' }, h('label', {}, t('Condition')), condition) : null,
-        flags.expiration ? h('div', { class:'tracking-control' }, h('label', {}, t('Expiration')), expiration) : null
+      replace(trackingInputs,
+        qtyGroup,
+        flags.quantity ? field('Maximum quantity', maximum) : null,
+        flags.quantity ? field('Low stock threshold', threshold) : null,
+        flags.quantity ? h('label', { class:'check item-percent' }, quantityPercent, t('Show quantity as percentage')) : null,
+        flags.durability ? h('div', { class:'tracking-control item-full' }, h('label', {}, t('Durability')), h('div', { class:'track-slider' }, durability, durabilityValue)) : null,
+        flags.condition ? field('Condition', condition) : null,
+        flags.expiration ? field('Expiration', expiration) : null
       );
       trackingNote.textContent = Object.keys(overrides).length ? 'Customized for this item. Other fields inherit the category defaults.' : 'All fields currently inherit the category defaults.';
     }
@@ -373,24 +357,44 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const meaning = h('p', { class: 'hint' }, data.rarityLabels?.[draft.rarity]?.meaning ?? '');
 
     const photoBox = h('div', { class: 'photo-box' });
+    const presetPanel = h('div', { class: 'pharmacy-presets' });
+    const presetNames = {auto:'Automatic / photo',bottle:'Medicine bottle','bottle-pills':'Bottle and pills',spray:'Squeeze nasal spray',symbol:'Generic pixel icon'};
+    const colorInput = h('input', { type:'color', value:draft.iconColor, 'aria-label':t('Icon color') });
+    const presetButtons = h('div', { class:'pharmacy-preset-grid', role:'group', 'aria-label':t('Pharmacy icon presets') });
+    const drawMedicineOptions = () => {
+      const cat = catById().get(category.value);
+      presetPanel.hidden = !isPharmacyCategory(cat) && defaultMedicinePreset(name.value,cat)==='symbol' && draft.iconPreset==='auto';
+      colorInput.value = draft.iconColor;
+      replace(presetButtons, PHARMACY_PRESETS.map(key => {
+        const svg = pharmacyIconSvg(name.value,cat,{icon_preset:key,icon_color:draft.iconColor}) || pixelIconSvg(id, {color:cat?.color || FALLBACK_COLOR});
+        return h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===key?' on':''}`,'aria-pressed':String(draft.iconPreset===key),onclick:()=>{draft.iconPreset=key;drawMedicineOptions();renderPhoto();}},h('span',{class:'pharmacy-preset-preview',html:svg}),h('span',{},t(presetNames[key])));
+      }));
+    };
+    colorInput.addEventListener('input',()=>{draft.iconColor=medicineColor(colorInput.value);if(draft.iconPreset==='auto')draft.iconPreset=defaultMedicinePreset(name.value,catById().get(category.value));drawMedicineOptions();renderPhoto();});
+    presetPanel.append(h('div',{class:'pharmacy-preset-head'},h('strong',{},t('Pharmacy icon presets')),h('label',{class:'item-color'},t('Icon color'),colorInput)),presetButtons);
+    category.addEventListener('change',()=>{drawMedicineOptions();renderPhoto();});
+    name.addEventListener('change',()=>{if(draft.iconPreset==='auto'&&!initialMeta.icon_color)draft.iconColor=defaultMedicineColor(name.value);drawMedicineOptions();renderPhoto();});
     const fileInput = h('input', {
       type: 'file', accept: 'image/*', class: 'visually-hidden', id: 'it-photo',
       onchange: (e) => {
         const f = e.target.files?.[0];
         if (!f) return;
-        draft.photoFile = f; draft.removePhoto = false;
+        draft.photoFile = f; draft.removePhoto = false; draft.iconPreset = 'auto';
+        drawMedicineOptions();
         const url = URL.createObjectURL(f);
         renderPhoto(url);
       },
     });
-    function renderPhoto(previewUrl) {
+    function renderPhoto(previewUrl = draft.previewUrl) {
+      if (draft.previewUrl && draft.previewUrl !== previewUrl) URL.revokeObjectURL(draft.previewUrl);
+      draft.previewUrl = previewUrl;
       const hasExisting = existing?.photo_path && !draft.removePhoto;
       const showing = previewUrl || null;
       const preview = h('span', { class: 'photo-preview' });
-      if (showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
-      else if (hasExisting) { preview.replaceChildren(art(existing, 'art')); }
-      else if (isMethotrexate(name.value)) preview.replaceChildren(h('img', { src: methotrexateIcon, alt: '', class: 'pixel-inventory-icon' }));
-      else preview.innerHTML = medicineIcon(name.value) || pixelIconSvg(id, { color: catById().get(category.value)?.color || FALLBACK_COLOR });
+      const cat = catById().get(category.value);
+      preview.innerHTML = pharmacyIconSvg(name.value,cat,{icon_preset:draft.iconPreset,icon_color:draft.iconColor}) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
+      if (draft.iconPreset === 'auto' && showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
+      else if (draft.iconPreset === 'auto' && hasExisting) photos.urlFor(existing).then(url=>{if(url && preview.isConnected)preview.replaceChildren(h('img',{src:url,alt:''}));}).catch(()=>{});
       photoBox.replaceChildren(preview,
         h('span', { class: 'photo-actions' },
           h('label', { class: 'btn small', for: 'it-photo' }, showing || hasExisting ? 'Replace photo' : 'Take or choose photo'),
@@ -398,7 +402,8 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
             draft.photoFile = null; draft.removePhoto = true; renderPhoto(null);
           } }, 'Remove photo') : null));
     }
-    renderPhoto(null);
+    drawMedicineOptions();
+    renderPhoto();
     // Native, offline sprite generation: no API credentials or third-party upload.
     const generateIcon = h('button', { class: 'btn small', type: 'button', onclick: async () => {
       try {
@@ -414,7 +419,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
           const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
           if (!blob) throw new Error('Could not create the icon.');
           draft.photoFile = new File([blob], 'pixel-icon.png', { type: 'image/png' });
-          draft.removePhoto = false;
+          draft.removePhoto = false; draft.iconPreset = 'auto'; drawMedicineOptions();
           renderPhoto(URL.createObjectURL(blob));
           toast('Pixel icon ready. Save this item to apply it.');
         } finally { URL.revokeObjectURL(url); }
@@ -447,7 +452,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
             for(let n=0;n<3;n++)pixels.data[i+n]=nearest[n];pixels.data[i+3]=255;}
           context.putImageData(pixels,0,0);
           const result=await new Promise(resolve=>cv.toBlob(resolve,'image/png'));if(!result)throw new Error('PNG conversion failed.');
-          draft.photoFile=new File([result],'ai-pixel-icon.png',{type:'image/png'});draft.removePhoto=false;renderPhoto(URL.createObjectURL(result));
+          draft.photoFile=new File([result],'ai-pixel-icon.png',{type:'image/png'});draft.removePhoto=false;draft.iconPreset='auto';drawMedicineOptions();renderPhoto(URL.createObjectURL(result));
           toast(t('AI icon ready. Save this item to apply it.'));
         }finally{URL.revokeObjectURL(url);}
       }catch(err){toast(err.message||'AI image generation failed.');}finally{aiButton.disabled=false;aiButton.textContent=old;}
@@ -496,7 +501,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       };
       try {
         await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
@@ -521,40 +526,30 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       toast('Item deleted');
     }
 
-    const advanced = h('details', { class: 'more', open: isEdit },
-      h('summary', {}, 'More details'),
-      h('label', { for: 'it-cat' }, 'Category'), category,
-      h('h3', { class:'tracking-heading' }, t('Inventory tracking')),
-      h('p', { class:'hint' }, 'Select which fields this item uses. They start with your category defaults.'),
-      trackingChoices, resetTracking, trackingNote, trackingInputs,
-      h('h3', { class:'tracking-heading' }, 'Purchase & warranty'),
-      h('label', {}, t('Purchase price')), price, h('label', {}, 'Currency'), currency,
-      h('label', {}, 'Purchase date'), purchaseDate, h('label', {}, t('Warranty ends')), warrantyDate,
-      h('label', {}, 'Next maintenance date'), maintenanceDate,h('label',{},'Maintenance notes'),maintenanceNotes,
-      h('label', {}, 'Rarity'), h('div', { class: 'rarity-row' }, rarityBtns), meaning,
-      h('label', { for: 'it-desc' }, 'Pixel art description'), desc,
-      h('div', { class: 'inline-actions' },
-        h('button', { class: 'btn small', type: 'button', onclick: suggest }, 'Suggest one'),
-        h('button', { class: 'btn small', type: 'button', onclick: copyPrompt }, 'Copy as image prompt')),
-      h('label', { for: 'it-notes' }, 'Notes'), notes,
-      h('label', { class: 'check', for: 'it-lost' }, lost, 'I cannot find this (start a lost quest)'));
-
+    const trackingOptions = h('details',{class:'item-section'},h('summary',{},t('Tracking fields')),trackingChoices, h('div',{class:'item-track-options'},resetTracking,trackingNote));
+    const purchase = h('details',{class:'item-section'},h('summary',{},t('Purchase & warranty')),
+      h('div',{class:'item-field-grid'},field('Purchase price',price),field('Currency',currency),field('Purchase date',purchaseDate),field('Warranty ends',warrantyDate),field('Next maintenance date',maintenanceDate),field('Maintenance notes',maintenanceNotes)));
+    const iconTools = h('details',{class:'item-section'},h('summary',{},t('Custom icon tools')),
+      h('div',{class:'inline-actions'},generateIcon,aiButton),field('Pixel art description',desc),
+      h('div',{class:'inline-actions'},h('button',{class:'btn small',type:'button',onclick:suggest},'Suggest one'),h('button',{class:'btn small',type:'button',onclick:copyPrompt},'Copy as image prompt')));
+    const extra = h('details',{class:'item-section',open:Boolean(existing?.notes || existing?.is_lost)},h('summary',{},t('Notes & lost status')),
+      field('Notes',notes),h('label',{class:'check',for:'it-lost'},lost,'I cannot find this (start a lost quest)'));
+    const locationField = h('div',{class:'item-field'},h('label',{for:'it-place'},t('Where is it?')),
+      h('div',{class:'place-pick'},place,h('button',{class:'btn small',type:'button',onclick:()=>openPlaceSheet({
+        store,locations:data.locations,onSaved:async(row)=>{await load();place.replaceChildren(...placeOptions(data.locations));place.value=row.id;}
+      })},'New place')));
     const sheet = openSheet({
       title: isEdit ? 'Edit item' : 'Add item',
-      body: h('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); save(); } },
-        h('label', { for: 'it-name' }, 'Name'), name,
-        qtyGroup,
-        h('label', { for: 'it-place' }, 'Where is it?'),
-        h('div', { class: 'place-pick' }, place,
-          h('button', { class: 'btn small', type: 'button', onclick: () => openPlaceSheet({
-            store, locations: data.locations,
-            onSaved: async (row) => { await load(); place.replaceChildren(...placeOptions(data.locations)); place.value = row.id; },
-          }) }, 'New place')),
-        h('label', {}, 'Photo / pixel icon'), photoBox, fileInput,
-        h('div', { class: 'inline-actions' }, generateIcon, aiButton),
-        advanced,
-        error,
-        h('button', { type: 'submit', class: 'visually-hidden' }, 'Save')),
+      size:'item-editor',
+      onClose:()=>{if(draft.previewUrl)URL.revokeObjectURL(draft.previewUrl);},
+      body: h('form', { class:'form item-editor-form', onsubmit:(e)=>{e.preventDefault();save();} },
+        field('Name',name),
+        h('div',{class:'item-field-grid'},field('Category',category),locationField),
+        h('section',{class:'item-section item-tracking'},h('h3',{},t('Inventory tracking')),trackingInputs,trackingOptions),
+        h('section',{class:'item-section'},h('h3',{},t('Rarity')),h('div',{class:'rarity-row'},rarityBtns),meaning),
+        h('section',{class:'item-section'},h('h3',{},t('Photo / pixel icon')),photoBox,fileInput,presetPanel,iconTools),
+        purchase,extra,error,
+        h('button',{type:'submit',class:'visually-hidden'},'Save')),
       footer: [
         isEdit ? h('button', { class: 'btn danger', type: 'button', onclick: remove }, 'Delete') : null,
         h('span', { class: 'spacer' }),
