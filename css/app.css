@@ -1613,3 +1613,12 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .pharmacy-preset-preview svg { display:block;width:100%;height:100%; }
 @media(min-width:700px) { dialog.sheet.item-editor { width:min(590px,100vw); } }
 @media(max-width:380px) { .item-editor-form .item-field-grid { gap:6px; } .item-editor-form .place-pick { grid-template-columns:1fr; } .pharmacy-preset-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+
+/* Six compact choices (three bottle variants plus automatic, sprayer and generic).
+   Keep the independently editable palette in two short rows on phones. */
+.pharmacy-preset-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.pharmacy-preset-preview { width:44px;height:44px; }
+.pharmacy-color-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px; }
+.item-editor-form .pharmacy-color-grid .item-color { justify-content:space-between;min-width:0;line-height:1.15; }
+.item-editor-form .pharmacy-color-grid input[type=color] { width:34px;height:28px; }
