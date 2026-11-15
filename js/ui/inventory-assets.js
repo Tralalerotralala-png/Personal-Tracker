@@ -12,17 +12,66 @@ export function assetGroup(category) {
   const name=String(category?.name||'').trim().toLowerCase();
   return ASSET_GROUPS.find(g=>[g.en,g.es].some(x=>x.toLowerCase()===name))?.id||'all';
 }
+// Two-dimensional material ramps: warm reflected shadows, cool metal
+// highlights and a restrained golden light source from the upper left.
+const RAMP = {
+ d:['#221b18','#342b27','#5b4b3c','#8c7460'],a:['#4b4038','#756c64','#9d8d7c','#d3c0a5'],
+ s:['#615d59','#a8a6a0','#d7d3c8','#fff1d7'],i:['#b89b72','#f8e8c9','#fff2d7','#fff9eb'],
+ h:['#9a7048','#dfba86','#f4d8a4','#fff0c9'],w:['#532e1b','#93613a','#bd844a','#e9b875'],
+ o:['#85451e','#c77b38','#ecab59','#ffd98b'],y:['#9a5c20','#e6b84d','#ffda77','#fff0b0'],
+ r:['#71302d','#b45449','#e27c63','#ffae8b'],g:['#28513e','#498d70','#76b394','#b3d6a0'],
+ l:['#4e7350','#90bd83','#b9d8a0','#e0e7b5'],b:['#30466b','#496e9e','#70a0cf','#b5d8e7'],
+ c:['#4e768e','#91bdd3','#b9dce6','#e2f1ed'],p:['#625078','#a483b4','#cba8d6','#edd1e6']
+};
+const cache=new Map();
 export function inventoryAssetSvg(preset) {
+  if(cache.has(preset))return cache.get(preset);
   const asset=byId.get(preset);if(!asset)return '';
-  const pixels=Array.from({length:16},()=>Array(16).fill(null));
+  const pixels=Array.from({length:34},()=>Array(34).fill(null));
   for(const cmd of asset.recipe.split(';')){
-    const [x,y,w,h,key]=cmd.split(' '),color=PALETTE[key]||null;
-    for(let j=Number(y);j<Number(y)+Number(h);j++)for(let i=Number(x);i<Number(x)+Number(w);i++)pixels[j][i]=color;
+    const [x,y,w,h,key]=cmd.split(' '),color=RAMP[key]?key:null;
+    for(let j=1+2*Number(y);j<1+2*(Number(y)+Number(h));j++)for(let i=1+2*Number(x);i<1+2*(Number(x)+Number(w));i++)pixels[j][i]=color;
   }
-  const parts=[];
-  for(let y=0;y<16;y++)for(let x=0;x<16;x++){
-    const color=pixels[y][x]||([[0,1],[0,-1],[1,0],[-1,0]].some(([dx,dy])=>pixels[y+dy]?.[x+dx])?'#2a1202':null);
-    if(color)parts.push('<rect x="'+x+'" y="'+y+'" width="1" height="1" fill="'+color+'"/>');
+  // Chamfer external corners on the finer pixel grid, instead of magnifying
+  // the old square blocks. Preserve thin wires, stems, and tool edges.
+  const get=(x,y)=>pixels[y]?.[x]||null;
+  const cuts=[];
+  for(let y=1;y<33;y++)for(let x=1;x<33;x++){
+    const key=get(x,y);if(!key)continue;
+    for(const [dx,dy] of [[1,1],[-1,-1],[1,-1],[-1,1]]){
+      if(!get(x+dx,y)&&!get(x,y+dy)&&get(x-dx,y)===key&&get(x,y-dy)===key&&get(x-dx,y-dy)===key){cuts.push([x,y]);break;}
+    }
   }
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">'+parts.join('')+'</svg>';
+  for(const [x,y] of cuts)pixels[y][x]=null;
+  const out=[];
+  const lit=(x,y)=>{
+    const k=get(x,y);
+    if(!k)return [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]].some(([dx,dy])=>get(x+dx,y+dy))?'#25180f':null;
+    const ramp=RAMP[k],up=get(x,y-1),left=get(x-1,y),down=get(x,y+1),right=get(x+1,y);
+    if(!up&&!left)return ramp[3];
+    if(!up||!left)return ramp[2];
+    if(!down||!right)return ramp[0];
+    if(up!==k&&left!==k)return ramp[2];
+    if(down!==k&&right!==k)return ramp[0];
+    // Secondary material sheen only on broad faces, not random noisy pixels.
+    if((k==='s'||k==='y'||k==='c'||k==='i')&&x%8===3&&y%7===2&&get(x+2,y)===k&&get(x,y+2)===k)return ramp[2];
+    return ramp[1];
+  };
+  for(let y=0;y<34;y++){
+    for(let x=0;x<34;){
+      const color=lit(x,y);let end=x+1;while(end<34&&lit(end,y)===color)end++;
+      if(color)out.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+color+'"/>');x=end;
+    }
+  }
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" shape-rendering="crispEdges" aria-hidden="true">'+out.join('')+'</svg>';
+  cache.set(preset,svg);return svg;
+}
+// Match meaningful item names, never override an explicitly selected sprite.
+const normalizeName=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+export function defaultInventoryAsset(name,category){
+  const query=' '+normalizeName(name)+' ';const group=assetGroup(category);
+  if(group==='pharmacy')return '';
+  const candidates=INVENTORY_ASSETS.filter(a=>group==='all'||a.group===group);
+  const matches=candidates.flatMap(a=>[a.name,a.spanish,a.id.slice(6)].map(normalizeName).filter(n=>n&&query.includes(' '+n+' ')).map(n=>({id:a.id,len:n.length})));
+  matches.sort((a,b)=>b.len-a.len);return matches[0]?.id||'';
 }

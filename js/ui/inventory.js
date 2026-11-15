@@ -3,7 +3,7 @@ import { resolveDailyLoot } from '../data/daily-loot.js';
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
 import { pixelIconSvg } from './pixel-icon.js';
-import { INVENTORY_ASSETS, ASSET_GROUPS, assetGroup, isAssetPreset, inventoryAssetSvg } from './inventory-assets.js';
+import { INVENTORY_ASSETS, ASSET_GROUPS, assetGroup, isAssetPreset, inventoryAssetSvg, defaultInventoryAsset } from './inventory-assets.js';
 import { PHARMACY_PRESETS, MEDICINE_COLOR_DEFAULTS, isPharmacyCategory, defaultMedicinePreset, defaultMedicineColor, medicinePreset, medicineColor, pharmacyIconSvg } from './pharmacy-icons.js';
 import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
@@ -19,6 +19,7 @@ import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 const RARITY_RANK = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
 const FALLBACK_COLOR = '#c9b58a';
 const inventoryPreset = value => isAssetPreset(value) ? value : medicinePreset(value);
+const itemAsset = (name,cat,meta) => inventoryAssetSvg(meta.icon_preset) || pharmacyIconSvg(name,cat,meta) || (inventoryPreset(meta.icon_preset)==='auto' ? inventoryAssetSvg(defaultInventoryAsset(name,cat)) : '');
 export function createInventoryView({ store, photos, auth = null, config = {} }) {
   const state = {
     pane: 'items', // 'items' | 'places'
@@ -93,7 +94,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   function art(item, cls = 'art') {
     const cat = catById().get(item.category_id);
     const meta = metaOf(item);
-    const box = h('span', { class: cls, html: inventoryAssetSvg(meta.icon_preset) || pharmacyIconSvg(item.name, cat, meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
+    const box = h('span', { class: cls, html: itemAsset(item.name,cat,meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
     if (item.photo_path && inventoryPreset(meta.icon_preset) === 'auto') {
       photos.urlFor(item).then((url) => {
         if (url && box.isConnected !== false) box.replaceChildren(h('img', { src: url, alt: '', loading: 'lazy' }));
@@ -392,7 +393,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       icon_paper_color:draft.iconPaperColor, icon_dose_color:draft.iconDoseColor,
     });
     const activeKind = () => draft.iconPreset === 'auto' ? defaultMedicinePreset(name.value,catById().get(category.value)) : draft.iconPreset;
-    const doseDefault = () => activeKind()==='bottle-tablet' ? MEDICINE_COLOR_DEFAULTS.tablet : draft.iconColor;
+    const doseDefault = () => activeKind()==='bottle-tablet' ? MEDICINE_COLOR_DEFAULTS.tablet : MEDICINE_COLOR_DEFAULTS.capsule;
     const colorControls = [
       {key:'iconColor',label:'Cross / accent',fallback:()=>defaultMedicineColor(name.value)},
       {key:'iconBodyColor',label:'Bottle color',fallback:()=>MEDICINE_COLOR_DEFAULTS.body},
@@ -427,7 +428,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       resetColors.hidden=customAsset||kind==='symbol';
       drawCatalog();
       replace(presetButtons,PHARMACY_PRESETS.map(key=>{
-        const svg=pharmacyIconSvg(name.value,cat,iconMeta(key))||pixelIconSvg(id,{color:cat?.color||FALLBACK_COLOR});
+        const svg=itemAsset(name.value,cat,iconMeta(key))||pixelIconSvg(id,{color:cat?.color||FALLBACK_COLOR});
         return h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===key?' on':''}`,'aria-pressed':String(draft.iconPreset===key),onclick:()=>{
           draft.iconPreset=key;drawMedicineOptions();renderPhoto();
         }},h('span',{class:'pharmacy-preset-preview',html:svg}),h('span',{},t(presetNames[key])));
@@ -455,7 +456,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       const showing = previewUrl || null;
       const preview = h('span', { class: 'photo-preview' });
       const cat = catById().get(category.value);
-      preview.innerHTML = inventoryAssetSvg(draft.iconPreset) || pharmacyIconSvg(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
+      preview.innerHTML = itemAsset(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
       if (draft.iconPreset === 'auto' && showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
       else if (draft.iconPreset === 'auto' && hasExisting) photos.urlFor(existing).then(url=>{if(url && preview.isConnected)preview.replaceChildren(h('img',{src:url,alt:''}));}).catch(()=>{});
       photoBox.replaceChildren(preview,

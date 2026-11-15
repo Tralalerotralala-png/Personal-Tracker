@@ -12,7 +12,7 @@ export function defaultMedicinePreset(name, category) {
 }
 export function defaultMedicineColor(name) {
   const n = medication(name);
-  return /^loratadin/.test(n) ? '#a39bdc' : /^montelukast/.test(n) ? '#62bda9' : '#49a89e';
+  return /^loratadin/.test(n) ? '#a39bdc' : /^montelukast/.test(n) ? '#62bda9' : '#0e908d';
 }
 export function medicineColor(value, fallback = '#49a89e') {
   return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback;
@@ -20,68 +20,60 @@ export function medicineColor(value, fallback = '#49a89e') {
 export function medicinePreset(value) {
   return value === 'bottle-pills' ? 'bottle-pill' : PHARMACY_PRESETS.includes(value) ? value : 'auto';
 }
-// Shared artwork sampled from the approved bottle-only reference. Each
-// character corresponds to exactly one pixel, and all three bottle presets
-// use this same grid, size, position and palette. The dose is a separate layer.
+// Pixel samples from the two user-approved reference artworks. The shared
+// amber bottle is reconstructed only where covered by the foreground dose.
+// Each dose has its own sampled outline, highlights and independent palette.
 const BOTTLE = [
-  '..DDDDDDDDDD..',
-  '.DDPPPPPPPPDD.',
-  'DPPNNQQQPPNPPD',
-  'DNNNNNNNNNNNND',
-  'DMLNLNLNLNLNMD',
-  'DNLPLPLPLPLPMD',
-  'DMLNLNLNLNLNLD',
-  '.DLOLOLOLOLOD.',
-  '.DFEEEEEEEEFD.',
-  'DFGHGGGGGHHFFD',
-  'DHGIIIKKKKIGHD',
-  'DGIIKIIIIIIHGD',
-  'DFGGGGGGGGGFFD',
-  'DMNNNNABNNNNMD',
-  'DNOPPPAAPPPOND',
-  'DNOPAAAAAAPOND',
-  'DNOOAAAAAAOOND',
-  'DNNPPPAAPPPNND',
-  'DMNNNNBBNNNNMD',
-  'DFGGGGGGGGGGFD',
-  'DHIIKKJJJJIIHD',
-  'DFHIIJJJJIIHFD',
-  '.DFGHHHHHHHFD.',
-  '..DDDDDDDDDD..',
+  "....DDDDDDDDDDDDDDDDDDDD....",
+  "....DDDDDDDDDDDDDDDDDDDD....",
+  "..DDDDppppppppppppppppDDDD..",
+  "..DDDDppppppppppppppppDDDD..",
+  "DDqqqqmmmmmpppppppppmmqqqqDD",
+  "DDqqqqmmmmmppppppppplmqqqqDD",
+  "DDmmqqqqqqqqqqqqqqqqqqqqllDD",
+  "DDmmqqqqqqqqqqqqqqqqqqqqllDD",
+  "DDmmeeooeeooeeooeeooeeoollDD",
+  "DDmmedooeeooeeooeeoodeoollDD",
+  "DDmmeeooeeooeeooeeooeeoollDD",
+  "DDmmeeooeeooeeooeeooeeoollDD",
+  "DDDDeeooeeooeeooeeooeejlDDDD",
+  "DDDDeeooeepoeeopeeooeejjDDDD",
+  "..DDDDDDDDDDDDDDDDDDDDDDDD..",
+  "..DDDDDDDDDDDDDDDDDDDDDDDD..",
+  "DDDDffhhhhhhhhhhhhffffffDDDD",
+  "DDDDffiiiiiiiiiiiiffffffDDDD",
+  "DDffffiiiiiinnnnnnnniiffffDD",
+  "DDffffiiiiiinnnnnnnniiffffDD",
+  "DDffiiiinniiiiiiiiiiiiffffDD",
+  "DDffiiiinniiiiiiiiiiiiffbbDD",
+  "DDbbffffffffffffffffffbbbbDD",
+  "DDbbffffffffffffffffffbbbbDD",
+  "DDmmppppppppppppppppppppmmDD",
+  "DDmmppppppppggggppppppppmmDD",
+  "DDmmmmppppppggggppppppmmmmDD",
+  "DDmmmmppppppggggppppppmmmmDD",
+  "DDmmmmpppggggggggggpppmmmmDD",
+  "DDmmmmpppggggggggggpppmmmmDD",
+  "DDmmmmpppggggggggggpppmmmmDD",
+  "DDmmmmpppggggggggggpppmmmmDD",
+  "DDmmmmppppppggggppppppmmmmDD",
+  "DDmmmmppppppggggppppppmmmmDD",
+  "DDmmppppppppggggppppppppmmDD",
+  "DDmmppppppppppppppppppppmmDD",
+  "DDbbccccccccccccccccccbbbbDD",
+  "DDffccccccccccccccccccffffDD",
+  "DDffiiiihnniiihhhhhhhhffffDD",
+  "DDffiiiiinniiiiiiiiiiiifffDD",
+  "DDffffiiiiiiiiiiiiiiiiffbbDD",
+  "DDDDffiiiihhiiiiiiiiffbbDDDD",
+  "..DDffiiiiiiiiiiiiiiffbbDD..",
+  "..DDDDDDDDDDDDDDDDDDDDDDDD..",
+  "....DDDDDDDDDDDDDDDDDDDD...."
 ];
-// A single diagonal capsule: the lower-left half is entirely colored, and
-// the upper-right half is ivory. Symmetric rounded ends, consistent width,
-// and a continuous outline keep the capsule recognizable at inventory size.
-const CAPSULE = [
-  '............',
-  '......DDDD..',
-  '.....DQQPPD.',
-  '....DQQPPPD.',
-  '...DQQPPPPD.',
-  '..DXXPPPPND.',
-  '.DXXXXPPND..',
-  '.DXXXXXND...',
-  '.DXXXXYD....',
-  '.DXXXYD.....',
-  '..DDDD......',
-  '............',
-];
-const TABLET = [
-  '..DDDDD..',
-  '.DTTTTTD.',
-  'DTQTTRTTD',
-  'DTTTRTTTD',
-  'DTTRTTTTD',
-  'DTRTTTTTD',
-  '.DSSSSSD.',
-  '..DDDDD..',
-];
-const BASE_PALETTE = {
-  D:'#2a1202',E:'#4b1e03',F:'#763913',G:'#a5490a',H:'#b85c0b',I:'#d47812',J:'#e1840d',K:'#fcc46c',
-  L:'#76583d',M:'#ad8d69',N:'#d3b78c',O:'#e8cc9f',P:'#fce3b4',Q:'#fdf6ea',
-  A:'#0c857a',B:'#0a8076',
-};
-export const MEDICINE_COLOR_DEFAULTS = Object.freeze({body:'#d47812',paper:'#fce3b4',tablet:'#fce3b4'});
+const CAPSULE = [[31,24,"DDDDDDD"],[32,24,"DDNNNDDD"],[33,24,"DDPPPDDD"],[34,22,"DDPPPPPPPD"],[35,22,"DDPPPPNNPD"],[36,19,"DDDDPPPPNNNPD"],[37,18,"DDDXXXPPPNNDDD"],[38,18,"DDDXXXPPNNPDDD"],[39,17,"DDDXXXXYYNNDDD"],[40,17,"DDXXXXXYYYDDD"],[41,17,"DDXXXXYYYDD"],[42,17,"DDXXXYYDDDD"],[43,18,"DXXXYYDDD"],[44,19,"DYYYDDD"],[45,19,"DDDDDD"]];
+const TABLET = [[34,20,"DDDDDDDD"],[35,18,"DDDDDDDDDD"],[36,17,"DDDSTRTTDDD"],[37,16,"TDTTTTRTTTDDD"],[38,16,"DTTTTTRTTTTDD"],[39,16,"DTTTTTRTTTTDD"],[40,16,"DTTTTTRTTTTDD"],[41,16,"DTTTTTRTTTSDD"],[42,16,"DSSSTTRTTSSDD"],[43,18,"SSSTRTSSDD"],[44,20,"SSRSSDDD"],[45,18,"DDSSRSSDD"],[46,19,"DDDDDD"]];
+const BASE_PALETTE = {"D":"#251408","a":"#302216","b":"#863a0f","c":"#9a4515","d":"#745339","e":"#825c3f","f":"#b2541b","g":"#0e908d","h":"#d97d23","i":"#e38124","j":"#ac8a66","k":"#3cc7b7","l":"#bc9871","m":"#c5a57f","n":"#fdb95e","o":"#e3c99f","p":"#eed7b0","q":"#f6e3c3"};
+export const MEDICINE_COLOR_DEFAULTS = Object.freeze({body:'#d97d23',paper:'#eed7b0',tablet:'#f6e3c3',capsule:'#3cc7b7'});
 // Preserve the exact sampled palette when colors are unchanged. Recolor
 // shaded pixels relative to their reference, maintaining highlights and depth.
 function tint(source, reference, target) {
@@ -98,13 +90,14 @@ function renderBottle(kind, accent, meta) {
   const body=medicineColor(meta.icon_body_color,MEDICINE_COLOR_DEFAULTS.body);
   const paper=medicineColor(meta.icon_paper_color,MEDICINE_COLOR_DEFAULTS.paper);
   const isTablet=kind==='bottle-tablet';
-  const dose=medicineColor(meta.icon_dose_color,isTablet?MEDICINE_COLOR_DEFAULTS.tablet:accent);
+  const dose=medicineColor(meta.icon_dose_color,isTablet?MEDICINE_COLOR_DEFAULTS.tablet:MEDICINE_COLOR_DEFAULTS.capsule);
   const palette={...BASE_PALETTE};
-  for(const key of 'EFGHIJK')palette[key]=tint(palette[key],MEDICINE_COLOR_DEFAULTS.body,body);
-  for(const key of 'LMNOPQ')palette[key]=tint(palette[key],MEDICINE_COLOR_DEFAULTS.paper,paper);
-  palette.A=accent;palette.B=tint('#0a8076','#0c857a',accent);
-  palette.X=dose;palette.Y=tint('#0a655e','#0c857a',dose);
-  palette.T=dose;palette.S=tint('#ad8d69','#fce3b4',dose);palette.R=tint('#b09269','#fce3b4',dose);
+  for(const key of 'bcfhin')palette[key]=tint(palette[key],MEDICINE_COLOR_DEFAULTS.body,body);
+  for(const key of 'dej lmopq'.replaceAll(' ',''))palette[key]=tint(palette[key],MEDICINE_COLOR_DEFAULTS.paper,paper);
+  palette.g=accent;
+  palette.X=dose;palette.Y=tint('#0e908d',MEDICINE_COLOR_DEFAULTS.capsule,dose);
+  palette.P='#f6e3c3';palette.N='#eed7b0';
+  palette.T=dose;palette.S=tint('#c5a57f',MEDICINE_COLOR_DEFAULTS.tablet,dose);palette.R=tint('#bc9871',MEDICINE_COLOR_DEFAULTS.tablet,dose);
   // Run-length encoding keeps the SVG compact; no interpolation, images or filters.
   const grid=(rows,ox,oy)=>rows.map((row,y)=>{
     let out='';
@@ -115,9 +108,9 @@ function renderBottle(kind, accent, meta) {
     }
     return out;
   }).join('');
-  const bottle=grid(BOTTLE,8,3);
-  const overlay=kind==='bottle-pill'?grid(CAPSULE,19,19):isTablet?grid(TABLET,20,21):'';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true"><g data-part="bottle">${bottle}</g><g data-part="dose">${overlay}</g></svg>`;
+  const bottle=grid(BOTTLE,12,4);
+  const overlay=(kind==='bottle-pill'?CAPSULE:isTablet?TABLET:[]).map(([y,x,row])=>grid([row],12+x,4+y)).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" shape-rendering="crispEdges" aria-hidden="true"><g data-part="bottle">${bottle}</g><g data-part="dose">${overlay}</g></svg>`;
 }
 
 export function pharmacyIconSvg(name, category, meta = {}) {
