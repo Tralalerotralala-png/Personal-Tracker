@@ -1632,3 +1632,11 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .asset-filters>* {min-width:0;width:100%;}
 .asset-grid {grid-template-columns:repeat(auto-fill,minmax(72px,1fr));max-height:300px;overflow-y:auto;overscroll-behavior:contain;padding:2px;}
 .asset-grid .pharmacy-preset-preview {width:40px;height:40px;}
+
+/* The current moon should read at a glance beside the temperature. The
+   square moon SVG fills its box; do not shrink it in compact widget modes. */
+.w-weather-glyph.w-weather-moon {display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;}
+.w-weather-glyph.w-weather-moon svg {display:block;width:36px;height:36px;}
+.widget .w-mud-dashboard .w-weather-glyph.w-weather-moon svg {
+  width:clamp(30px,9cqh,42px);height:clamp(30px,9cqh,42px);
+}

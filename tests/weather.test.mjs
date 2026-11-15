@@ -386,19 +386,30 @@ test('service: changing the place fetches again', async () => {
   assert.equal(fetchImpl.calls.length, n + 2);
 });
 
-test('moon icons: new is dark, full is bright, and quarters light opposite sides', () => {
+test('moon icons: rounded disk, correct illumination and detailed opposing crescents', () => {
   const ref = Date.UTC(2000, 0, 6, 18, 14);
   const synodic = 29.530588853 * 86400000;
   const icon = (fraction) => moonPhaseSvg(new Date(ref + fraction * synodic));
-  const illuminated = (svg) => [...svg.matchAll(/<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="1"/g)]
-    .map(([, x, y, width]) => ({ x: Number(x), y: Number(y), width: Number(width) }));
-  const newMoon = illuminated(icon(0));
-  const fullMoon = illuminated(icon(0.5));
-  const firstQuarter = illuminated(icon(0.25));
-  const lastQuarter = illuminated(icon(0.75));
-  assert.equal(newMoon.length, 0, 'new moon should have no illuminated pixels');
-  assert.ok(fullMoon.reduce((sum, row) => sum + row.width, 0) > 100, 'full moon should be bright');
-  assert.ok(firstQuarter.every(row => row.x >= 8), 'waxing quarter should light the right');
-  assert.ok(lastQuarter.every(row => row.x + row.width <= 8), 'waning quarter should light the left');
-  assert.ok(illuminated(icon(0.125)).length < fullMoon.length, 'crescent should be less illuminated than full');
+  const pixels = (svg,part) => [...svg.split('<g data-part="'+part+'">')[1].split('</g>')[0].matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="1" fill="(#[0-9a-f]+)"/g)]
+    .flatMap(([,x,y,w,c])=>Array.from({length:Number(w)},(_,i)=>({x:Number(x)+i,y:Number(y),c})));
+  const lit=f=>pixels(icon(f),'illuminated');
+  assert.match(icon(.125),/viewBox="0 0 40 40"/);
+  assert.equal(lit(0).length,0);
+  assert.ok(lit(.5).length>1000);
+  assert.ok(lit(.25).every(p=>p.x>=20));
+  assert.ok(lit(.75).every(p=>p.x<20));
+  const crescent=lit(.125), waning=lit(.875);
+  assert.ok(crescent.length>100&&crescent.length<lit(.25).length);
+  assert.ok(Math.abs(crescent.length-waning.length)<4);
+  assert.ok(crescent.every(p=>p.x>=20));
+  assert.ok(waning.every(p=>p.x<20));
+  assert.ok(new Set(crescent.map(p=>p.c)).size>=3,'subtle detailed shading');
+  const across=Array.from(new Set(crescent.map(p=>p.y))).map(y=>Math.min(...crescent.filter(p=>p.y===y).map(p=>p.x)));
+  assert.ok(new Set(across).size>=5,'curved terminator instead of vertical block');
+  for (const fraction of [0,.03,.125,.25,.5,.75,.875,.97]){
+    const all=[...lit(fraction),...pixels(icon(fraction),'earthshine')];
+    assert.ok(all.every(p=>(p.x+.5-20)**2+(p.y+.5-20)**2<=18.5**2));
+    assert.equal(new Set(all.map(p=>p.x+','+p.y)).size,all.length);
+  }
 });
+

@@ -347,6 +347,8 @@ export function glyphSvg(name) {
 // The colored sun/cloud layers and animated rain are inline SVG: no image assets.
 export function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
   const kind = weatherGlyph(code).glyph;
+  // A clear nighttime sky uses the entire square icon, not a tiny nested moon.
+  if (night && kind === 'sun') return moonPhaseSvg(date);
   const px = (x,y,w,h,color,cls='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"${cls?` class="${cls}"`:''}/>`;
   // A layered 24px pixel sun: crisp stepped circular disk, warm orange rim,
   // bright golden center and eight separate chunky rays.
@@ -371,7 +373,7 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
     (y>=8 && y<=15 ? px(x+3,y,Math.max(1,w-7),1,'#ffda37') : '')
   ).join('');
   const sun = `<g class="wx-sun-art">${sunRays}${sunDisk}</g>`;
-  const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="16" height="16" ');
+  const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="23" height="23" ');
   const cloud = `<g class="wx-cloud-layer">${[px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('')}</g>`;
   const drizzle = [0,1,2].map((i)=>px(12+i*6,20+(i%2),2,3,'#6fb9e9','wx-rain-drop')).join('');
   const storm = px(17,17,4,3,'#ffe183')+px(15,20,3,4,'#ffd15b');
@@ -388,9 +390,9 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
   else content=night ? moon : sun;
   // All symbols share one 32x26 artboard. Center the *visible* rectangles,
   // not just the SVG element: clouds, fog, sun and rain have different bounds.
-  // Moon contains its own SVG and already uses the 16px coordinate system.
+  // A partly cloudy moon is drawn in a 23px nested square; clear moons return above.
   const bounds = {
-    sun: [0, 0, night ? 16 : 24, night ? 16 : 24],
+    sun: [0, 0, 24, 24],
     partly: [0, 0, 28, 24],
     cloud: [8, 5, 28, 19],
     fog: [5, 8, 27, 18],

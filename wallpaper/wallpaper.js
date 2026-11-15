@@ -1974,6 +1974,8 @@ function glyphSvg(name) {
 // The colored sun/cloud layers and animated rain are inline SVG: no image assets.
 function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
   const kind = weatherGlyph(code).glyph;
+  // A clear nighttime sky uses the entire square icon, not a tiny nested moon.
+  if (night && kind === 'sun') return moonPhaseSvg(date);
   const px = (x,y,w,h,color,cls='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"${cls?` class="${cls}"`:''}/>`;
   // A layered 24px pixel sun: crisp stepped circular disk, warm orange rim,
   // bright golden center and eight separate chunky rays.
@@ -1998,7 +2000,7 @@ function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
     (y>=8 && y<=15 ? px(x+3,y,Math.max(1,w-7),1,'#ffda37') : '')
   ).join('');
   const sun = `<g class="wx-sun-art">${sunRays}${sunDisk}</g>`;
-  const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="16" height="16" ');
+  const moon = moonPhaseSvg(date).replace('<svg ','<svg x="0" y="0" width="23" height="23" ');
   const cloud = `<g class="wx-cloud-layer">${[px(11,8,12,4,'#b0accf'),px(8,12,19,7,'#9da3cc'),px(13,5,9,4,'#c9c8e4'),px(10,10,18,3,'#d6d8ed'),px(10,17,15,2,'#7a83ae')].join('')}</g>`;
   const drizzle = [0,1,2].map((i)=>px(12+i*6,20+(i%2),2,3,'#6fb9e9','wx-rain-drop')).join('');
   const storm = px(17,17,4,3,'#ffe183')+px(15,20,3,4,'#ffd15b');
@@ -2015,9 +2017,9 @@ function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
   else content=night ? moon : sun;
   // All symbols share one 32x26 artboard. Center the *visible* rectangles,
   // not just the SVG element: clouds, fog, sun and rain have different bounds.
-  // Moon contains its own SVG and already uses the 16px coordinate system.
+  // A partly cloudy moon is drawn in a 23px nested square; clear moons return above.
   const bounds = {
-    sun: [0, 0, night ? 16 : 24, night ? 16 : 24],
+    sun: [0, 0, 24, 24],
     partly: [0, 0, 28, 24],
     cloud: [8, 5, 28, 19],
     fog: [5, 8, 27, 18],
@@ -2522,22 +2524,56 @@ function moonPhase(date = new Date()) {
 function moonPhaseSvg(date = new Date()) {
   const phase = moonPhase(date);
   const n = phase.fraction, waxing = n <= 0.5;
-  const lit = (1 - Math.cos(n * 2 * Math.PI)) / 2;
-  // Pixel-aligned scanlines make the lit fraction explicit: new is dark,
-  // full is bright, waxing lights the right and waning lights the left.
-  // The terminator follows the projected ellipse of the Moon's day/night edge.
-  const rows = [];
-  for (let y = 1; y < 15; y++) {
-    const dy = y + 0.5 - 8;
-    const halfWidth = Math.sqrt(Math.max(0, 49 - dy * dy));
-    const left = Math.max(1, Math.ceil(8 - halfWidth));
-    const right = Math.min(15, Math.floor(8 + halfWidth));
-    const terminator = 8 + (waxing ? 1 : -1) * (1 - 2 * lit) * halfWidth;
-    const start = waxing ? Math.max(left, Math.ceil(terminator)) : left;
-    const end = waxing ? right : Math.min(right, Math.floor(terminator));
-    if (end > start) rows.push(`<rect x="${start}" y="${y}" width="${end - start}" height="1"/>`);
+  // Orthographic projection of a sphere: both the limb and the terminator
+  // are curved. A finer grid retains that curvature even in thin crescents.
+  const size = 40, radius = 18.5, center = size / 2;
+  const angle = n * Math.PI * 2;
+  const cos = Math.cos(angle);
+  const sin = Math.abs(Math.sin(angle));
+  const side = waxing ? 1 : -1;
+  // Fixed, subtle lunar surface features, not a random texture that flickers
+  // when the widget updates. Coordinates are normalized to the disk.
+  const maria = [
+    [-.32,-.27,.29,.22], [.10,-.43,.18,.14],
+    [.37,.01,.21,.30], [-.24,.27,.25,.17],
+    [.32,.43,.13,.10]
+  ];
+  const craters = [[-.55,-.06,.075],[.05,.34,.095],[.52,-.36,.065],[-.16,-.61,.057],[.62,.19,.050]];
+  const dark = [], light = [];
+  const sample = (x,y) => {
+    const u=(x+.5-center)/radius, v=(y+.5-center)/radius;
+    const q=u*u+v*v;
+    if(q>1)return null;
+    const z=Math.sqrt(Math.max(0,1-q));
+    const incidence=side*u*sin-z*cos;
+    const illuminated=incidence>0.000001;
+    const mare=maria.some(([cx,cy,rx,ry])=>((u-cx)/rx)**2+((v-cy)/ry)**2<1);
+    const crater=craters.some(([cx,cy,r])=>(u-cx)**2+(v-cy)**2<r*r);
+    if(!illuminated){
+      const color=q>.91?'#635f79':mare||crater?'#363246':'#454157';
+      return {color,illuminated};
+    }
+    // Keep the brightest portion ivory, and the terminator softly warm.
+    const color=incidence<.045?'#ccba98':mare||crater?'#d1c2a7':q>.94?'#f0dfb3':incidence>.35?'#fff3d7':'#eadcbe';
+    return {color,illuminated};
+  };
+  // Run-length encoded pixel rows; every pixel of both layers is clipped to
+  // the same circular disk. No smooth outline or rectangle extends beyond it.
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;){
+      const p=sample(x,y);
+      if(!p){x++;continue;}
+      let end=x+1;
+      while(end<size){
+        const next=sample(end,y);
+        if(!next||next.color!==p.color||next.illuminated!==p.illuminated)break;
+        end++;
+      }
+      (p.illuminated?light:dark).push(`<rect x="${x}" y="${y}" width="${end-x}" height="1" fill="${p.color}"/>`);
+      x=end;
+    }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><circle cx="8" cy="8" r="7" fill="#544c63" stroke="#857e98" stroke-width=".35"/><g fill="#eadfc4">${rows.join('')}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><g data-part="earthshine">${dark.join('')}</g><g data-part="illuminated">${light.join('')}</g></svg>`;
 }
 function isNightAtLocation(current, date = new Date()) {
   if (current?.is_day === 0) return true;
@@ -3487,7 +3523,7 @@ function mountMud(el, { weather, store }) {
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
-      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
+      h('span', { class: `w-weather-glyph${night && code === 0 ? ' w-weather-moon' : ''}`, title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
         h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;

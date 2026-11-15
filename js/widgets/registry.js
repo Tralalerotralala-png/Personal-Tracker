@@ -78,7 +78,7 @@ function mountMud(el, { weather, store }) {
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
-      h('span', { class: 'w-weather-glyph', title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
+      h('span', { class: `w-weather-glyph${night && code === 0 ? ' w-weather-moon' : ''}`, title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
       h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
         h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
       h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
