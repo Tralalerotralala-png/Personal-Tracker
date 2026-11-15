@@ -215,7 +215,7 @@ export function createMudView({ store, weather }) {
     if (state.status === 'no-location' || (!state.place && state.status === 'idle')) {
       const search = createPlaceSearch({ weather, autofocus: false });
       replace(el, h('div', { class: 'mud-empty' },
-        h('h2', {}, language()==='es'?'¿De qué lugar deseas el pronóstico?':'Where do you need the weather forecast?'),
+        h('h2', {}, language()==='es'?'¿De qué lugar quieres consultar el clima?':'Where do you need the weather forecast?'),
         h('p', { class: 'prose' }, language()==='es'?'Escribe tu ciudad. Obtendrás un pronóstico del clima y del estado del terreno.':'Enter a town or city to see weather and ground conditions.'),
         search.el));
       return;
@@ -241,12 +241,12 @@ export function createMudView({ store, weather }) {
       banner(state),
       weatherPanel(state, today, future),
       h('details',{class:'wx-forecast-review'},
-        h('summary',{},language()==='es'?'Pronóstico anterior comparado':'Yesterday’s forecast compared'),
+        h('summary',{},language()==='es'?'Comparación con el pronóstico anterior':'Yesterday’s forecast compared'),
         state.forecastReview
           ? h('p',{},language()==='es'
               ? `Para ${state.forecastReview.date}: se pronosticaron ${fmt(state.forecastReview.forecastRain)} mm de lluvia y ${fmt(state.forecastReview.forecastHigh)}°C. El modelo retrospectivo indica ${fmt(state.forecastReview.retrospectiveRain)} mm y ${fmt(state.forecastReview.retrospectiveHigh)}°C.`
               : `For ${state.forecastReview.date}: forecast ${fmt(state.forecastReview.forecastRain)} mm rain and ${fmt(state.forecastReview.forecastHigh)}°C high. Later retrospective model data shows ${fmt(state.forecastReview.retrospectiveRain)} mm and ${fmt(state.forecastReview.retrospectiveHigh)}°C.`)
-          : h('p',{class:'hint'},language()==='es'?'Se mostrarán comparaciones después de guardar un pronóstico y volver al día siguiente.':'Comparison becomes available after a forecast is saved and the next day’s data arrives.'),
+          : h('p',{class:'hint'},language()==='es'?'Podrás ver la comparación cuando se guarde un pronóstico y estén disponibles los datos del día siguiente.':'Comparison becomes available after a forecast is saved and the next day’s data arrives.'),
         h('p',{class:'hint'},language()==='es'?'La comparación es entre versiones del modelo Open-Meteo, no mediciones realizadas en tu domicilio.':'Both values come from Open-Meteo model data, not measurements at your address.')),
       hourlyRain(state),
       skyPanel(state),

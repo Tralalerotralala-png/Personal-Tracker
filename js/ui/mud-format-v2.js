@@ -2,7 +2,7 @@
 // the one-sentence summary. Kept apart from the Mud tab so the wallpaper can use them without
 // pulling in any dialogs or forms.
 import { h } from './dom.js';
-import { language } from './language.js';
+import { language, t } from './language.js';
 
 const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
 const DAY_LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' });
@@ -22,7 +22,7 @@ export function mudBar(row) {
       h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * (100 / 3)) * 3))}%` }))));
 }
 
-export const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
+export const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Ligeramente lodoso',Muddy:'Lodoso',Swamp:'Muy lodoso'}[label]||label) : label;
 
 export function mudChip(row) {
   // The number remains available to screen readers and on hover. Visually,
@@ -51,6 +51,7 @@ export function localizedMudWhy(why){
  .replace(/soil is dry/gi,'el suelo está seco')
  .replace(/drying well/gi,'se seca rápidamente')
  .replace(/drying slowly/gi,'se seca lentamente')
+ .replace(/little drying \(cool or still\)/gi,'se seca muy poco (por el frío o la falta de viento)')
  .replace(/little drying/gi,'se seca muy poco');
 }
-export const localizedWeather = text => language()==='es' ? ({Clear:'Despejado',Sunny:'Soleado','Partly cloudy':'Parcialmente nublado',Cloudy:'Nublado',Overcast:'Cubierto','Light rain':'Lluvia ligera',Rain:'Lluvia',Snow:'Nieve',Fog:'Niebla',Thunderstorm:'Tormenta eléctrica'}[text]||text) : text;
+export const localizedWeather = text => language()==='es' ? t(text) : text;

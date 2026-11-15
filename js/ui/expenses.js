@@ -135,7 +135,7 @@ export function createExpensesView({store}) {
         const existing=new Set(entries.map(x=>[x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
         const unique=imported.filter(x=>!existing.has([x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
         if(!unique.length){toast(label('All records are already present','Los registros ya existen'));return;}
-        if(!await confirmDialog({title:label('Import transactions?','¿Importar movimientos?'),message:`${unique.length} ${label('new rows will be saved. Review your CSV before importing.','registros nuevos serán guardados. Revisa tu CSV antes de importar.')}`,confirmLabel:label('Import','Importar')}))return;
+        if(!await confirmDialog({title:label('Import transactions?','¿Importar movimientos?'),message:`${unique.length} ${label('new rows will be saved. Review your CSV before importing.','se guardarán nuevos registros. Revisa tu CSV antes de importar.')}`,confirmLabel:label('Import','Importar')}))return;
         for(const row of unique)await store.setSetting(`hub_expense:${uuid()}`,row);
         toast(label('Transactions imported','Movimientos importados'));await load();
       }catch(err){toast(err.message);}finally{upload.value='';}
@@ -143,7 +143,7 @@ export function createExpensesView({store}) {
     const download=()=>{const csv=exportTransactionsCsv(activeRows());const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));const a=h('a',{href:url,download:`expenses-${month}-${currency}.csv`});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);};
     const container=h('div',{class:'expense-content'},sectionHeading(label('Transaction ledger','Registro de movimientos'),h('div',{class:'expense-actions'},btn(label('Import CSV','Importar CSV'),()=>upload.click()),btn(label('Export CSV','Exportar CSV'),download))),
       h('div',{class:'expense-filter-row'},query,filter,h('label',{class:'expense-checkbox'},history,label('All months','Todos los meses')),count),list,
-      h('p',{class:'hint'},label('Recurring entries are marked for planning only; the app does not create or charge future payments automatically.','Los movimientos recurrentes son solo para planificación; la app no crea ni cobra pagos futuros automáticamente.')),upload);
+      h('p',{class:'hint'},label('Recurring entries are marked for planning only; the app does not create or charge future payments automatically.','Los movimientos recurrentes son solo para organizar tus pagos; la app no crea ni cobra pagos futuros automáticamente.')),upload);
     updateRows();return container;
   }
   function renderEditor(){
@@ -161,7 +161,7 @@ export function createExpensesView({store}) {
     const error=h('p',{class:'form-error',role:'alert'});
     const save=async()=>{
       const val=Number(amount.value);
-      if(!title.value.trim()||amount.value.trim()===''||!Number.isFinite(val)||val<0||!/^\d{4}-\d{2}-\d{2}$/.test(date.value)){error.textContent=label('Enter a title, valid date and nonnegative amount.','Escribe un título, una fecha válida y un importe no negativo.');return;}
+      if(!title.value.trim()||amount.value.trim()===''||!Number.isFinite(val)||val<0||!/^\d{4}-\d{2}-\d{2}$/.test(date.value)){error.textContent=label('Enter a title, valid date and nonnegative amount.','Escribe un título, una fecha válida y un importe mayor o igual a cero.');return;}
       await store.setSetting(`hub_expense:${original?.id||uuid()}`,{...current,title:title.value.trim(),due:date.value,amount:val,type:type.value,currency:currencyPick.value,category:cat.value.trim()||'Other',account:account.value.trim(),repeat:repeat.value,body:notes.value.trim()});
       editing=null;await load();toast(label('Saved','Guardado'));
     };
@@ -194,7 +194,7 @@ export function createExpensesView({store}) {
       .sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
     const monthly=recurring.reduce((sum,x)=>sum+x.amount*(x.repeat==='weekly'?52/12:x.repeat==='yearly'?1/12:1),0);
     return h('div',{class:'expense-content'},
-      sectionHeading(label('Upcoming subscriptions and bills','Próximas suscripciones y facturas')),
+      sectionHeading(label('Upcoming subscriptions and bills','Próximas suscripciones y pagos de servicios')),
       h('p',{class:'hint'},label('Only entries marked recurring are shown. Due dates are estimates; this app never charges or creates future transactions automatically.','Solo aparecen movimientos marcados como recurrentes. Las fechas son estimaciones; esta aplicación nunca cobra ni crea movimientos futuros automáticamente.')),
       h('div',{class:'expense-summary'},makeStat(label('Recurring items','Movimientos recurrentes'),recurring.length),makeStat(label('Estimated monthly cost','Costo mensual estimado'),money(monthly,currency))),
       recurring.length?h('div',{class:'expense-list'},recurring.map(x=>h('button',{class:'expense-row',type:'button',onclick:()=>{editing=x;renderEditor();}},
@@ -219,8 +219,8 @@ export function createExpensesView({store}) {
       replace(result,makeStat(label('Tax','Impuesto'),money(r.taxAmount,currency)),makeStat(label('Tip','Propina'),money(r.tipAmount,currency)),makeStat(label('Total bill','Total de la cuenta'),money(r.total,currency)),makeStat(label('Per person','Por persona'),money(r.perPerson,currency)));
     }catch(e){replace(result,h('p',{class:'form-error'},label('Check the amounts, percentages, and number of people.','Revisa los importes, porcentajes y número de personas.')));}};
     for(const x of [subtotal,tax,tip,people])x.addEventListener('input',calc);
-    const content=h('div',{class:'expense-content'},sectionHeading(label('Tax, tip & split calculator','Calculadora de impuestos, propinas y división')),
-      h('p',{class:'hint'},label('Estimates only. Tax and tip are calculated independently from the subtotal; no expense is saved until you add a transaction.','Solo estimaciones. El impuesto y la propina se calculan sobre el subtotal; no se guarda ningún gasto hasta que agregues un movimiento.')),
+    const content=h('div',{class:'expense-content'},sectionHeading(label('Tax, tip & split calculator','Calculadora de impuestos, propinas y cuenta dividida')),
+      h('p',{class:'hint'},label('Estimates only. Tax and tip are calculated independently from the subtotal; no expense is saved until you add a transaction.','Los resultados son estimados. El impuesto y la propina se calculan sobre el subtotal; no se guarda ningún gasto hasta que agregues un movimiento.')),
       h('div',{class:'expense-form-grid'},field(label('Subtotal','Subtotal'),subtotal),field(label('Tax %','Impuesto %'),tax),field(label('Tip %','Propina %'),tip),field(label('People','Personas'),people)),result);
     calc();return content;
   }

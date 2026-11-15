@@ -1320,33 +1320,33 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
- ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Informes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
+ ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Reportes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
 
  ['Library','Biblioteca'],['Books','Libros'],['Films','Películas'],['Albums','Álbumes'],['Recently played','Jugados recientemente'],['Currently playing','Jugando ahora'],
  ['Sky events','Eventos astronómicos'],['Upcoming sky events','Próximos eventos astronómicos'],['Selected location','Ubicación seleccionada'],
- ['Dates are approximate. Check local visibility and the weather.','Las fechas son aproximadas. Comprueba la visibilidad local y el clima.'],
+ ['Dates are approximate. Check local visibility and the weather.','Las fechas son aproximadas. Consulta la visibilidad en tu ubicación y el pronóstico del clima.'],
  ['Dates are approximate. Visibility at your location is not guaranteed; check the source before planning.','Las fechas son aproximadas. No se garantiza la visibilidad en tu ubicación; consulta la fuente antes de planear.'],
  ['Details and visibility','Detalles y visibilidad'],['Hourly rain timeline','Lluvia por hora'],['next 24 hours','próximas 24 horas'],
- ['Hourly rain data unavailable; refresh Weather to try again.','No hay datos de lluvia por hora; actualiza Clima para intentarlo de nuevo.'],
- ['No hourly forecast for the coming day.','No hay pronóstico por hora para el próximo día.'],
- ['History range','Rango del historial'],['days','días'],['Past weather and ground conditions','Clima y condiciones anteriores'],
+ ['Hourly rain data unavailable; refresh Weather to try again.','No hay datos de lluvia por hora. Actualiza la sección de Clima para intentarlo de nuevo.'],
+ ['No hourly forecast for the coming day.','No hay pronóstico por hora para las próximas 24 horas.'],
+ ['History range','Rango del historial'],['days','días'],['Past weather and ground conditions','Historial del clima y del terreno'],
  ['Past days use weather model data, not measurements at your address.','Los días anteriores usan datos de modelos meteorológicos, no mediciones en tu domicilio.'],
- ['Enter a description first.','Escribe una descripción primero.'],['AI icons need Supabase and an installed Edge Function.','Los iconos IA requieren Supabase y una función Edge instalada.'],
+ ['Enter a description first.','Escribe una descripción primero.'],['AI icons need Supabase and an installed Edge Function.','Los iconos generados con IA requieren Supabase y una función Edge instalada.'],
  ['Generating with AI...','Generando con IA...'],['Generate with AI','Generar con IA'],['Please sign in first.','Primero inicia sesión.'],
- ['AI icon ready. Save this item to apply it.','Icono de IA listo. Guarda el objeto para aplicarlo.'],
+ ['AI icon ready. Save this item to apply it.','Icono generado con IA. Guarda el objeto para aplicarlo.'],
  ['Open a game in your library to see it here.','Abre un juego en tu biblioteca para verlo aquí.'],
  ['Theme presets','Temas predefinidos'],
 
- ['Currency Converter','Conversor de divisas'],['Add pair','Agregar par'],['Remove','Quitar'],['Swap','Invertir'],['Amount','Cantidad'],['Cached','En caché'],['Rate unavailable','Tipo de cambio no disponible'],['Last updated','Última actualización'],['Choose a place in the Weather tab.','Elige una ubicación en Clima.'],['kinds','tipos'],['lost','perdidos'],['legendary','legendarios'],['Drizzle','Llovizna'],['No weather data','Sin datos del clima'],['Logs','Registros'],
+ ['Currency Converter','Convertidor de divisas'],['Add pair','Agregar par de monedas'],['Remove','Quitar'],['Swap','Invertir'],['Amount','Cantidad'],['Cached','En caché'],['Rate unavailable','Tipo de cambio no disponible'],['Last updated','Última actualización'],['Choose a place in the Weather tab.','Elige una ubicación en Clima.'],['kinds','tipos'],['lost','perdidos'],['legendary','legendarios'],['Drizzle','Llovizna'],['No weather data','Sin datos del clima'],['Logs','Registros'],
  ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Clima'],['Calendar','Calendario'],['Feed','Noticias'],
  ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Games','Juegos'],['Game Library','Biblioteca de juegos'],['Clear','Despejado'],['Ground conditions','Condiciones del terreno'],['Mud conditions','Condiciones del terreno'],['Weather and mud','Clima y terreno'],['Tune the mud model','Ajustar el modelo del terreno'],['Observed','Observado'],['Forecast','Pronóstico'],['No big change expected.','No se esperan cambios importantes.'],['No rain over 3 days, soil is dry, drying well','Sin lluvia en los últimos 3 días; el suelo está seco y se está secando bien'],['Current conditions','Condiciones actuales'],
  ['Daily forecast','Pronóstico diario'],['Next six days','Próximos seis días'],['Feels like','Sensación térmica'],
- ['Humidity','Humedad'],['Wind','Viento'],['Rain today','Lluvia de hoy'],['Today','Hoy'],['Tomorrow','Mañana'],
+ ['Humidity','Humedad'],['Wind','Viento'],['Rain today','Lluvia acumulada de hoy'],['Today','Hoy'],['Tomorrow','Mañana'],
  ['Sunny','Soleado'],['Clear sky','Cielo despejado'],['Partly cloudy','Parcialmente nublado'],
- ['Cloudy','Nublado'],['Overcast','Cubierto'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
+ ['Cloudy','Nublado'],['Overcast','Nublado'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
  ['Snow','Nieve'],['Thunderstorm','Tormenta eléctrica'],['Fog','Niebla'],['Storms','Tormentas'],
- ['Mud forecast','Pronóstico del terreno'],['Show quantity as percentage','Mostrar cantidad como porcentaje'],['Show maximum amounts','Mostrar cantidades máximas'],['Show maximum quantity','Mostrar cantidad máxima'],['Inventory icon assets','Iconos de inventario'],['Search icon assets','Buscar iconos'],['Icon category','Categoría de iconos'],['No matching icons','No hay iconos coincidentes'],["Tracking fields","Campos de seguimiento"],["Pharmacy icon presets","Iconos de farmacia"],["Icon color","Color del icono"],["Automatic / photo","Automático / foto"],["Medicine bottle","Frasco de medicamento"],["Bottle and pills","Frasco y pastillas"],["Bottle with capsule","Frasco con cápsula"],["Bottle with tablet","Frasco con tableta"],["Cross / accent","Cruz / acento"],["Bottle color","Color del frasco"],["Cap and label","Tapa y etiqueta"],["Capsule / tablet color","Color de cápsula / tableta"],["Reset icon colors","Restablecer colores"],["Squeeze nasal spray","Atomizador nasal flexible"],["Generic pixel icon","Icono de píxeles genérico"],["Custom icon tools","Herramientas de iconos personalizados"],["Notes & lost status","Notas y estado de extravío"],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
- ['Change place','Cambiar lugar'],['Choose a place','Elegir lugar'],['Refresh','Actualizar'],
+ ['Mud forecast','Pronóstico del terreno'],['Show quantity as percentage','Mostrar cantidad como porcentaje'],['Show maximum amounts','Mostrar cantidades máximas'],['Show maximum quantity','Mostrar cantidad máxima'],['Inventory icon assets','Iconos de inventario'],['Search icon assets','Buscar iconos'],['Icon category','Categoría de iconos'],['No matching icons','No se encontraron iconos'],["Tracking fields","Campos de seguimiento"],["Pharmacy icon presets","Iconos de farmacia"],["Icon color","Color del icono"],["Automatic / photo","Automático / foto"],["Medicine bottle","Frasco de medicamento"],["Bottle and pills","Frasco y pastillas"],["Bottle with capsule","Frasco con cápsula"],["Bottle with tablet","Frasco con tableta"],["Cross / accent","Color de la cruz"],["Bottle color","Color del frasco"],["Cap and label","Tapa y etiqueta"],["Capsule / tablet color","Color de cápsula / tableta"],["Reset icon colors","Restablecer colores"],["Squeeze nasal spray","Atomizador nasal"],["Generic pixel icon","Icono pixel art genérico"],["Custom icon tools","Herramientas para personalizar iconos"],["Notes & lost status","Notas y estado del objeto perdido"],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
+ ['Change place','Cambiar ubicación'],['Choose a place','Elegir ubicación'],['Refresh','Actualizar'],
  ['Items','Objetos'],['Places','Lugares'],['Add an item','Agregar objeto'],['Add item','Agregar objeto'],
  ['Clear filters','Borrar filtros'],['No items match these filters.','Ningún objeto coincide con estos filtros.'],
  ['Your pack is empty. Add your first item, then note where it lives.','Tu mochila está vacía. Agrega un objeto y anota dónde está.'],
@@ -1361,15 +1361,15 @@ const pairs = [
  ['English','English'],['Español','Español'],['Save','Guardar'],['Cancel','Cancelar'],
  ['Add','Agregar'],['Delete','Eliminar'],['Search','Buscar'],['Close','Cerrar'],
  ['Synced','Sincronizado'],['Syncing','Sincronizando'],['Offline','Sin conexión'],['Ready','Listo'],
- ['Coming up','Próximos eventos'],['Headlines','Titulares'],['Pack stats','Estadísticas'],
+ ['Coming up','Próximos eventos'],['Headlines','Noticias principales'],['Pack stats','Estadísticas de la mochila'],
  ['Clock and date','Reloj y fecha'],['Loot and lost quests','Hallazgos y objetos perdidos'],
  ['Good morning','Buenos días'],['Good afternoon','Buenas tardes'],['Good evening','Buenas noches'],
- ['Your dashboard at a glance','Tu resumen del día'],['Nothing planned this week.','No hay eventos esta semana.'],
+ ['Your dashboard at a glance','Tu resumen del día'],['Nothing planned this week.','No hay eventos programados esta semana.'],
  ['No items yet. Add some in the Pack tab.','Aún no hay objetos. Agrega algunos en Mochila.'],
- ['No feed sources yet. Add one in the Feed tab.','Aún no hay fuentes. Agrégalas en Noticias.'],
- ['No headlines right now.','No hay titulares por ahora.'],['Loading headlines...','Cargando titulares...'],
- ['Loading the forecast...','Cargando el pronóstico...'],['No place chosen yet.','Aún no has elegido un lugar.'],
- ['High','Máxima'],['Low','Mínima'],['Dry','Seco'],['Tacky','Pegajoso'],['Muddy','Lodoso'],['Swamp','Pantano'],
+ ['No feed sources yet. Add one in the Feed tab.','Aún no tienes fuentes de noticias. Agrega una en Noticias.'],
+ ['No headlines right now.','No hay noticias por ahora.'],['Loading headlines...','Cargando titulares...'],
+ ['Loading the forecast...','Cargando el pronóstico...'],['No place chosen yet.','Aún no has seleccionado una ubicación.'],
+ ['High','Máxima'],['Low','Mínima'],['Dry','Seco'],['Tacky','Ligeramente lodoso'],['Muddy','Lodoso'],['Swamp','Muy lodoso'],
 
  ['Alerts','Avisos'],['Insights','Estadísticas'],['Task','Tarea'],['Note','Nota'],['Expense','Gasto'],
  ['Items','Objetos'],['Events','Eventos'],['Your day','Tu día'],['Open personal hub','Abrir centro personal'],
@@ -1384,15 +1384,15 @@ const pairs = [
  ['Type to search your items, events, tasks, notes and expenses.','Escribe para buscar objetos, eventos, tareas, notas y gastos.'],
  ['Items by category','Objetos por categoría'],['Inventory items','Objetos registrados'],['Tasks open','Tareas pendientes'],
  ['Expenses tracked (MXN)','Gastos registrados (MXN)'],['Uncategorized','Sin categoría'],
- ['Display','Pantalla'],['Accent color','Color de acento'],['Panel opacity','Opacidad de los paneles'],
- ['Reduce animations','Reducir animaciones'],['Scanline effect','Efecto de líneas de pantalla'],
+ ['Display','Visualización'],['Accent color','Color de énfasis'],['Panel opacity','Opacidad de los paneles'],
+ ['Reduce animations','Reducir animaciones'],['Scanline effect','Efecto de líneas de pantalla CRT'],
  ['Open','Abrir'],['Edit','Editar'],['Complete task','Completar tarea'],
  ['All fields currently inherit the category defaults.','Todos los campos usan la configuración de su categoría.'],
- ['Category defaults saved','Se guardaron los valores predeterminados de la categoría'],
- ['Local time','Hora local'],['Weather and mud','Clima y lodo'],['Tasks, personal notes, expense records, search, and notifications in one place.','Tareas, notas, gastos, búsqueda y avisos en un solo lugar.'],
+ ['Category defaults saved','Se guardó la configuración de la categoría'],
+ ['Local time','Hora local'],['Weather and mud','Clima y terreno'],['Tasks, personal notes, expense records, search, and notifications in one place.','Tareas, notas, gastos, búsqueda y avisos en un solo lugar.'],
  ['Notes','Notas'],['Total','Total'],['New place','Nuevo lugar'],['Save tiers','Guardar niveles'],
  ['Does not repeat','No se repite'],['Every 2 weeks','Cada 2 semanas'],
- ['Every 2 weeks','Cada 2 semanas'],['Does not repeat','No se repite'],['Every day','Cada día'],['Every week','Cada semana'],['Every month','Cada mes'],['Every year','Cada año'],['Repeats','Se repite'],['Every','Cada'],['Stop repeating after (optional)','Dejar de repetir después de (opcional)'],['Condition','Estado'],['Expiration','Caducidad'],['Durability','Durabilidad'],['Quantity','Cantidad'],['Remaining','Restantes'],['Maximum quantity','Cantidad máxima'],['Low stock threshold','Avisar cuando queden'],['Use category defaults','Usar valores predeterminados de la categoría'],['Categories','Categorías'],['Category tracking defaults','Campos predeterminados por categoría'],['Needs attention','Requiere atención'],['Low stock','Pocas unidades'],['Expiring soon','Próximo a caducar'],['Expired','Caducado'],['Good','Bueno'],['Excellent','Excelente'],['Worn','Desgastado'],['Damaged','Dañado'],['Needs repair','Necesita reparación'],['Purchase price','Precio de compra'],['Warranty ends','Fin de garantía'],['Tasks','Tareas'],['Notes','Notas'],['Expenses','Gastos'],['Notification center','Centro de avisos'],['Personal hub','Centro personal'],['Search everything','Buscar en todo'],['Save changes','Guardar cambios'],['Remaining quantity','Cantidad restante'],['Inventory tracking','Seguimiento de objetos'],['Now','Ahora'],['Local','Local'],['MUD','LODO'],['Change','Cambiar'],['Edit','Editar'],
+ ['Every 2 weeks','Cada 2 semanas'],['Does not repeat','No se repite'],['Every day','Cada día'],['Every week','Cada semana'],['Every month','Cada mes'],['Every year','Cada año'],['Repeats','Se repite'],['Every','Cada'],['Stop repeating after (optional)','Fecha de fin de repetición (opcional)'],['Condition','Estado'],['Expiration','Fecha de caducidad'],['Durability','Durabilidad'],['Quantity','Cantidad'],['Remaining','Restantes'],['Maximum quantity','Cantidad máxima'],['Low stock threshold','Avisar si quedan pocas unidades'],['Use category defaults','Usar configuración de la categoría'],['Categories','Categorías'],['Category tracking defaults','Seguimiento predeterminado por categoría'],['Needs attention','Requiere atención'],['Low stock','Quedan pocas unidades'],['Expiring soon','Próximo a vencer'],['Expired','Vencido'],['Good','Bueno'],['Excellent','Excelente'],['Worn','Desgastado'],['Damaged','Dañado'],['Needs repair','Necesita reparación'],['Purchase price','Precio de compra'],['Warranty ends','Vencimiento de la garantía'],['Tasks','Tareas'],['Notes','Notas'],['Expenses','Gastos'],['Notification center','Centro de avisos'],['Personal hub','Centro personal'],['Search everything','Buscar en todo'],['Save changes','Guardar cambios'],['Remaining quantity','Cantidad restante'],['Inventory tracking','Seguimiento de objetos'],['Now','Ahora'],['Local','Local'],['MUD','LODO'],['Change','Cambiar'],['Edit','Editar'],
  // Additional English ⇄ Spanish interface labels; custom user text is never bulk-translated.
  ["All","Todos"],
  ["pieces","unidades"],
@@ -1406,10 +1406,10 @@ const pairs = [
  ["Sort: Place","Orden: Lugar"],
  ["Filter by category","Filtrar por categoría"],
  ["Filter by rarity","Filtrar por rareza"],
- ["Lost only","Solo perdidos"],
+ ["Lost only","Solo objetos perdidos"],
  ["No category","Sin categoría"],
- ["No place","Sin lugar"],
- ["No place yet","Sin lugar todavía"],
+ ["No place","Sin ubicación"],
+ ["No place yet","Aún sin ubicación"],
  ["Where is it?","¿Dónde está?"],
  ["Where is it? Search your items","¿Dónde está? Busca tus objetos"],
  ["Inventory sections","Secciones de la mochila"],
@@ -1421,7 +1421,7 @@ const pairs = [
  ["Add to pack","Agregar a la mochila"],
  ["Place","Lugar"],
  ["Newest","Recientes"],
- ["Lost, last seen:","Perdido, visto por última vez:"],
+ ["Lost, last seen:","Perdido; última ubicación:"],
  ["Lost quests","Misiones de objetos perdidos"],
  ["Today's loot","Hallazgo de hoy"],
  ["No items match these filters.","Ningún objeto coincide con estos filtros."],
@@ -1435,18 +1435,18 @@ const pairs = [
  ["Place added","Lugar agregado"],
  ["Place deleted","Lugar eliminado"],
  ["Unassigned","Sin asignar"],
- ["Top level (not inside anything)","Nivel superior (fuera de otros lugares)"],
+ ["Top level (not inside anything)","Ubicación principal (no está dentro de otra)"],
  ["Kind (optional)","Tipo (opcional)"],
  ["Inside","Dentro de"],
  ["Notes (optional)","Notas (opcional)"],
- ["Give this place a name.","Ponle un nombre al lugar."],
+ ["Give this place a name.","Escribe un nombre para el lugar."],
  ["A place cannot be put inside itself.","No puedes colocar un lugar dentro de sí mismo."],
- ["Everything stored here moves up to the place above it (or to Unassigned). Nothing else is deleted.","Todo lo guardado aquí pasará al lugar superior (o a Sin asignar). No se borrará nada más."],
+ ["Everything stored here moves up to the place above it (or to Unassigned). Nothing else is deleted.","Todo lo que guardaste aquí pasará a la ubicación superior o quedará sin asignar. No se eliminará nada más."],
  ["Add a place inside","Agregar un lugar dentro de"],
  ["Add a place inside ","Agregar un lugar dentro de "],
  ["building","edificio"],
- ["room","habitación"],
- ["cupboard","armario"],
+ ["room","cuarto"],
+ ["cupboard","gabinete"],
  ["shelf","estante"],
  ["drawer","cajón"],
  ["bin","contenedor"],
@@ -1464,21 +1464,21 @@ const pairs = [
  ["Item deleted","Objeto eliminado"],
  ["Edit item","Editar objeto"],
  ["More details","Más detalles"],
- ["Photo / pixel icon","Foto / icono de píxeles"],
+ ["Photo / pixel icon","Foto o icono pixel art"],
  ["Replace photo","Reemplazar foto"],
  ["Take or choose photo","Tomar o elegir foto"],
  ["Selected photo","Foto seleccionada"],
- ["Next maintenance date","Fecha de próximo mantenimiento"],
+ ["Next maintenance date","Fecha del próximo mantenimiento"],
  ["Maintenance notes","Notas de mantenimiento"],
- ["Pixel art description","Descripción del arte de píxeles"],
+ ["Pixel art description","Descripción del icono pixel art"],
  ["Suggest one","Sugerir una"],
- ["Copy as image prompt","Copiar como instrucción de imagen"],
+ ["Copy as image prompt","Copiar descripción para generar imagen"],
  ["Rarity tiers saved","Niveles de rareza guardados"],
  ["New category name","Nombre de nueva categoría"],
  ["Add category","Agregar categoría"],
  ["Category name","Nombre de categoría"],
  ["Choose which inventory fields are enabled by default in each category. Individual items can override any checkbox. Saved values are never deleted when hidden.","Elige los campos predeterminados por categoría. Cada objeto puede modificarlos. Los valores guardados no se borran al ocultar campos."],
- ["Category defaults saved","Valores de categoría guardados"],
+ ["Category defaults saved","Se guardó la configuración de la categoría"],
  ["Delete category","Eliminar categoría"],
  ["Items in this category stay in your pack, with no category.","Los objetos de esta categoría permanecerán en tu mochila, sin categoría."],
  ["Select which fields this item uses. They start with your category defaults.","Elige los campos que usa este objeto. Inicialmente heredan la configuración de su categoría."],
@@ -1491,21 +1491,22 @@ const pairs = [
  ["One more","Uno más"],
  ["No matching results.","No hay resultados."],
  ["Write or suggest a description first","Primero escribe o solicita una descripción"],
- ["Prompt copied","Instrucción copiada"],
+ ["Prompt copied","Descripción copiada"],
  ["Press copy on your keyboard to copy the selected text","Usa Copiar en tu teclado para copiar el texto seleccionado"],
  ["Icon creation failed","No se pudo crear el icono"],
- ["Pixel icon ready. Save this item to apply it.","Icono de píxeles listo. Guarda el objeto para aplicarlo."],
- ["Maximum quantity must be a whole number not smaller than remaining quantity.","La cantidad máxima debe ser un número entero no menor que las unidades restantes."],
- ["Low-stock threshold must be zero or higher.","El límite de existencias bajas debe ser cero o mayor."],
- ["Give the item a name.","Ponle un nombre al objeto."],
- ["Quantity must be a whole number, 0 or more.","La cantidad debe ser un número entero de cero o más."],
+ ["Pixel icon ready. Save this item to apply it.","Icono listo. Guarda el objeto para aplicarlo."],
+ ["Maximum quantity must be a whole number not smaller than remaining quantity.","La cantidad máxima debe ser un número entero igual o mayor que la cantidad restante."],
+ ["Low-stock threshold must be zero or higher.","El mínimo de unidades debe ser cero o mayor."],
+ ["Give the item a name.","Escribe un nombre para el objeto."],
+ ["Quantity must be a whole number, 0 or more.","La cantidad debe ser un número entero mayor o igual a cero."],
  ["It disappears from every device. Export a backup first if you might want it back.","Desaparecerá de todos los dispositivos. Exporta un respaldo si podrías necesitarlo."],
  ["Grid view","Vista de cuadrícula"],
  ["List view","Vista de lista"],
  ["Easy to replace","Fácil de reemplazar"],
- ["Useful, takes some effort to replace","Útil; requiere esfuerzo reemplazarlo"],
+ ["Useful, takes some effort to replace","Útil; no es tan fácil de reemplazar"],
  ["Hard or expensive to replace","Difícil o costoso de reemplazar"],
  ["Irreplaceable","Irreemplazable"],
+ ['Freezing drizzle','Llovizna helada'],['Freezing rain','Lluvia helada'],['Snow showers','Chubascos de nieve'],['Rain showers','Chubascos'],['Open day','Abrir día'],['Show all','Ver todos'],['Filter by status','Filtrar por estado'],['Search collection','Buscar en la colección'],['out of','de'],
 ];
 const translations = new Map(pairs);
 const t = (value) => language() === 'es' ? translations.get(value) || value : value;
@@ -1569,7 +1570,7 @@ __define("js/ui/mud-format-v2.js", function (__require, __exports) {
 // the one-sentence summary. Kept apart from the Mud tab so the wallpaper can use them without
 // pulling in any dialogs or forms.
 const { h } = __require("js/ui/dom.js");
-const { language } = __require("js/ui/language.js");
+const { language, t } = __require("js/ui/language.js");
 
 const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
 const DAY_LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' });
@@ -1589,7 +1590,7 @@ function mudBar(row) {
       h('span', { class: 'blk-fill', style: `width:${Math.max(0, Math.min(100, (score - i * (100 / 3)) * 3))}%` }))));
 }
 
-const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Pegajoso',Muddy:'Lodoso',Swamp:'Pantano'}[label]||label) : label;
+const localizedMudLabel = label => language()==='es' ? ({Dry:'Seco',Tacky:'Ligeramente lodoso',Muddy:'Lodoso',Swamp:'Muy lodoso'}[label]||label) : label;
 
 function mudChip(row) {
   // The number remains available to screen readers and on hover. Visually,
@@ -1618,9 +1619,10 @@ function localizedMudWhy(why){
  .replace(/soil is dry/gi,'el suelo está seco')
  .replace(/drying well/gi,'se seca rápidamente')
  .replace(/drying slowly/gi,'se seca lentamente')
+ .replace(/little drying \(cool or still\)/gi,'se seca muy poco (por el frío o la falta de viento)')
  .replace(/little drying/gi,'se seca muy poco');
 }
-const localizedWeather = text => language()==='es' ? ({Clear:'Despejado',Sunny:'Soleado','Partly cloudy':'Parcialmente nublado',Cloudy:'Nublado',Overcast:'Cubierto','Light rain':'Lluvia ligera',Rain:'Lluvia',Snow:'Nieve',Fog:'Niebla',Thunderstorm:'Tormenta eléctrica'}[text]||text) : text;
+const localizedWeather = text => language()==='es' ? t(text) : text;
 Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, localizedMudLabel, mudChip, summarySentence, localizedMudWhy, localizedWeather });
 });
 __define("js/ui/pixel-icon.js", function (__require, __exports) {
@@ -2637,7 +2639,7 @@ function isNightAtLocation(current, date = new Date()) {
 
 function localizedMoonPhase(label,language='en') {
  if(language!=='es')return label;
- return ({'New moon':'Luna nueva','Waxing crescent':'Luna creciente','First quarter':'Cuarto creciente','Waxing gibbous':'Gibosa creciente','Full moon':'Luna llena','Waning gibbous':'Gibosa menguante','Last quarter':'Cuarto menguante','Waning crescent':'Luna menguante'})[label]||label;
+ return ({'New moon':'Luna nueva','Waxing crescent':'Luna creciente','First quarter':'Cuarto creciente','Waxing gibbous':'Luna gibosa creciente','Full moon':'Luna llena','Waning gibbous':'Luna gibosa menguante','Last quarter':'Cuarto menguante','Waning crescent':'Luna menguante'})[label]||label;
 }
 Object.assign(__exports, { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase });
 });

@@ -69,5 +69,5 @@ export function isNightAtLocation(current, date = new Date()) {
 
 export function localizedMoonPhase(label,language='en') {
  if(language!=='es')return label;
- return ({'New moon':'Luna nueva','Waxing crescent':'Luna creciente','First quarter':'Cuarto creciente','Waxing gibbous':'Gibosa creciente','Full moon':'Luna llena','Waning gibbous':'Gibosa menguante','Last quarter':'Cuarto menguante','Waning crescent':'Luna menguante'})[label]||label;
+ return ({'New moon':'Luna nueva','Waxing crescent':'Luna creciente','First quarter':'Cuarto creciente','Waxing gibbous':'Luna gibosa creciente','Full moon':'Luna llena','Waning gibbous':'Luna gibosa menguante','Last quarter':'Cuarto menguante','Waning crescent':'Luna menguante'})[label]||label;
 }

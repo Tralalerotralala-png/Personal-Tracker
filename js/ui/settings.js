@@ -258,7 +258,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       .map(([id,label])=>h('option',{value:id},label)));
   const previewCard=h('div',{class:'theme-live-preview'},
     h('div',{class:'theme-preview-panel'},
-      h('strong',{},language()==='es'?'Vista de ejemplo':'Example panel'),
+      h('strong',{},language()==='es'?'Vista previa':'Example panel'),
       h('p',{},language()==='es'?'Así se verían los colores y la iluminación.':'A sample of the colors and lighting.'),
       h('span',{class:'theme-preview-action'},language()==='es'?'Botón':'Button')));
   function updateThemePreview(){
@@ -363,7 +363,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const diagnosticsReport=h('div',{class:'diagnostics-report','aria-live':'polite'});
   const runDiagnostics=h('button',{class:'btn small',type:'button',onclick:async()=>{
     runDiagnostics.disabled=true;
-    replace(diagnosticsReport,h('p',{class:'hint'},language()==='es'?'Comprobando...':'Checking...'));
+    replace(diagnosticsReport,h('p',{class:'hint'},language()==='es'?'Verificando...':'Checking...'));
     try{
       const es=language()==='es';
       const sync=mode==='cloud'?store.sync.getStatus():null;
@@ -396,7 +396,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   }},language()==='es'?'Ejecutar diagnósticos':'Run diagnostics');
   const diagnostics=h('section',{class:'set-block'},
     h('h3',{},language()==='es'?'Diagnósticos del proyecto':'Project diagnostics'),
-    h('p',{class:'hint'},language()==='es'?'Revisa sincronización, caché, clima y copias sin mostrar contraseñas ni datos personales.':'Check sync, caching, weather, and private storage without showing passwords or personal records.'),
+    h('p',{class:'hint'},language()==='es'?'Revisa la sincronización, la caché, el clima y los respaldos sin mostrar contraseñas ni datos personales.':'Check sync, caching, weather, and private storage without showing passwords or personal records.'),
     runDiagnostics,diagnosticsReport);
 
   // Compact settings categories: only the selected section is visible.
