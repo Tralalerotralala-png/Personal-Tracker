@@ -207,15 +207,62 @@ Object.assign(__exports, { keyOf, todayKeyLocal, parseKey, addDaysKey, weekdayOf
 });
 __define("js/data/daily-loot.js", function (__require, __exports) {
 "use strict";
-// Stable civil-day rotation: each available item appears once per cycle.
-// Sorting IDs makes the result independent of database query ordering.
+// Stable civil-day rotation with an optional saved cycle. The pure fallback
+// is deterministic even when the data source returns items in a different order.
+const dayNumber = date => Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+const eligible = items => items.filter(i => i.id != null && !i.is_lost && !i.deleted_at)
+  .slice().sort((a,b) => String(a.id).localeCompare(String(b.id)));
 function dailyLoot(items, date = new Date()) {
-  const pool = items.filter(i => !i.is_lost && !i.deleted_at).slice().sort((a,b) => String(a.id).localeCompare(String(b.id)));
+  const pool = eligible(items);
   if (!pool.length) return null;
-  const day = Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()) / 86400000);
+  const day = dayNumber(date);
   return pool[((day % pool.length) + pool.length) % pool.length];
 }
-Object.assign(__exports, { dailyLoot });
+
+// Keep today's item when the inventory changes; only replace it if it is
+// removed or lost. Advance through unfeatured IDs before starting a new cycle.
+function dailyLootSelection(items, saved = null, date = new Date()) {
+  const pool = eligible(items), day = dayNumber(date);
+  if (!pool.length) return { item: null, state: saved };
+  if (saved?.day === day) {
+    const item = pool.find(i => String(i.id) === saved.id);
+    if (item) return { item, state: saved };
+  }
+  const ids = new Set(pool.map(i => String(i.id)));
+  let seen = new Set(Array.isArray(saved?.seen) ? saved.seen.filter(id => ids.has(id)) : []);
+  let candidates = pool.filter(i => !seen.has(String(i.id)));
+  if (!candidates.length) { seen = new Set(); candidates = pool; }
+  if (saved?.id && candidates.length > 1) candidates = candidates.filter(i => String(i.id) !== saved.id);
+  // Initial pick is consistent with the read-only deterministic fallback.
+  const item = saved?.id ? candidates.find(i => String(i.id).localeCompare(saved.id) > 0) || candidates[0] : dailyLoot(candidates,date);
+  seen.add(String(item.id));
+  return { item, state: { day, id: String(item.id), seen: [...seen] } };
+}
+
+const KEY = 'daily_loot_rotation_v1';
+const pending = new WeakMap();
+// Share the saved selection between Pack and Overview, even if both render
+// concurrently. Read-only wallpaper stores keep their own device-local cycle.
+function resolveDailyLoot(store, items, date = new Date()) {
+  const before = pending.get(store) || Promise.resolve();
+  const task = before.catch(() => {}).then(async () => {
+    const readOnly = store.readOnly === true;
+    let saved;
+    try { saved = readOnly ? await store.meta?.get(KEY) : await store.getSetting(KEY); } catch {}
+    const result = dailyLootSelection(items, saved, date);
+    if (result.state && result.state !== saved) {
+      try {
+        if (readOnly) await store.meta?.set(KEY, result.state);
+        else await store.setSetting(KEY, result.state);
+      } catch (error) { console.warn('Could not save daily loot rotation', error); }
+    }
+    return result.item;
+  });
+  pending.set(store,task);
+  task.finally(() => { if (pending.get(store) === task) pending.delete(store); });
+  return task;
+}
+Object.assign(__exports, { dailyLoot, dailyLootSelection, resolveDailyLoot });
 });
 __define("js/data/defaults.js", function (__require, __exports) {
 "use strict";
@@ -1298,7 +1345,7 @@ const pairs = [
  ['Sunny','Soleado'],['Clear sky','Cielo despejado'],['Partly cloudy','Parcialmente nublado'],
  ['Cloudy','Nublado'],['Overcast','Cubierto'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
  ['Snow','Nieve'],['Thunderstorm','Tormenta eléctrica'],['Fog','Niebla'],['Storms','Tormentas'],
- ['Mud forecast','Pronóstico del terreno'],['Show quantity as percentage','Mostrar cantidad como porcentaje'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
+ ['Mud forecast','Pronóstico del terreno'],['Show quantity as percentage','Mostrar cantidad como porcentaje'],['Show maximum amounts','Mostrar cantidades máximas'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
  ['Change place','Cambiar lugar'],['Choose a place','Elegir lugar'],['Refresh','Actualizar'],
  ['Items','Objetos'],['Places','Lugares'],['Add an item','Agregar objeto'],['Add item','Agregar objeto'],
  ['Clear filters','Borrar filtros'],['No items match these filters.','Ningún objeto coincide con estos filtros.'],
@@ -3371,7 +3418,7 @@ const { mountCurrency } = __require("js/widgets/currency.js");
 const { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
-const { dailyLoot } = __require("js/data/daily-loot.js");
+const { resolveDailyLoot } = __require("js/data/daily-loot.js");
 const { timeAgo } = __require("js/ui/format.js");
 const { articleKey, readingIndex, updateReading } = __require("js/feed/reading.js");
 const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
@@ -3526,12 +3573,12 @@ function mountLoot(el, { store, showPlaces = true, interactive = false }) {
   const render = async () => {
     const [items, locations] = await Promise.all([store.list('items'), store.list('locations')]);
     const lost = items.filter((i) => i.is_lost);
-    const loot = dailyLoot(items);
+    const loot = await resolveDailyLoot(store, items);
     if (!items.length) return replace(el, note('No items yet. Add some in the Pack tab.'));
     // On the wallpaper, where things are stored is hidden unless you turned that on.
     const where = (i) => (showPlaces ? locationPath(locations, i.location_id) : null);
     replace(el, h('div', { class: 'w-loot' },
-      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, "Today's loot"), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
+      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, t("Today's loot")), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
       lost.length ? h('div', { class: 'w-lost' }, h('span', { class: 'w-k warn' }, lost.length === 1 ? '1 lost quest' : `${lost.length} lost quests`),
         lost.slice(0, 3).map((i) => {
           const days = daysSince(i.lost_since);
@@ -3539,7 +3586,7 @@ function mountLoot(el, { store, showPlaces = true, interactive = false }) {
           return h('p', {}, h('b', {}, i.name), h('span', { class: 'w-path' }, detail));
         })) : null));
   };
-  const inst = live(render, (run) => [storeTables(store, ['items', 'locations'], run)]);
+  const inst = live(render, (run) => [storeTables(store, ['items', 'locations', 'settings'], run)]);
   let lastDay = todayKeyLocal();
   const checkDay = () => { const next = todayKeyLocal(); if (next !== lastDay) { lastDay = next; inst.refresh(); } };
   const timer = setInterval(checkDay, 30_000);
