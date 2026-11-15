@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { categoryFields, itemFields, trackMeta, attentionFor } from '../js/data/tracking.js';
 import { t } from '../js/ui/language.js';
-import { pharmacyIconSvg, defaultMedicinePreset, defaultMedicineColor, medicineColor, medicinePreset, isPharmacyCategory } from '../js/ui/pharmacy-icons.js';
+import { pharmacyIconSvg, defaultMedicinePreset, defaultMedicineColor, medicineColor, medicinePreset, isPharmacyCategory, PHARMACY_PRESETS } from '../js/ui/pharmacy-icons.js';
 
 test('item fields inherit category defaults until explicitly overridden', () => {
   const defaults = categoryFields({ pharmacy: { quantity:true, expiration:true, condition:false } }, 'pharmacy');
@@ -45,8 +45,8 @@ test('pharmacy presets reuse one sprite family and keep individual colors', () =
   assert.ok(isPharmacyCategory(category));
   assert.ok(isPharmacyCategory({name:'Farmacia'}));
   for (const name of ['Methotrexate','Montelukast','Loratadine']) {
-    assert.equal(defaultMedicinePreset(name, category),'bottle-pills');
-    assert.match(pharmacyIconSvg(name,category),/viewBox="0 0 24 24"/);
+    assert.equal(defaultMedicinePreset(name, category),'bottle-pill');
+    assert.match(pharmacyIconSvg(name,category),/viewBox="0 0 32 32"/);
   }
   assert.equal(defaultMedicinePreset('Oximetazoline',category),'spray');
   assert.equal(defaultMedicinePreset('Oximetazolina',category),'spray');
@@ -67,4 +67,29 @@ test('compact editor retains tracking, notes, purchase details and icon tools',(
  for(const label of ['Tracking fields','Purchase & warranty','Custom icon tools','Notes & lost status'])assert.ok(inventory.includes(label));
  assert.ok(inventory.includes('icon_preset: draft.iconPreset'));
  assert.match(css,/\.item-editor-form \.item-field-grid \{[^}]*repeat\(2,minmax\(0,1fr\)\)/);
+});
+
+test('approved bottle variants share exactly the same base and a half-colored capsule',()=>{
+ const cat={name:'Pharmacy'};
+ const icons=['bottle','bottle-pill','bottle-tablet'].map(icon_preset=>pharmacyIconSvg('Example',cat,{icon_preset,icon_color:'#123456',icon_dose_color:'#bc42ee'}));
+ const part=(svg,name)=>svg.match(new RegExp('<g data-part="'+name+'">([\\s\\S]*?)</g>'))[1];
+ assert.equal(part(icons[0],'bottle'),part(icons[1],'bottle'));
+ assert.equal(part(icons[1],'bottle'),part(icons[2],'bottle'));
+ assert.equal(part(icons[0],'dose'),'');
+ assert.notEqual(part(icons[1],'dose'),part(icons[2],'dose'));
+ const capsule=part(icons[1],'dose');
+ const area=[...capsule.matchAll(/width="(\d+)" height="1" fill="(#\w+)"/g)].reduce((out,[,width,color])=>({...out,[color]:(out[color]||0)+Number(width)}),{});
+ assert.ok(area['#bc42ee']>=8,'capsule color must cover a solid half, not just a stripe');
+ assert.ok((area['#fce3b4']||0)+(area['#fdf6ea']||0)>=10);
+ assert.equal(medicinePreset('bottle-pills'),'bottle-pill');
+ assert.ok(!PHARMACY_PRESETS.includes('bottle-pills'));
+ assert.equal(pharmacyIconSvg('Example',cat,{icon_preset:'bottle-pills'}),pharmacyIconSvg('Example',cat,{icon_preset:'bottle-pill'}));
+});
+test('independent pharmacy palette colors persist and render',()=>{
+ const meta=trackMeta({icon_preset:'bottle-tablet',icon_color:'#123456',icon_body_color:'#445566',icon_paper_color:'#778899',icon_dose_color:'#aabbcc'});
+ const svg=pharmacyIconSvg('Example',{name:'Pharmacy'},meta);
+ for(const color of ['#123456','#445566','#778899','#aabbcc'])assert.ok(svg.includes(color),color);
+ assert.equal(trackMeta({icon_body_color:'invalid'}).icon_body_color,null);
+ const inventory=fs.readFileSync(new URL('../js/ui/inventory.js',import.meta.url),'utf8');
+ for(const field of ['icon_body_color','icon_paper_color','icon_dose_color'])assert.ok(inventory.includes(field));
 });
