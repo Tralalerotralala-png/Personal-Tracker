@@ -1,4 +1,4 @@
-import { dailyLoot } from '../data/daily-loot.js';
+import { resolveDailyLoot } from '../data/daily-loot.js';
 // The Inventory tab: "Where is it?" search, lost-item quests, the slot grid,
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
@@ -9,7 +9,7 @@ import {
 } from '../data/inventory-logic.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
-import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor } from '../data/tracking.js';
+import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor, quantityDisplay } from '../data/tracking.js';
 import { t, locale, language, categoryLabel } from './language.js';
 import { uuid } from '../data/util.js';
 import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
@@ -50,6 +50,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     placeId: null, // a place id, or 'none' for "no place"
     sort: 'newest',
     display: localStorage.getItem('tracker-pack-display') || 'grid',
+    showMax: localStorage.getItem('tracker-pack-show-max') !== 'false',
   };
   let data = { items: [], locations: [], categories: [], rarityLabels: DEFAULT_SETTINGS.rarity_labels, tracking: {}, categoryDefaults: {} };
 
@@ -63,7 +64,8 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     ]);
     categories.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
     const [trackingRows, categoryDefaults] = await Promise.all([store.list('settings', { where: r => r.key.startsWith('item_tracking:') }), store.getSetting('category_tracking_defaults')]);
-    data = { items, locations, categories, rarityLabels, tracking: Object.fromEntries(trackingRows.map(r => [r.key.slice('item_tracking:'.length), r.value])), categoryDefaults: categoryDefaults || {} };
+    const loot = await resolveDailyLoot(store, items);
+    data = { loot, items, locations, categories, rarityLabels, tracking: Object.fromEntries(trackingRows.map(r => [r.key.slice('item_tracking:'.length), r.value])), categoryDefaults: categoryDefaults || {} };
   }
 
   const ctx = () => ({ items: data.items, locations: data.locations, categories: data.categories });
@@ -72,7 +74,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   const pathOf = (item) => locationPath(data.locations, item.location_id);
   const metaOf = item => data.tracking[item.id] || {};
   const fieldsOf = item => itemFields(metaOf(item), categoryFields(data.categoryDefaults, item.category_id));
-  const quantityText = (item) => { const meta = metaOf(item); const max = Math.max(item.quantity, meta.max_quantity ?? item.quantity); return meta.quantity_percent ? `${max > 0 ? Math.round(item.quantity / max * 100) : 0}%` : `${item.quantity}/${max}`; };
+  const quantityText = (item) => quantityDisplay(item.quantity, metaOf(item), state.showMax);
   const barFor = (item) => {
     const meta = metaOf(item), enabled = fieldsOf(item);
     const parts = [];
@@ -177,7 +179,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   function renderQuests() {
     const lost = data.items.filter((i) => i.is_lost);
     const showing = !state.q && !state.category && !state.rarities.size && !state.placeId && !state.lostOnly;
-    const loot = dailyLoot(data.items);
+    const loot = data.loot;
 
     const blocks = [];
     if (showing && lost.length) {
@@ -189,7 +191,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
             h('span', { class: 'quest-meta' }, language() === 'es' ? `perdido hace ${daysSince(i.lost_since) ?? '?'} días, visto por última vez en: ${pathOf(i)}` : `lost ${daysSince(i.lost_since) ?? '?'} days, last seen: ${pathOf(i)}`))))),
         lost.length > 3 ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { state.lostOnly = true; renderAll(); } }, `Show all ${lost.length} lost items`) : null));
     }
-    if (showing && loot) {
+    if (loot) {
       blocks.push(h('button', { class: `loot r-${loot.rarity}`, type: 'button', onclick: () => openItemSheet(loot) },
         h('span', { class: 'loot-art' }, art(loot, 'art')),
         h('span', { class: 'loot-text' },
@@ -222,7 +224,12 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         state.placeId === 'none' ? t('No place') : `${language() === 'es' ? 'En' : 'In'}: ${locationPath(data.locations, state.placeId)}`, ' ×')
       : null;
 
-    replace(filtersEl, catRow, rarityRow, placeChip ? h('div', { class: 'filter-foot' }, placeChip) : null);
+    const maxToggle = chip(t('Show maximum amounts'), state.showMax, () => {
+      state.showMax = !state.showMax;
+      try { localStorage.setItem('tracker-pack-show-max', String(state.showMax)); } catch {}
+      renderFilters(); renderResults();
+    });
+    replace(filtersEl, catRow, rarityRow, h('div', { class: 'filter-foot' }, maxToggle, placeChip));
   }
 
   function sorted(items) {
@@ -611,9 +618,10 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   });
 
   let lastDay = todayKeyLocal();
-  function checkDay() { const day=todayKeyLocal(); if(day!==lastDay && el.isConnected && !el.hidden){lastDay=day;renderQuests();} }
+  function checkDay() { const day=todayKeyLocal(); if(day!==lastDay && el.isConnected && !el.hidden){lastDay=day;refresh().catch(error => console.warn('Could not refresh daily loot',error));} }
   const dayTimer=setInterval(checkDay,30000);
   window.addEventListener('focus',checkDay);
+  document.addEventListener('visibilitychange',checkDay);
   async function show() {
     await refresh(); renderPane(); checkDay();
     const id=sessionStorage.getItem('tracker-open-item');
@@ -623,7 +631,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     el,
     mount: show,
     show,
-    destroy(){clearInterval(dayTimer);window.removeEventListener('focus',checkDay);},
+    destroy(){clearInterval(dayTimer);window.removeEventListener('focus',checkDay);document.removeEventListener('visibilitychange',checkDay);},
     focusSearch: () => searchInput.focus(),
   };
 }
