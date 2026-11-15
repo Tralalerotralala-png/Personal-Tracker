@@ -93,3 +93,21 @@ test('independent pharmacy palette colors persist and render',()=>{
  const inventory=fs.readFileSync(new URL('../js/ui/inventory.js',import.meta.url),'utf8');
  for(const field of ['icon_body_color','icon_paper_color','icon_dose_color'])assert.ok(inventory.includes(field));
 });
+
+test('capsule is a single rounded symmetric pixel shape with an unbroken outline',()=>{
+ const svg=pharmacyIconSvg('Example',{name:'Pharmacy'},{icon_preset:'bottle-pill',icon_dose_color:'#a39bdc'});
+ const dose=svg.split('<g data-part="dose">')[1].split('</g>')[0];
+ const pixels=new Map();
+ for(const [,x,y,w,color] of dose.matchAll(/x="(\d+)" y="(\d+)" width="(\d+)" height="1" fill="(#[0-9a-f]+)"/g)){
+  for(let i=0;i<Number(w);i++)pixels.set(`${Number(x)+i},${y}`,color);
+ }
+ const coords=[...pixels.keys()].map(p=>p.split(',').map(Number));
+ const xs=coords.map(p=>p[0]),ys=coords.map(p=>p[1]);
+ const xsum=Math.min(...xs)+Math.max(...xs),ysum=Math.min(...ys)+Math.max(...ys);
+ assert.ok(coords.length>=60,'capsule should have a substantial, not skinny, silhouette');
+ for(const [x,y] of coords){
+  assert.ok(pixels.has(`${xsum-x},${ysum-y}`),'both rounded ends must have the same silhouette');
+  if([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>!pixels.has(`${x+dx},${y+dy}`)))assert.equal(pixels.get(`${x},${y}`),'#2a1202','outer edge must be outlined');
+  assert.ok(x>=0&&x<32&&y>=0&&y<32,'capsule fits within icon bounds');
+ }
+});
