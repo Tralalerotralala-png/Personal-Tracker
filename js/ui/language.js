@@ -27,7 +27,7 @@ const pairs = [
  ['Sunny','Soleado'],['Clear sky','Cielo despejado'],['Partly cloudy','Parcialmente nublado'],
  ['Cloudy','Nublado'],['Overcast','Cubierto'],['Light rain','Lluvia ligera'],['Rain','Lluvia'],
  ['Snow','Nieve'],['Thunderstorm','Tormenta eléctrica'],['Fog','Niebla'],['Storms','Tormentas'],
- ['Mud forecast','Pronóstico del terreno'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
+ ['Mud forecast','Pronóstico del terreno'],['Show quantity as percentage','Mostrar cantidad como porcentaje'],['MUD OUTLOOK','ESTADO DEL TERRENO'],['WEATHER OUTLOOK','PRONÓSTICO DEL CLIMA'],['LOCAL TIME','HORA LOCAL'],
  ['Change place','Cambiar lugar'],['Choose a place','Elegir lugar'],['Refresh','Actualizar'],
  ['Items','Objetos'],['Places','Lugares'],['Add an item','Agregar objeto'],['Add item','Agregar objeto'],
  ['Clear filters','Borrar filtros'],['No items match these filters.','Ningún objeto coincide con estos filtros.'],
