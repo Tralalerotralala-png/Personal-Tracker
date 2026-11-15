@@ -126,7 +126,8 @@ export function createDreamDiaryView({store}) {
    const error=h('p',{class:'form-error',role:'alert'});
    const nightPanel=h('section',{class:'dream-night-panel'});
    const editorSession=session;
-   let night=entry?.nightSky||null,nightPromise=null,nightDate=null,nightRequest=0;
+   let night=entry?.nightSky||null,nightPromise=null,nightDate=null,nightRequest=0,saving=false;
+   const newEntryId=original?.id||uuid();
    function renderNight(loading=false){
     replace(nightPanel,h('h3',{},trNight('Previous night · weather & sky','Noche anterior · clima y cielo')),night?nightDetails(night):null,
       loading?h('p',{class:'hint',role:'status'},trNight('Loading overnight weather…','Consultando el clima de la noche…')):h('button',{type:'button',class:'btn small',onclick:()=>requestNight(true)},trNight('Refresh night data','Actualizar datos de la noche')));
@@ -134,15 +135,17 @@ export function createDreamDiaryView({store}) {
    function requestNight(force=false){
     if(type!=='dreams')return Promise.resolve(null);
     const chosen=date.value||today();
-    if(!force&&night?.date===chosen&&night.status==='complete'){renderNight();return Promise.resolve(night);}
+    if(!force&&night?.date===chosen&&night.status==='complete'){nightRequest++;nightPromise=null;renderNight();return Promise.resolve(night);}
     if(!force&&nightPromise&&nightDate===chosen)return nightPromise;
     const seq=++nightRequest;nightDate=chosen;
+    const prior=night?.date===chosen&&night.status==='complete'?night:null;
     if(night?.date!==chosen)night=baseDreamNight(chosen);
     renderNight(true);
     nightPromise=(async()=>{
       let result;
       try{const place=await store.getSetting('location',null);result=await loadDreamNight(chosen,place);}catch{result=baseDreamNight(chosen);}
-      if(seq===nightRequest){nightPromise=null;if(session===editorSession){night=result;renderNight();}}
+      if(prior&&result.status!=='complete')result=prior;
+      if(seq===nightRequest){nightPromise=null;if(session===editorSession&&(date.value||today())===chosen){night=result;renderNight();}}
       return result;
     })();return nightPromise;
    }
@@ -167,21 +170,24 @@ export function createDreamDiaryView({store}) {
    const editor={close:closeEditor};
    const actions=[
     original?button(L().delete,async()=>{if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;session.data[type]=session.data[type].filter(x=>x.id!==original.id);delete session.data.drafts?.[draftKey];editorDirty=false;await persist();editor.close();draw();}):null,
-    h('button',{class:'btn primary',onclick:async()=>{
+    h('button',{class:'btn primary',onclick:async(e)=>{
+      if(saving)return;
       if(!title.value.trim()){error.textContent='Title required';return;}
+      saving=true;const saveButton=e.currentTarget;saveButton.disabled=true;
       try{
        const saveDate=date.value||today();
        const savedNight=type==='dreams'?(nightPromise&&nightDate===saveDate?await nightPromise:night?.date===saveDate?night:await requestNight()):null;
-       if(session!==editorSession||date.value&&date.value!==saveDate)return;
+       if(session!==editorSession||!form.isConnected||(date.value||today())!==saveDate)return;
        let art=entry?.art||null;
        if(file.files?.length){const f=file.files[0];if(f.size>100*1024||!['image/png','image/jpeg','image/webp'].includes(f.type)){error.textContent=L().art;return;}
         art=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(f);});}
-       const updated={...entry,id:original?.id||uuid(),title:safeText(title.value,140),date:saveDate,body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art,...(type==='dreams'?{nightSky:savedNight}:{})};
-       if(session!==editorSession)return;
+       const updated={...entry,id:newEntryId,title:safeText(title.value,140),date:saveDate,body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art,...(type==='dreams'?{nightSky:savedNight}:{})};
+       if(session!==editorSession||!form.isConnected||(date.value||today())!==saveDate)return;
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
        delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;editorDirty=false;
        await persist();editor.close();draw();
       }catch(err){error.textContent=L().saveFailed;}
+      finally{saving=false;saveButton.disabled=false;}
     }},L().save)];
    const page=h('section',{class:'journal-inline-editor'},
      h('div',{class:'journal-editor-head'},h('h2',{},entry?L().name:L().new),button(language()==='es'?'Volver':'Back',()=>{
