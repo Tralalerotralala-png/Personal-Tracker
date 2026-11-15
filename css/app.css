@@ -1707,3 +1707,20 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .dream-night-event small{display:block;}
 .dream-night-hour{display:grid;grid-template-columns:48px minmax(0,1fr) 64px 60px;gap:5px;padding:4px 0;font-size:.75rem;border-bottom:1px solid var(--edge);}
 .journal-entry>.dream-night-card-summary{color:var(--accent);font-size:.75rem;}
+
+/* Compact weather: detailed pixel silhouettes, single theme hue, gentle motion. */
+.wx-compact{overflow:visible;vertical-align:middle;}
+.wx-compact .wx-sun-art{transform-origin: center;animation:compactSun 5s steps(5,end) infinite alternate;}
+.wx-compact .wx-cloud-layer{animation:compactCloud 6s steps(3,end) infinite alternate;}
+.wx-compact .wx-fog-layer{animation:compactFog 5s steps(3,end) infinite alternate;}
+.wx-compact .wx-rain-drop{animation:compactRain 1.5s steps(3,end) infinite;}
+.wx-compact .wx-snow-flake{animation:compactSnow 3.5s steps(4,end) infinite;}
+.wx-compact .wx-lightning{animation:compactFlash 7s steps(1,end) infinite;}
+@keyframes compactSun{from{opacity:.78}to{opacity:1}}
+@keyframes compactCloud{from{transform:translateX(-.5px)}to{transform:translateX(.5px)}}
+@keyframes compactFog{from{transform:translateX(-1px)}to{transform:translateX(1px)}}
+@keyframes compactRain{0%{transform:translateY(-1px);opacity:.55}65%{transform:translateY(2px);opacity:1}100%{transform:translateY(2px);opacity:.45}}
+@keyframes compactSnow{0%{transform:translate(-1px,-1px);opacity:.6}65%{transform:translate(1px,1px);opacity:1}100%{transform:translate(0,2px);opacity:.5}}
+@keyframes compactFlash{0%,92%,100%{opacity:.75}94%,97%{opacity:1}}
+.reduce-animations .wx-compact g{animation:none!important;}
+@media(prefers-reduced-motion:reduce){.wx-compact g{animation:none!important;}}

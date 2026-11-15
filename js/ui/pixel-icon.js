@@ -341,6 +341,8 @@ export function glyphNames() { return Object.keys(GLYPHS); }
 export function glyphRows(name) { return GLYPHS[name] ?? null; }
 
 export function glyphSvg(name) {
+  const compactCodes={sun:0,partly:2,cloud:3,fog:45,rain:61,snow:71,storm:95};
+  if(Object.prototype.hasOwnProperty.call(compactCodes,name))return compactWeatherSvg(compactCodes[name]);
   if(name==='expenses'){
     const rows=["........................","........AAAAAAAA........","......AABBBAACCCAA......",".....AABBBBAACCCCAA.....","....ABBBBBBAACCCCCCA....","...ABBBBBBBAACCCCCCCA...","...ABBBBBBBAACCCDDDCA...","..ABBBBBBBBAACDDDDDDCA..","..ABBBBBBBBAADDDDDDDCA..","..ABBBBBBBEAADDDDDDDCA..",".ABBBBBBEEEEDDDDDDDDDCA.",".AFBBEEEEEEEDDDDDDDDDGA.",".AFEEEEEAAAHIAADDDDDDGA.",".AAFEEAAAHHAAIIAAADDGAA.",".AAFAAHHHHHAAIIIIAAAGAA.","..AAHHHHHHHAAIIIIIIAAA..","..AAJHHHHHHAAIIIIIIKAA..","..AAJJHHHHHAAIIIIIKKAA..","...AAJJHHHHAAIIIIKKAA...","...AAAAJJHHAAIIKKAAAA...","....AAAAJJJAAKKKAAAA....",".....AAAAAAAAAAAAAA.....",".......AAAAAAAAAA.......",".........AAAAAA........."],palette=["#26354d","#b1f1cb","#fff0a5","#f0b959","#70cbb3","#3f917c","#b87530","#e98299","#a48ae5","#a74662","#6953ab"];
     const rects=rows.flatMap((row,y)=>[...row].flatMap((c,x)=>c==='.'?[]:[`<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[c.charCodeAt(0)-65]}"/>`])).join('');
@@ -456,12 +458,25 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
     }
     if(kind==='snow'){
       for(const [cx,cy] of [[9,29],[21,34],[32,28]]){
-        content+=layer((x,y)=>{
+        content+='<g class="wx-snow-flake" style="animation-delay:'+(-cx/15)+'s">'+layer((x,y)=>{
           const dx=x-cx,dy=y-cy,ax=Math.abs(dx),ay=Math.abs(dy);
           return (ax<.8&&ay<4.2||ay<.8&&ax<4.2||Math.abs(ax-ay)<.7&&ax<2.8&&ay<2.8)?(ax+ay<2?'#fff5ed':'#b4ddf2'):null;
-        });
+        })+'</g>';
       }
     }
   }
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>';
+}
+
+/** Compact monochrome weather art shares the detailed weather silhouettes.
+ * Preserve the theme's single foreground tone, including animated layers. */
+export function compactWeatherSvg(code,options={}) {
+  const svg=weatherIconSvg(code,options);
+  const kind=weatherGlyph(code).glyph;
+  return svg.replace(/^<svg /,'<svg class="wx-compact wx-compact-'+kind+'" ')
+     .replace(/fill="#([0-9a-fA-F]{6})"/g,(_,hex)=>{
+      const rgb=hex.match(/../g).map(v=>parseInt(v,16));
+      const light=(rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722)/255;
+      return 'fill="currentColor" fill-opacity="'+(.36+.64*light).toFixed(2)+'"';
+    });
 }
