@@ -1646,3 +1646,34 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .widget .w-mud-dashboard .w-weather-glyph svg {width:clamp(30px,9cqh,42px);height:clamp(30px,9cqh,42px);}
 .hotbar .slot[data-route="inventory"] .slot-icon svg {width:30px;height:30px;}
 @media(max-width:480px){.hotbar .slot[data-route="inventory"] .slot-icon svg{width:23px;height:23px;}}
+
+/* Equal clock label, time and date rows on both clocks. */
+.widget .w-mud-dashboard .w-weather-clock .w-time-unit,.w-mud-dashboard .w-weather-clock .w-time-unit {
+ display:grid;grid-template-rows:1.4em 1.5em 1.2em;align-content:start;align-items:center;justify-items:center;align-self:start;gap:3px;width:100%;min-width:0;text-align:center;
+}
+.w-mud-dashboard .w-weather-clock .w-time-unit > span{grid-row:1;line-height:1.25;}
+.w-mud-dashboard .w-weather-clock .w-time-unit > strong{grid-row:2;line-height:1.1;white-space:nowrap;}
+.w-mud-dashboard .w-weather-clock .w-time-unit > small{grid-row:3;line-height:1.2;}
+.box-count{z-index:3;font-variant-numeric:tabular-nums;}
+.box-row-count{color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+.box-stock-panel{grid-column:1/-1;display:grid;gap:8px;padding:10px;border:1px solid var(--edge);}
+.box-stock-rows{display:grid;gap:8px;}
+.box-stock-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:8px;padding:8px;border:1px solid var(--edge);}
+.box-stock-row>strong{grid-column:1/-1;}
+.box-stock-row .item-field{min-width:0;}
+.box-stock-panel>button{justify-self:start;}
+.box-stock-total{font-variant-numeric:tabular-nums;}
+/* Reserve the protruding disc's footprint to keep it off the game text. */
+.game-detail:has(>.media-case-game){grid-template-columns:minmax(240px,310px) minmax(0,1fr);gap:24px;}
+.media-case-game{width:clamp(148px,17vw,225px);margin-right:76px;}
+.media-case-game .media-case-disc{
+ top:12%;left:10%;width:96%;border:3px solid #6b8aa9;
+ background:radial-gradient(circle at center,#121923 0 8%,#9cc5ed 8.5% 10%,#233d59 10.5% 13%,#c0d9e7 13.5% 15%,#486d94 15.5% 17%,transparent 17.5%),repeating-radial-gradient(circle at center,transparent 0 4px,#d4eaff22 4px 5px,transparent 5px 7px),conic-gradient(from 28deg,#527cae,#b6d8f4,#38638c,#7faecb,#405c88,#c5e7f8,#527cae);
+ box-shadow:inset 0 0 0 2px #c5e2f488,inset 0 0 14px #0a1f43aa,4px 5px 0 #0006;
+ animation:ptGameDiscSlide .9s .24s cubic-bezier(.18,.72,.2,1) both;
+}
+.media-case-game .media-case-disc::after{content:'DVD';position:absolute;right:9%;top:39%;color:#ecf6ff;font-size:clamp(9px,1vw,14px);font-weight:700;letter-spacing:.05em;text-shadow:1px 1px #234361;}
+@keyframes ptGameDiscSlide{from{transform:translateX(0)}to{transform:translateX(37%)}}
+@media(max-width:650px){.game-detail:has(>.media-case-game){grid-template-columns:1fr;gap:18px;}.media-case-game{width:min(56vw,210px);margin-right:0;}}
+.game-backups .backup-upload{margin:0 0 14px;padding:12px;border:1px solid var(--edge);background:var(--panel-2);}
+.game-backups [hidden]{display:none!important;}

@@ -14,6 +14,7 @@ export function trackMeta(meta = {}) {
     overrides: meta.overrides || {}, durability: Number.isFinite(meta.durability) ? meta.durability : 100,
     max_quantity: Number.isFinite(meta.max_quantity) ? meta.max_quantity : null,
     quantity_percent: meta.quantity_percent === true,
+    extra_boxes: normalizeBoxes(meta.extra_boxes),
     show_max_quantity: meta.show_max_quantity !== false,
     icon_preset: typeof meta.icon_preset === 'string' ? meta.icon_preset : 'auto',
     icon_color: /^#[0-9a-f]{6}$/i.test(String(meta.icon_color || '')) ? meta.icon_color : null,
@@ -62,4 +63,23 @@ export function quantityMeter(quantity, meta = {}) {
   const count = Math.max(0, Number(quantity) || 0);
   const max = Math.max(count, Number.isFinite(meta.max_quantity) ? meta.max_quantity : count);
   return max > 0 ? Math.min(100, Math.max(0, count / max * 100)) : 0;
+}
+
+export function normalizeBoxes(boxes) {
+  return Array.isArray(boxes)?boxes.filter(b=>b&&Number.isSafeInteger(b.current)&&b.current>=0&&Number.isSafeInteger(b.maximum)&&b.maximum>=b.current).map(b=>({current:b.current,maximum:b.maximum})):[];
+}
+export function boxTotals(primary, boxes=[]) {
+  const all=[primary,...boxes];
+  if(all.some(b=>!b||!Number.isSafeInteger(b.current)||b.current<0||!Number.isSafeInteger(b.maximum)||b.maximum<b.current))throw new Error('Each box needs a valid current and maximum quantity.');
+  const current=all.reduce((n,b)=>n+b.current,0),maximum=all.reduce((n,b)=>n+b.maximum,0);
+  if(!Number.isSafeInteger(current)||!Number.isSafeInteger(maximum))throw new Error('Quantity is too large.');
+  return {current,maximum,boxes:all.length};
+}
+// The item retains its combined stock and capacity for existing consumers.
+export function primaryBox(quantity,meta={}) {
+  const extra=normalizeBoxes(meta.extra_boxes);
+  const n=Math.max(0,Number(quantity)||0);
+  const totalMax=Math.max(n,Number.isFinite(meta.max_quantity)?meta.max_quantity:n);
+  const current=Math.max(0,n-extra.reduce((s,b)=>s+b.current,0));
+  return {current,maximum:Math.max(current,totalMax-extra.reduce((s,b)=>s+b.maximum,0))};
 }

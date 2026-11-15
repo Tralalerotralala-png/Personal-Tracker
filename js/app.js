@@ -135,7 +135,7 @@ const VIEWS = {
   expenses: expensesView,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'board'], ['expenses', 'Expenses', 'pack'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'board'], ['expenses', 'Expenses', 'expenses'],
 ];
 
 const main = h('main', { id: 'main' });

@@ -1320,6 +1320,7 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Boxes','Cajas'],['Box','Caja'],['Add another box','Agregar otra caja'],['Each box has its own quantity and capacity. Your pack shows their combined total.','Cada caja tiene su propia cantidad y capacidad. Tu mochila muestra el total de todas.'],['Each box needs a valid current and maximum quantity.','Cada caja debe tener una cantidad actual y máxima válidas.'],['Remove box?','¿Quitar caja?'],['This removes its quantity from the total when you save.','Su cantidad se restará del total cuando guardes.'],['Quantity is too large.','La cantidad es demasiado grande.'],
  ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Reportes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
 
  ['Library','Biblioteca'],['Books','Libros'],['Films','Películas'],['Albums','Álbumes'],['Recently played','Jugados recientemente'],['Currently playing','Jugando ahora'],
@@ -1714,6 +1715,7 @@ function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
 // ---- navigation glyphs (drawn in currentColor) ------------------------------
 
 const GLYPHS = {
+  expenses: ["....###.....","..#####.##..",".######.###.",".######.####","#######.####","#######.####","#######.####","######......",".####.#####.",".###.######.","..#.######..","....####...."],
   pack: [
       "....................",
       ".......######.......",
@@ -3572,7 +3574,7 @@ function mountMud(el, { weather, store }) {
       analog,
       h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined)),
         h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
-      extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra))) : null);
+      extra ? h('div', { class: 'w-time-unit' }, h('span', {}, ui.extra_clock_label || extra.replaceAll('_', ' ')), h('strong', {}, clock(extra)), h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: extra }))) : null);
     const c = s.current;
     const night = skyLighting(s, ui, now).night;
     const moon = moonPhase(now);

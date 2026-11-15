@@ -11,9 +11,11 @@ export function createGameBackupPanel({backups,gameId}) {
  const status=h('p',{class:'hint',role:'status','aria-live':'polite'});
  if(!backups){replace(section,h('h3',{},tr('Game save backups','Copias de partidas')),h('p',{class:'hint'},tr('Sign in with Supabase to use private file storage.','Inicia sesión con Supabase para guardar archivos privados.')));return section;}
  const entries=h('div',{class:'backup-list'});
- const file=h('input',{type:'file',accept:'.sav,.dat,.bin,.bak,.zip,.7z,.rar,.ini,.cfg,.json,.txt,.xml,.vdf,.db,.sqlite,.srm,.state,.sgm,.save,.mcr,.gme,.sl2,.co2,.dsv,.profile'});
+ const file=h('input',{type:'file'});
  const notes=h('input',{type:'text',maxlength:300,placeholder:tr('Backup description (optional)','Descripción de la copia (opcional)')});
- const cat=h('select',{},[['Save','Save / Partida'],['Config','Configuration / Configuración'],['Mod','Mods / Presets'],['Other','Other / Otro']].map(([v,label])=>h('option',{value:v},label)));
+ const categories=[['Save','Save','Partida'],['Config','Configuration','Configuración'],['Mod','Mods / presets','Mods / ajustes'],['Other','Other','Otro']];
+ const categoryLabel=value=>{const entry=categories.find(c=>c[0]===value);return entry?tr(entry[1],entry[2]):value;};
+ const cat=h('select',{},categories.map(([v,en,es])=>h('option',{value:v},tr(en,es))));
  const upload=h('button',{class:'btn primary small',type:'button',disabled:true},tr('Upload backup','Subir copia'));
  const compare=h('div',{class:'backup-comparison'});
  const compareSelect=h('select',{'aria-label':tr('First backup','Primera copia')});
@@ -39,9 +41,9 @@ export function createGameBackupPanel({backups,gameId}) {
      replace(compareSelect,...choices.map(x=>x.cloneNode(true)));
      replace(compareOther,...choices);
      if(rows.length>1)compareOther.value=rows[1].id;
-     compare.hidden=rows.length<2;
+     const comparePanel=section.querySelector('.backup-comparison-panel');if(comparePanel)comparePanel.hidden=rows.length<2;
      replace(entries,...(rows.length?rows.map(entry=>h('div',{class:'backup-entry'},
-       h('div',{class:'backup-entry-meta'},h('strong',{},entry.name),h('small',{},`${entry.category} · ${size(entry.size)} · ${new Date(entry.createdAt).toLocaleString(language()==='es'?'es-MX':'en-US')}`),entry.notes?h('p',{},entry.notes):null),
+       h('div',{class:'backup-entry-meta'},h('strong',{},entry.name),h('small',{},`${categoryLabel(entry.category)} · ${size(entry.size)} · ${new Date(entry.createdAt).toLocaleString(language()==='es'?'es-MX':'en-US')}`),entry.notes?h('p',{},entry.notes):null),
        h('div',{class:'inline-actions'},
          h('button',{class:'btn small',onclick:async()=>{
            status.textContent=tr('Verifying download…','Verificando descarga…');
@@ -81,11 +83,11 @@ export function createGameBackupPanel({backups,gameId}) {
  });
  replace(section,h('h3',{},tr('Game save backups','Copias de partidas')),
    h('p',{class:'hint'},tr('Private Supabase Storage · versioned files · verified SHA-256 downloads. Files are not added to GitHub.','Almacenamiento privado de Supabase · versiones · descargas verificadas con SHA-256. Los archivos no se suben a GitHub.')),
+   h('div',{class:'backup-upload'},h('label',{},tr('File (25 MB max)','Archivo (máx. 25 MB)'),file),h('label',{},tr('Category','Categoría'),cat),notes,upload),status,
    h('div',{class:'backup-vault-overview'}),h('p',{class:'backup-usage hint'}),entries,
    h('div',{class:'backup-comparison-panel'},h('h4',{},tr('Compare backup versions','Comparar versiones de copias')),
       h('p',{class:'hint'},tr('Compare metadata and SHA-256, not the contents of save files.','Compara fechas, tamaños y SHA-256, no el contenido del archivo.')),
-      h('div',{class:'backup-comparison'},compareSelect,compareOther,compareButton,compareResult)),
-   h('div',{class:'backup-upload'},h('label',{},tr('File (25 MB max)','Archivo (máx. 25 MB)'),file),h('label',{},tr('Category','Categoría'),cat),notes,upload),status);
+      h('div',{class:'backup-comparison'},compareSelect,compareOther,compareButton,compareResult)));
  refresh();
  return section;
 }

@@ -11,7 +11,9 @@ const cleanFilename = name => String(name ?? '').split(/[\\/]/).pop().replace(/[
 export function validateBackupFile(file) {
   if (!file || !file.name || !Number.isFinite(file.size) || file.size <= 0) throw new Error('Choose a non-empty backup file.');
   if (file.size > GAME_BACKUP_LIMIT) throw new Error('Maximum file size is 25 MB for reliable browser uploads.');
-  const ext = cleanFilename(file.name).split('.').pop().toLowerCase();
+  const filename=cleanFilename(file.name);
+  // Preserve extensionless console saves by using a private opaque .bin object.
+  const ext=filename.includes('.')?filename.split('.').pop().toLowerCase():'bin';
   if (!EXTENSIONS.has(ext)) throw new Error('Choose a game save, ZIP archive, or configuration file (not an executable).');
   return ext;
 }
@@ -55,7 +57,7 @@ export function createGameBackupService({client, store}) {
     await checkReady(gameId);
     const checksum = await sha256(file);
     const {error} = await client.storage.from(GAME_BACKUP_BUCKET).upload(path,file,{
-      contentType:file.type || 'application/octet-stream',upsert:false,cacheControl:'0',
+      contentType:'application/octet-stream',upsert:false,cacheControl:'0',
     });
     if (error) throw new Error(`Backup upload failed: ${error.message}`);
     const rec = {id,gameId,path,name:cleanFilename(file.name),size:file.size,hash:checksum,

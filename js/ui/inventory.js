@@ -11,7 +11,7 @@ import {
 } from '../data/inventory-logic.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
-import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor, quantityDisplay, quantityMeter } from '../data/tracking.js';
+import { TRACK_FIELDS, TRACK_LABELS, CONDITIONS, TRACKING_KEY, categoryFields, itemFields, trackMeta, attentionFor, quantityDisplay, quantityMeter, normalizeBoxes, boxTotals, primaryBox } from '../data/tracking.js';
 import { t, locale, language, categoryLabel } from './language.js';
 import { uuid } from '../data/util.js';
 import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
@@ -54,6 +54,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   const pathOf = (item) => locationPath(data.locations, item.location_id);
   const metaOf = item => data.tracking[item.id] || {};
   const fieldsOf = item => itemFields(metaOf(item), categoryFields(data.categoryDefaults, item.category_id));
+  const boxCount=item=>1+normalizeBoxes(metaOf(item).extra_boxes).length;
   const quantityText = (item) => quantityDisplay(item.quantity, metaOf(item), state.showMax);
   const barFor = (item) => {
     const meta = metaOf(item), enabled = fieldsOf(item);
@@ -122,6 +123,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     },
     h('span', { class: 'tile-frame' },
       art(item, 'art'),
+      boxCount(item)>1?h('span',{class:'qty box-count',title:t('Boxes'),'aria-label':`${boxCount(item)} ${t('Boxes')}`},`×${boxCount(item)}`):null,
       item.is_lost ? h('span', { class: 'lost-mark', 'aria-hidden': 'true' }, '?') : null),
     h('span', { class: 'tile-name' }, item.name), barFor(item));
   }
@@ -130,7 +132,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     return h('button', { class: `row-item r-${item.rarity}`, type: 'button', onclick: () => openItemSheet(item) },
       h('span', { class: 'row-art' }, art(item, 'art')),
       h('span', { class: 'row-text' },
-        h('span', { class: 'row-name' }, item.name),
+        h('span', { class: 'row-name' }, item.name, boxCount(item)>1?h('span',{class:'box-row-count'},` ×${boxCount(item)}`):null),
         item.is_lost ? h('span', { class: 'lost-tag' }, t('Lost, last seen:')) : null,
         breadcrumb(item), barFor(item)));
   }
@@ -290,8 +292,9 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     draft.iconColorEdited = Boolean(initialMeta.icon_color);
     draft.previewUrl = null;
     const field = (label, control) => h('label', { class: 'item-field' }, h('span', {}, t(label)), control);
-    const qty = h('input', { type: 'number', id: 'it-qty', min: 0, step: 1, inputmode: 'numeric', value: existing?.quantity ?? 1 });
-    const stepQty = (d) => { qty.value = Math.max(0, (parseInt(qty.value, 10) || 0) + d); if (Number(qty.value)>Number(maximum.value)) maximum.value=qty.value; };
+    const firstBox=primaryBox(existing?.quantity ?? 1,initialMeta);
+    const qty = h('input', { type: 'number', id: 'it-qty', min: 0, step: 1, inputmode: 'numeric', value: firstBox.current });
+    const stepQty = (d) => { qty.value = Math.max(0, (parseInt(qty.value, 10) || 0) + d); if (Number(qty.value)>Number(maximum.value)) maximum.value=qty.value; updateBoxTotal(); };
     const qtyGroup = h('div', { class:'tracking-control' }, h('label', { for:'it-qty' }, t('Remaining quantity')),
       h('div', { class: 'stepper' },
         h('button', { class:'btn', type:'button', 'aria-label':'One fewer', onclick: () => stepQty(-1) }, '−'), qty,
@@ -311,7 +314,29 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const durability = h('input', { type: 'range', min: 0, max: 100, step: 1, value: initialMeta.durability });
     const durabilityValue = h('output', {}, `${initialMeta.durability}%`);
     durability.addEventListener('input', () => { durabilityValue.textContent = `${durability.value}%`; });
-    const maximum = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.max_quantity ?? Math.max(1, Number(qty.value) || 1) });
+    const maximum = h('input', { type: 'number', min: 0, step: 1, value: firstBox.maximum });
+    const boxRows=h('div',{class:'box-stock-rows'});
+    const boxSummary=h('p',{class:'hint box-stock-total','aria-live':'polite'});
+    const boxes=[];
+    const boxPanel=h('div',{class:'box-stock-panel item-full'},h('strong',{},t('Boxes')),h('p',{class:'hint'},t('Each box has its own quantity and capacity. Your pack shows their combined total.')),boxSummary,boxRows);
+    const boxValues=()=>boxes.map(b=>({current:b.current.value===''?NaN:Number(b.current.value),maximum:b.maximum.value===''?NaN:Number(b.maximum.value)}));
+    function updateBoxTotal(){
+      try{const totals=boxTotals({current:Number(qty.value),maximum:Number(maximum.value)},boxValues());boxSummary.textContent=`${t('Total')}: ${totals.current}/${totals.maximum} · ${totals.boxes} ${t(totals.boxes===1?'Box':'Boxes')}`;}
+      catch{boxSummary.textContent=t('Each box needs a valid current and maximum quantity.');}
+    }
+    function drawBoxes(){
+      replace(boxRows,boxes.map((b,i)=>h('div',{class:'box-stock-row'},h('strong',{},`${t('Box')} ${i+2}`),field('Remaining quantity',b.current),field('Maximum quantity',b.maximum),h('button',{class:'btn small danger',type:'button',onclick:async()=>{if(!await confirmDialog({title:t('Remove box?'),message:t('This removes its quantity from the total when you save.'),confirmLabel:t('Remove'),danger:true}))return;boxes.splice(i,1);drawBoxes();}},t('Remove')))));
+      updateBoxTotal();
+    }
+    function addBox(b){
+      const current=h('input',{type:'number',min:0,step:1,value:b.current});
+      const capacity=h('input',{type:'number',min:0,step:1,value:b.maximum});
+      current.addEventListener('input',updateBoxTotal);capacity.addEventListener('input',updateBoxTotal);
+      boxes.push({current,maximum:capacity});drawBoxes();
+    }
+    for(const b of normalizeBoxes(initialMeta.extra_boxes))addBox(b);
+    boxPanel.append(h('button',{type:'button',class:'btn small',onclick:()=>{const n=Math.max(0,Math.floor(Number(maximum.value)||0));addBox({current:n,maximum:n});}},t('Add another box')));
+    qty.addEventListener('input',updateBoxTotal);maximum.addEventListener('input',updateBoxTotal);updateBoxTotal();
     const threshold = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.low_stock_threshold });
     const quantityPercent = h('input', { type: 'checkbox', checked: initialMeta.quantity_percent });
     const showMaximum = h('input', { type: 'checkbox', checked: initialMeta.show_max_quantity });
@@ -334,6 +359,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       replace(trackingInputs,
         qtyGroup,
         flags.quantity ? h('div', {class:'tracking-control'}, field('Maximum quantity', maximum), h('label', {class:'check item-percent'}, showMaximum, t('Show maximum quantity'))) : null,
+        flags.quantity ? boxPanel : null,
         flags.quantity ? field('Low stock threshold', threshold) : null,
         flags.quantity ? h('label', { class:'check item-percent' }, quantityPercent, t('Show quantity as percentage')) : null,
         flags.durability ? h('div', { class:'tracking-control item-full' }, h('label', {}, t('Durability')), h('div', { class:'track-slider' }, durability, durabilityValue)) : null,
@@ -540,8 +566,10 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     async function save() {
       error.textContent = '';
       const nm = name.value.trim();
-      const q = Number(qty.value);
-      const max = Number(maximum.value);
+      let q = Number(qty.value);
+      let max = Number(maximum.value);
+      const extraBoxes=boxValues();
+      if(extraBoxes.length){try{const totals=boxTotals({current:q,maximum:max},extraBoxes);q=totals.current;max=totals.maximum;}catch(err){error.textContent=t(err.message);return;}}
       if (itemFields({ overrides }, catDefaults()).quantity && (!Number.isInteger(max) || max < q)) { error.textContent = 'Maximum quantity must be a whole number not smaller than remaining quantity.'; maximum.focus(); return; }
       const stockMin = Number(threshold.value);
       if (!Number.isInteger(stockMin) || stockMin < 0) { error.textContent = 'Low-stock threshold must be zero or higher.'; threshold.focus(); return; }
@@ -565,7 +593,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       };
       try {
         await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, show_max_quantity: showMaximum.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, extra_boxes: extraBoxes, quantity_percent: quantityPercent.checked, show_max_quantity: showMaximum.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
