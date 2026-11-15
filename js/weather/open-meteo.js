@@ -172,3 +172,15 @@ export function todayInTimezone(timezone, now = new Date()) {
     return now.toISOString().slice(0, 10);
   }
 }
+
+// Only the configured weather location and requested calendar dates are sent.
+// Nothing from the content of the encrypted journal is included in the request.
+export async function fetchDreamNightHours(place,startDate,endDate,{historical=false,...opts}={}) {
+  const url=historical?'https://archive-api.open-meteo.com/v1/archive':FORECAST_URL;
+  const params=new URLSearchParams({
+    latitude:String(round(place.lat,4)),longitude:String(round(place.lon,4)),
+    timezone:place.timezone||'auto',timeformat:'unixtime',start_date:startDate,end_date:endDate,
+    hourly:'temperature_2m,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m',
+  });
+  return getJson(url+'?'+params,{timeoutMs:8000,...opts});
+}

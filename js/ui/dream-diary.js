@@ -3,7 +3,11 @@
 import { h, replace, openSheet, confirmDialog, toast } from './dom.js';
 import { uuid } from '../data/util.js';
 import { language } from './language.js';
-import { moonPhaseSvg } from '../weather/moon-phase.js';
+import { moonPhaseSvg, localizedMoonPhase } from '../weather/moon-phase.js';
+import { weatherGlyph, weatherIconSvg } from './pixel-icon.js';
+import { localizedWeather } from './mud-format-v2.js';
+import { skyEventIconSvg } from '../weather/sky-events.js';
+import { baseDreamNight, loadDreamNight } from '../weather/dream-night.js';
 import { JOURNAL_KEY, emptyJournal, validPin, encryptJournal, decryptJournal } from './private-journal-crypto.js';
 const DURATION=40*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
@@ -11,6 +15,39 @@ const labels={
  en:{title:'Logs',intro:'Your dreams and private reflections are locked separately from the rest of Personal Tracker.',open:'Open private journal',warning:'A four-digit PIN offers limited protection against determined attackers. Entries are encrypted before syncing, but a stolen encrypted backup could be brute-forced. There is no PIN recovery. Never reuse an important PIN.',pin:'Four-digit PIN',again:'Confirm PIN',setup:'Create PIN',unlock:'Unlock',lock:'Lock now',wrong:'Incorrect PIN or damaged journal.',wait:'Too many attempts. Try again later.',dreams:'Dreams',sleep:'Sleep',moods:'Mood',habits:'Habits',vault:'Private Vault',new:'New entry',empty:'No entries yet.',save:'Save',delete:'Delete',date:'Date',name:'Title',body:'Description',type:'Dream type',vivid:'Vividness',tags:'Tags (comma-separated)',quality:'Sleep quality',hours:'Hours slept',mood:'Mood',done:'Completed today',locked:'Your private entries never appear in global search or Wallpaper Engine.',change:'Change PIN',old:'Current PIN',newPin:'New PIN',repeat:'Repeat new PIN',forgot:'Lost PINs cannot be recovered.',art:'Illustration (optional, max 100 KB)',night:'Dream illustration',none:'None',saveFailed:'Could not save private journal. Try again.',illustration:'Attach illustration'},
  es:{title:'Registros',intro:'Tus sueños y reflexiones privadas tienen un bloqueo separado del resto de Personal Tracker.',open:'Abrir diario privado',warning:'Un PIN de cuatro dígitos ofrece protección limitada contra ataques deliberados. Las entradas se cifran antes de sincronizarse, pero una copia cifrada robada podría descifrarse por fuerza bruta. No hay recuperación de PIN. No reutilices un PIN importante.',pin:'PIN de cuatro dígitos',again:'Confirmar PIN',setup:'Crear PIN',unlock:'Desbloquear',lock:'Bloquear ahora',wrong:'PIN incorrecto o diario dañado.',wait:'Demasiados intentos. Inténtalo más tarde.',dreams:'Sueños',sleep:'Sueño',moods:'Estado de ánimo',habits:'Hábitos',vault:'Bóveda privada',new:'Nueva entrada',empty:'Todavía no hay entradas.',save:'Guardar',delete:'Eliminar',date:'Fecha',name:'Título',body:'Descripción',type:'Tipo de sueño',vivid:'Intensidad del recuerdo',tags:'Etiquetas (separadas por comas)',quality:'Calidad del sueño',hours:'Horas dormidas',mood:'Estado de ánimo',done:'Completado hoy',locked:'Tus entradas privadas nunca aparecen en la búsqueda global ni en Wallpaper Engine.',change:'Cambiar PIN',old:'PIN actual',newPin:'PIN nuevo',repeat:'Repetir PIN nuevo',forgot:'No es posible recuperar un PIN perdido.',art:'Ilustración (opcional, máximo 100 KB)',night:'Ilustración del sueño',none:'Ninguna',saveFailed:'No se pudo guardar el diario privado. Inténtalo de nuevo.',illustration:'Adjuntar ilustración'}
 };
+
+const trNight=(en,es)=>language()==='es'?es:en;
+function nightSummary(night) {
+ if(!night)return '';
+ const w=night.weather;
+ return [localizedMoonPhase(night.moon.label,language())+' · '+night.moon.illumination+'%',
+   w?.code!=null?localizedWeather(weatherGlyph(w.code).text):null,
+   w?.min!=null?w.min.toFixed(0)+'–'+w.max.toFixed(0)+'°C':null].filter(Boolean).join(' · ');
+}
+function nightDetails(night){
+ const w=night.weather;
+ const metric=(en,es,value)=>value==null?null:h('span',{},trNight(en,es)+': '+value);
+ const status={complete:trNight('Hourly model estimates','Estimaciones del modelo por hora'),partial:trNight('Partial hourly data','Datos parciales por hora'),unavailable:trNight('Weather data unavailable. You can retry.','No hay datos del clima. Puedes reintentar.'),'no-location':trNight('Set a location in Weather to include local conditions.','Configura una ubicación en Clima para incluir las condiciones locales.'),future:trNight('Weather not yet available for this night.','El clima de esta noche aún no está disponible.')};
+ return [
+   h('p',{class:'hint'},night.startDate+' 21:00 – '+night.endDate+' 06:00'+(night.place?' · '+night.place:'')),
+   h('div',{class:'dream-night-sky'},
+     h('span',{class:'dream-night-icon',html:moonPhaseSvg(new Date(night.moon.at))}),
+     h('div',{},h('strong',{},localizedMoonPhase(night.moon.label,language())),h('p',{},night.moon.illumination+'% '+trNight('illuminated (approx.)','de iluminación (aprox.)'))),
+     w?.code!=null?h('span',{class:'dream-night-icon',html:weatherIconSvg(w.code,{night:true,date:new Date(night.moon.at)})}):null,
+     w?.code!=null?h('strong',{},localizedWeather(weatherGlyph(w.code).text)):null),
+   w?h('div',{class:'dream-night-metrics'},
+     metric('Temperature','Temperatura',w.min!=null?w.min.toFixed(1)+'–'+w.max.toFixed(1)+'°C':null),
+     metric('Precipitation','Precipitación',w.precipitation!=null?w.precipitation+' mm':null),
+     metric('Cloud cover','Nubosidad',w.cloud!=null?w.cloud+'%':null),
+     metric('Humidity','Humedad',w.humidity!=null?w.humidity+'%':null),
+     metric('Maximum wind','Viento máximo',w.windMax!=null?w.windMax+' km/h':null)):null,
+   h('p',{class:'hint'},status[night.status]||status.unavailable),
+   night.events?.length?night.events.map(e=>h('div',{class:'dream-night-event'},h('span',{class:'dream-night-icon',html:skyEventIconSvg(e.kind)}),h('span',{},language()==='es'?e.es:e.en,h('small',{},e.date+' · '+trNight('Local visibility not verified','Visibilidad local no verificada'))))):h('p',{class:'hint'},trNight('No events listed in the sky calendar for these dates.','No hay eventos registrados en el calendario astronómico para estas fechas.')),
+   w?.samples?.length?h('details',{class:'dream-night-hours'},h('summary',{},trNight('Overnight weather timeline','Clima durante la noche')), ...w.samples.map(sample=>h('div',{class:'dream-night-hour'},h('span',{},sample.time.slice(11)),h('span',{},sample.code==null?'—':localizedWeather(weatherGlyph(sample.code).text)),h('span',{},sample.temp==null?'—':sample.temp.toFixed(1)+'°C'),h('span',{},sample.precipitation==null?'—':sample.precipitation+' mm')))):null,
+   w?h('p',{class:'hint'},trNight('Weather data by Open-Meteo.com. Model estimates, not measured local observations.','Datos del clima de Open-Meteo.com. Estimaciones de modelos, no observaciones locales directas.')):null
+ ];
+}
+
 const safeText=(value,max=10000)=>String(value||'').slice(0,max);
 export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
@@ -87,14 +124,38 @@ export function createDreamDiaryView({store}) {
    const mood=h('select',{},['Peaceful','Happy','Curious','Neutral','Anxious','Sad','Afraid','Confused'].map(s=>h('option',{value:s,selected:(entry?.mood||'Neutral')===s},s)));
    const file=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});
    const error=h('p',{class:'form-error',role:'alert'});
+   const nightPanel=h('section',{class:'dream-night-panel'});
+   const editorSession=session;
+   let night=entry?.nightSky||null,nightPromise=null,nightDate=null,nightRequest=0;
+   function renderNight(loading=false){
+    replace(nightPanel,h('h3',{},trNight('Previous night · weather & sky','Noche anterior · clima y cielo')),night?nightDetails(night):null,
+      loading?h('p',{class:'hint',role:'status'},trNight('Loading overnight weather…','Consultando el clima de la noche…')):h('button',{type:'button',class:'btn small',onclick:()=>requestNight(true)},trNight('Refresh night data','Actualizar datos de la noche')));
+   }
+   function requestNight(force=false){
+    if(type!=='dreams')return Promise.resolve(null);
+    const chosen=date.value||today();
+    if(!force&&night?.date===chosen&&night.status==='complete'){renderNight();return Promise.resolve(night);}
+    if(!force&&nightPromise&&nightDate===chosen)return nightPromise;
+    const seq=++nightRequest;nightDate=chosen;
+    if(night?.date!==chosen)night=baseDreamNight(chosen);
+    renderNight(true);
+    nightPromise=(async()=>{
+      let result;
+      try{const place=await store.getSetting('location',null);result=await loadDreamNight(chosen,place);}catch{result=baseDreamNight(chosen);}
+      if(seq===nightRequest){nightPromise=null;if(session===editorSession){night=result;renderNight();}}
+      return result;
+    })();return nightPromise;
+   }
+   if(type==='dreams')date.addEventListener('change',()=>{requestNight();});
    const form=h('div',{class:'form'},h('label',{},L().name),title,h('label',{},L().date),date,
     type==='dreams'?[h('label',{},L().type),dreamType,h('label',{},L().vivid),vivid,h('label',{},L().tags),tags]:null,
     type==='sleep'?[h('label',{},L().hours),hours,h('label',{},L().quality),quality]:null,
     type==='moods'?[h('label',{},L().mood),mood]:null,
+    type==='dreams'?nightPanel:null,
     h('label',{},L().body),description,
     type==='dreams'?[h('label',{},L().illustration),file,entry?.art?h('img',{src:entry.art,alt:L().night,class:'journal-art'}):null]:null,error);
    const captureDraft=()=>({title:title.value,date:date.value,body:description.value,dreamType:dreamType.value,vivid:Number(vivid.value),
-      tags:tags.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value});
+      tags:tags.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,...(type==='dreams'&&night?.date===date.value?{nightSky:night}:{})});
    const persistDraft=async()=>{if(!session)return;session.data.drafts ||= {};session.data.drafts[draftKey]=captureDraft();await persist();};
    form.addEventListener('input',()=>{editorDirty=true;clearTimeout(activeDraftTimer);activeDraftTimer=setTimeout(()=>persistDraft().catch(()=>{}),1800);});
    const closeEditor=async()=>{
@@ -109,10 +170,14 @@ export function createDreamDiaryView({store}) {
     h('button',{class:'btn primary',onclick:async()=>{
       if(!title.value.trim()){error.textContent='Title required';return;}
       try{
+       const saveDate=date.value||today();
+       const savedNight=type==='dreams'?(nightPromise&&nightDate===saveDate?await nightPromise:night?.date===saveDate?night:await requestNight()):null;
+       if(session!==editorSession||date.value&&date.value!==saveDate)return;
        let art=entry?.art||null;
        if(file.files?.length){const f=file.files[0];if(f.size>100*1024||!['image/png','image/jpeg','image/webp'].includes(f.type)){error.textContent=L().art;return;}
         art=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(f);});}
-       const updated={...entry,id:original?.id||uuid(),title:safeText(title.value,140),date:date.value||today(),body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art};
+       const updated={...entry,id:original?.id||uuid(),title:safeText(title.value,140),date:saveDate,body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art,...(type==='dreams'?{nightSky:savedNight}:{})};
+       if(session!==editorSession)return;
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
        delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;editorDirty=false;
        await persist();editor.close();draw();
@@ -123,6 +188,9 @@ export function createDreamDiaryView({store}) {
        closeEditor();
      })),form,h('div',{class:'journal-editor-actions'},actions));
    replace(el,page);
+   if(type==='dreams'){
+     if(night?.date===(date.value||today()))renderNight();else requestNight();
+   }
   }
   function draw(){
    if(!session)return;
@@ -140,7 +208,7 @@ export function createDreamDiaryView({store}) {
         const dates=new Set(entry.completedDates||[]);if(dates.has(today()))dates.delete(today());else dates.add(today());
         entry.completedDates=[...dates].sort();await persist();draw();
        }),h('span',{},`${(entry.completedDates||[]).length} ${language()==='es'?'días registrados':'days logged'}`))
-     :h('button',{class:'journal-entry',onclick:()=>edit(active,entry)},h('strong',{},entry.title),h('small',{},dateDisplay(entry.date)),h('span',{},safeText(entry.body,110))));
+     :h('button',{class:'journal-entry',onclick:()=>edit(active,entry)},h('strong',{},entry.title),h('small',{},dateDisplay(entry.date)),h('span',{},safeText(entry.body,110)),active==='dreams'&&entry.nightSky?h('span',{class:'dream-night-card-summary'},nightSummary(entry.nightSky)):null));
    const drafts=Object.keys(session.data.drafts||{}).filter(k=>k.startsWith(active+':'));
    replace(list,h('div',{class:'journal-list-head'},h('h3',{},L()[active]),button(L().new,()=>edit(active))),
     drafts.length?h('p',{class:'journal-draft-reminder'},language()==='es'?'Borradores cifrados: ':'Encrypted drafts: ',...drafts.map(key=>button(language()==='es'?'Continuar borrador':'Resume draft',()=>{const id=key.split(':')[1];edit(active,session.data[active].find(x=>x.id===id)||null);}))) : null, dreamStats,
