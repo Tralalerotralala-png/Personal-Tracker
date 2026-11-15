@@ -19,6 +19,26 @@ const FALLBACK_COLOR = '#c9b58a';
 const methotrexateIcon = './icons/inventory/methotrexate-16.png';
 const isMethotrexate = name => /^methotrexate(?:\b|$)/i.test((name || '').trim());
 
+const medicineSprites = {
+  montelukast: [
+    '................','.....dddddd.....','....dccccccd....','....dchchchd....','....dddddddd....','.....oooooo.....','....obbbbbb o....'.replace(' ',''),'...obbbbbbbo....','...obwwwwwbo....','...obwgggwbo....','...obwwwwwbo....','...obwgggwbo....','...obwwwwwbo....','...obbbbbbbo....','....ooooooo.....','................'
+  ],
+  loratadine: [
+    '................','.....dddddd.....','....dccccccd....','....dchchchd....','....dddddddd....','.....oooooo.....','....obbbbbbo....','...obbbbbbbo....','...obwwwwwbo....','...obwpppwbo....','...obwwwwwbo....','...obwpppwbo....','...obwwwwwbo....','...obbbbbbbo....','....ooooooo.....','................'
+  ],
+  oximetazoline: [
+    '.......dd.......','.......dcdd.....','.......dccd.....','.......dcdd.....','......dwwd......','.....dddddd.....','.....dchhcd.....','....dwwwwwwd....','...dwwwwwwwwd...','...dwwgggwwwd...','...dwwgggwwwd...','....dwwwwwwd....','....dwwggwwd....','....dwwwwwwd....','.....dddddd.....','................'
+  ]
+};
+const medicinePalette = {d:'#59432f',c:'#e5c58c',h:'#fff2cd',o:'#92552b',b:'#d58a40',w:'#f4ead3',g:'#54b5a0',p:'#a39bdc'};
+function medicineIcon(name) {
+  const key = Object.keys(medicineSprites).find(k => String(name || '').trim().toLowerCase().split(/[^a-z]/)[0] === k);
+  if (!key) return '';
+  const pixels = medicineSprites[key].flatMap((row,y) => [...row].map((c,x) => medicinePalette[c] ? `<rect x="${x}" y="${y}" width="1" height="1" fill="${medicinePalette[c]}"/>` : '')).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${pixels}</svg>`;
+}
+
+
 
 export function createInventoryView({ store, photos, auth = null, config = {} }) {
   const state = {
@@ -52,6 +72,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   const pathOf = (item) => locationPath(data.locations, item.location_id);
   const metaOf = item => data.tracking[item.id] || {};
   const fieldsOf = item => itemFields(metaOf(item), categoryFields(data.categoryDefaults, item.category_id));
+  const quantityText = (item) => { const meta = metaOf(item); const max = Math.max(item.quantity, meta.max_quantity ?? item.quantity); return meta.quantity_percent ? `${max > 0 ? Math.round(item.quantity / max * 100) : 0}%` : `${item.quantity}/${max}`; };
   const barFor = (item) => {
     const meta = metaOf(item), enabled = fieldsOf(item);
     const parts = [];
@@ -60,7 +81,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       parts.push(h('span', { class: 'track-readout' }, `${t('Durability')} ${n}%`));
       parts.push(h('span', { class: 'track-meter', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(n), 'aria-label': t('Durability') }, h('span', { style: `width:${n}%;--meter-color:${n<=25?'#d9604c':n<=50?'#e0a23a':'#7fb356'}` })));
     }
-    if (enabled.quantity) parts.push(h('span', { class: 'track-readout' }, `${item.quantity}/${Math.max(item.quantity, meta.max_quantity ?? item.quantity)}`));
+    if (enabled.quantity) parts.push(h('span', { class: 'track-readout' }, quantityText(item)));
     if (enabled.condition) parts.push(h('span', { class: 'track-chip' }, t(meta.condition || 'Good')));
     if (enabled.expiration && meta.expiration_date) parts.push(h('span', { class: 'track-chip' }, `${t('Expiration')}: ${meta.expiration_date}`));
     const alerts = attentionFor(item, meta, categoryFields(data.categoryDefaults, item.category_id));
@@ -83,7 +104,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
 
   function art(item, cls = 'art') {
     const cat = catById().get(item.category_id);
-    const box = h('span', { class: cls, html: pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
+    const box = h('span', { class: cls, html: medicineIcon(item.name) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
     if (!item.photo_path && isMethotrexate(item.name)) box.replaceChildren(h('img', { src: methotrexateIcon, alt: '', class: 'pixel-inventory-icon' }));
     if (item.photo_path) {
       photos.urlFor(item).then((url) => {
@@ -112,7 +133,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     },
     h('span', { class: 'tile-frame' },
       art(item, 'art'),
-      item.quantity > 1 && fieldsOf(item).quantity ? h('span', { class: 'qty' }, item.quantity) : null,
+      fieldsOf(item).quantity && (item.quantity > 1 || metaOf(item).quantity_percent) ? h('span', { class: 'qty' }, metaOf(item).quantity_percent ? quantityText(item) : item.quantity) : null,
       item.is_lost ? h('span', { class: 'lost-mark', 'aria-hidden': 'true' }, '?') : null),
     h('span', { class: 'tile-name' }, item.name), barFor(item));
   }
@@ -122,7 +143,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       h('span', { class: 'row-art' }, art(item, 'art')),
       h('span', { class: 'row-text' },
         h('span', { class: 'row-name' }, item.name,
-          item.quantity > 1 && fieldsOf(item).quantity ? h('span', { class: 'row-qty' }, ` x${item.quantity}`) : null),
+          fieldsOf(item).quantity && (item.quantity > 1 || metaOf(item).quantity_percent) ? h('span', { class: 'row-qty' }, metaOf(item).quantity_percent ? ` ${quantityText(item)}` : ` x${item.quantity}`) : null),
         item.is_lost ? h('span', { class: 'lost-tag' }, t('Lost, last seen:')) : null,
         breadcrumb(item), barFor(item)));
   }
@@ -292,6 +313,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     durability.addEventListener('input', () => { durabilityValue.textContent = `${durability.value}%`; });
     const maximum = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.max_quantity ?? Math.max(1, Number(qty.value) || 1) });
     const threshold = h('input', { type: 'number', min: 0, step: 1, value: initialMeta.low_stock_threshold });
+    const quantityPercent = h('input', { type: 'checkbox', checked: initialMeta.quantity_percent });
     const condition = h('select', {}, CONDITIONS.map(x => h('option', { value:x, selected: initialMeta.condition === x }, t(x))));
     const expiration = h('input', { type: 'date', value: initialMeta.expiration_date });
     const price = h('input', { type: 'number', min: 0, step: '0.01', value: initialMeta.purchase_price ?? '', placeholder: 'Optional' });
@@ -310,7 +332,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       qtyGroup.hidden = !flags.quantity;
       trackingInputs.replaceChildren(
         flags.durability ? h('div', { class:'tracking-control' }, h('label', {}, t('Durability')), h('div', { class:'track-slider' }, durability, durabilityValue)) : null,
-        flags.quantity ? h('div', { class:'tracking-control' }, h('label', {}, t('Maximum quantity')), maximum, h('label', {}, t('Low stock threshold')), threshold) : null,
+        flags.quantity ? h('div', { class:'tracking-control' }, h('label', {}, t('Maximum quantity')), maximum, h('label', {}, t('Low stock threshold')), threshold, h('label', { class:'check' }, quantityPercent, t('Show quantity as percentage'))) : null,
         flags.condition ? h('div', { class:'tracking-control' }, h('label', {}, t('Condition')), condition) : null,
         flags.expiration ? h('div', { class:'tracking-control' }, h('label', {}, t('Expiration')), expiration) : null
       );
@@ -360,7 +382,8 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       const preview = h('span', { class: 'photo-preview' });
       if (showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
       else if (hasExisting) { preview.replaceChildren(art(existing, 'art')); }
-      else preview.innerHTML = pixelIconSvg(id, { color: catById().get(category.value)?.color || FALLBACK_COLOR });
+      else if (isMethotrexate(name.value)) preview.replaceChildren(h('img', { src: methotrexateIcon, alt: '', class: 'pixel-inventory-icon' }));
+      else preview.innerHTML = medicineIcon(name.value) || pixelIconSvg(id, { color: catById().get(category.value)?.color || FALLBACK_COLOR });
       photoBox.replaceChildren(preview,
         h('span', { class: 'photo-actions' },
           h('label', { class: 'btn small', for: 'it-photo' }, showing || hasExisting ? 'Replace photo' : 'Take or choose photo'),
@@ -466,7 +489,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       };
       try {
         await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
+        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, quantity_percent: quantityPercent.checked, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
         if (place.value) await store.meta.set('last_place', place.value);
         if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
         else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
