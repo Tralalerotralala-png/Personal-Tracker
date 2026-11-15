@@ -14,6 +14,8 @@ export function trackMeta(meta = {}) {
     overrides: meta.overrides || {}, durability: Number.isFinite(meta.durability) ? meta.durability : 100,
     max_quantity: Number.isFinite(meta.max_quantity) ? meta.max_quantity : null,
     quantity_percent: meta.quantity_percent === true,
+    icon_preset: typeof meta.icon_preset === 'string' ? meta.icon_preset : 'auto',
+    icon_color: /^#[0-9a-f]{6}$/i.test(String(meta.icon_color || '')) ? meta.icon_color : null,
     condition: meta.condition || 'Good', expiration_date: meta.expiration_date || '',
     low_stock_threshold: Number.isFinite(meta.low_stock_threshold) ? meta.low_stock_threshold : 5,
     purchase_price: Number.isFinite(meta.purchase_price) ? meta.purchase_price : null,
