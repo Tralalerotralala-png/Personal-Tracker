@@ -14,7 +14,7 @@ import { timeAgo } from '../ui/format.js';
 import {articleKey,readingIndex,updateReading} from '../feed/reading.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } from '../weather/moon-phase.js';
-import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
+import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, mergeSkyAndZodiacEvents, eventIconKind, eventLocalTime } from '../weather/sky-events.js';
 import { skyLighting } from '../weather/environment.js';
 import { language, t } from '../ui/language.js';
 import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily-phrases.js';
@@ -281,15 +281,25 @@ function mountRecentlyPlayed(el,{store}) {
   return live(render,run=>[storeTables(store,['settings'],run)]);
 }
 function mountSky(el,{weather}) {
- const render=()=>{const events=upcomingSkyEvents(new Date(),4);const place=weather?.getState().place?.name;
-  replace(el,h('div',{class:'w-sky'},
+ let rows=[],dead=false,loaded=false;
+ const render=async()=>{
+  const now=new Date(),place=weather?.getState()?.place,tz=place?.timezone,es=language()==='es';
+  const draw=()=>{
+   if(dead)return;
+   const events=mergeSkyAndZodiacEvents(now,rows,{timezone:tz,skyLimit:4,zodiacLimit:4});
+   replace(el,h('div',{class:'w-sky'},
     h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
-    ...events.map(e=>h('p',{class:'w-sky-event'},skyEventOnDate(e.date)?h('span',{class:'w-sky-symbol',html:skyEventIconSvg(skyEventOnDate(e.date).kind)}):null,h('span',{},e.date+' · '),
-      h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},language()==='es'?e.es:e.en))),
-    place?h('small',{},`${t('Selected location')}: ${place}`):null));
+    h('div',{class:'w-sky-scroll'},...events.map(e=>h('p',{class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':'')},
+      h('span',{class:'w-sky-symbol',html:skyEventIconSvg(eventIconKind(e))}),
+      h('span',{class:'w-sky-event-copy'},h('small',{class:'w-sky-event-date'},e.date+(e.at?' · '+eventLocalTime(e,tz,language()):'')),
+       h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},(e.symbol?e.symbol+' ':'')+(es?e.es:e.en)))))),
+    h('small',{class:'w-sky-note'},rows.length?(es?'Tránsitos tropicales calculados · no son predicciones.':'Calculated tropical transits · not predictions.'):(loaded?(es?'Tránsitos no disponibles; calendario astronómico conservado.':'Transits unavailable; sky calendar retained.'):(es?'Calculando tránsitos…':'Calculating transits…'))),
+    place?.name?h('small',{},t('Selected location')+': '+place.name):null));
+  };
+  draw();rows=await loadCalculatedSkyEvents(now);loaded=true;draw();
  };
- const inst=live(render,run=>[weather.subscribe(run)]);const timer=setInterval(()=>inst.refresh(),60*60_000);
- return {destroy(){clearInterval(timer);inst.destroy();},refresh:inst.refresh};
+ const inst=live(render,run=>[weather?.subscribe?.(run)]);const timer=setInterval(()=>inst.refresh(),5*60_000);
+ return {destroy(){dead=true;clearInterval(timer);inst.destroy();},refresh:inst.refresh};
 }
 function mountAudio(el,{audioPlayer,interactive}){if(!audioPlayer||!interactive){replace(el,note(t('Music and radio player · available in the Tracker app.')));return {destroy(){}};}return audioPlayer.mount(el);}
 const MOUNTS = { audio:mountAudio, sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };

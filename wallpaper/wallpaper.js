@@ -2554,6 +2554,230 @@ function createSnapshotStore(initial, storage = globalThis.localStorage) {
 }
 Object.assign(__exports, { createSnapshotStore });
 });
+__define("js/weather/celestial.js", function (__require, __exports) {
+"use strict";
+// Astronomy Engine 2.1.19 (MIT), loaded only on opening the sky map.
+// Fixed bright-star coordinates: rounded J2000 RA hours / declination degrees.
+const BRIGHT_STARS=[
+ ['Sirius',6.7525,-16.7161],['Canopus',6.3992,-52.6957],['Arcturus',14.2610,19.1824],['Vega',18.6156,38.7837],['Capella',5.2782,45.9980],
+ ['Rigel',5.2423,-8.2016],['Procyon',7.6550,5.2250],['Betelgeuse',5.9195,7.4071],['Achernar',1.6286,-57.2368],['Hadar',14.0637,-60.3730],
+ ['Altair',19.8464,8.8683],['Acrux',12.4433,-63.0991],['Aldebaran',4.5987,16.5093],['Antares',16.4901,-26.4320],['Spica',13.4199,-11.1613],
+ ['Pollux',7.7553,28.0262],['Fomalhaut',22.9608,-29.6222],['Deneb',20.6905,45.2803],['Regulus',10.1395,11.9672],['Castor',7.5767,31.8883],
+ ['Polaris',2.5303,89.2641],['Bellatrix',5.4189,6.3497],['Alnilam',5.6036,-1.2019],['Alnitak',5.6793,-1.9426],['Mintaka',5.5334,-0.2991],
+ ['Saiph',5.7959,-9.6696],['Dubhe',11.0621,61.7508],['Merak',11.0307,56.3824],['Phecda',11.8972,53.6948],['Megrez',12.2571,57.0326],['Alioth',12.9005,55.9598],['Mizar',13.3987,54.9254],['Alkaid',13.7923,49.3133],
+ ['Caph',0.1529,59.1498],['Schedar',0.6751,56.5373],['Navi',0.9451,60.7167],['Ruchbah',1.4302,60.2353],['Segin',1.9066,63.6700],
+ ['Mimosa',12.7953,-59.6888],['Gacrux',12.5194,-57.1132],['Imai',12.2524,-58.7489]
+];
+const SOLAR_BODIES=['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
+let pending=null;
+function loadAstronomy(){
+ if(globalThis.Astronomy?.Equator)return Promise.resolve(globalThis.Astronomy);
+ if(pending)return pending;
+ pending=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js';script.async=true;
+   const timer=setTimeout(()=>{script.remove();reject(Error('Sky calculations unavailable'));},12000);
+   script.onload=()=>{clearTimeout(timer);globalThis.Astronomy?.Equator?resolve(globalThis.Astronomy):reject(Error('Astronomy library unavailable'));};
+   script.onerror=()=>{clearTimeout(timer);script.remove();reject(Error('Astronomy library unavailable'));};document.head.append(script);
+ }).catch(err=>{pending=null;throw err;});return pending;
+}
+function skyPositions(A,place,date){
+ if(!Number.isFinite(place?.lat)||!Number.isFinite(place?.lon))return [];
+ const observer=new A.Observer(place.lat,place.lon,Math.max(-500,Number(place.elevation_m)||0));
+ const calc=(body,name,kind)=>{
+  const eq=A.Equator(body,date,observer,true,true),hor=A.Horizon(date,observer,eq.ra,eq.dec,'normal');
+  return {name,kind,altitude:hor.altitude,azimuth:hor.azimuth,ra:eq.ra,dec:eq.dec,...(kind==='body'&&Number.isFinite(eq.dist)?{distance:eq.dist}: {})};
+ };
+ const bodies=SOLAR_BODIES.map(name=>calc(name,name,'body'));
+ for(const [name,ra,dec] of BRIGHT_STARS){A.DefineStar('Star1',ra,dec,100);bodies.push(calc('Star1',name,'star'));}
+ return bodies;
+}
+function projectSky(azimuth,altitude,radius=174){
+ const a=azimuth*Math.PI/180,r=radius*(90-altitude)/90;
+ return {x:200+r*Math.sin(a),y:200-r*Math.cos(a)};
+}
+
+// A few familiar guide patterns drawn only from actual catalog stars.
+// These are asterisms / simplified figure lines, not IAU boundary polygons.
+const SKY_PATTERNS=[
+ {name:'Orion',paths:[['Betelgeuse','Bellatrix','Mintaka','Alnilam','Alnitak','Betelgeuse'],['Mintaka','Rigel','Saiph','Alnitak']]},
+ {name:'Big Dipper',paths:[['Dubhe','Merak','Phecda','Megrez','Dubhe'],['Megrez','Alioth','Mizar','Alkaid']]},
+ {name:'Cassiopeia',paths:[['Caph','Schedar','Navi','Ruchbah','Segin']]},
+ {name:'Southern Cross',paths:[['Gacrux','Acrux'],['Imai','Mimosa']]},
+ {name:'Summer Triangle',paths:[['Vega','Deneb','Altair','Vega']]},
+ {name:'Winter Triangle',paths:[['Betelgeuse','Procyon','Sirius','Betelgeuse']]}
+];
+const rad=Math.PI/180;
+function projectDome(azimuth,altitude,{yaw=0,tilt=36,radius=174}={}){
+ const a=(azimuth-yaw)*rad,e=altitude*rad,t=tilt*rad;
+ const east=Math.cos(e)*Math.sin(a),north=Math.cos(e)*Math.cos(a),up=Math.sin(e);
+ return {x:200+radius*east,y:238-radius*(north*Math.cos(t)+up*Math.sin(t)),depth:up*Math.cos(t)-north*Math.sin(t)};
+}
+function bodyDetails(A,place,date,object){
+ const out={};if(!object||!A)return out;
+ try{
+   let key=object.name;
+   if(object.kind==='star'){const row=BRIGHT_STARS.find(x=>x[0]===key);if(!row)return out;A.DefineStar('Star1',row[1],row[2],100);key='Star1';}
+   const observer=new A.Observer(place.lat,place.lon,Math.max(-500,Number(place.elevation_m)||0));
+   const eq=A.Equator(key,date,observer,false,true);
+   try{out.constellation=A.Constellation?.(eq.ra,eq.dec)?.name||null;}catch{}
+   if(object.kind==='body'){
+     try{const i=A.Illumination?.(key,date);if(i){out.magnitude=i.mag;out.phaseFraction=i.phase_fraction;out.phaseAngle=i.phase_angle;}}catch{}
+   }
+   for(const [name,direction] of [['rise',1],['set',-1]]){
+     try{out[name]=A.SearchRiseSet?.(key,observer,direction,date,2)?.date?.toISOString()||null;}catch{}
+   }
+ }catch{}
+ return out;
+}
+
+function bodyAltitudeSeries(A,place,date,object){
+ if(!A||!object||!Number.isFinite(place?.lat)||!Number.isFinite(place?.lon))return [];
+ try{
+  const observer=new A.Observer(place.lat,place.lon,Math.max(-500,Number(place.elevation_m)||0));
+  let key=object.name;
+  if(object.kind==='star'){const row=BRIGHT_STARS.find(s=>s[0]===key);if(!row)return [];A.DefineStar('Star1',row[1],row[2],100);key='Star1';}
+  return Array.from({length:25},(_,i)=>{
+   const hours=i-12,instant=new Date(date.getTime()+hours*3600000);
+   const eq=A.Equator(key,instant,observer,true,true),hor=A.Horizon(instant,observer,eq.ra,eq.dec,'normal');
+   if(!Number.isFinite(hor.altitude))throw Error('invalid altitude');
+   return {hours,altitude:hor.altitude};
+  });
+ }catch{return [];}
+}
+
+// The tropical zodiac is a conventional 12-sector coordinate system, not
+// the unequal IAU constellation boundaries. No horoscope service is needed.
+const ZODIAC_SIGNS=[
+ ['Aries','Aries','♈'],['Taurus','Tauro','♉'],['Gemini','Géminis','♊'],
+ ['Cancer','Cáncer','♋'],['Leo','Leo','♌'],['Virgo','Virgo','♍'],
+ ['Libra','Libra','♎'],['Scorpio','Escorpio','♏'],['Sagittarius','Sagitario','♐'],
+ ['Capricorn','Capricornio','♑'],['Aquarius','Acuario','♒'],['Pisces','Piscis','♓']
+];
+const ORBIT_BODIES=['Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
+function normalizeLongitude(value){return ((value%360)+360)%360;}
+function zodiacSector(longitude){
+ if(!Number.isFinite(longitude))return null;
+ const value=normalizeLongitude(longitude),index=Math.floor(value/30);
+ return {index,longitude:value,degree:value-index*30};
+}
+function geoLongitude(A,name,date){
+ const coord=name==='Sun'?A.SunPosition(date):A.Ecliptic(A.GeoVector(name,date,true));
+ if(!Number.isFinite(coord?.elon))throw Error('Invalid ecliptic longitude');
+ return normalizeLongitude(coord.elon);
+}
+// Central difference over one day, wrap-safe even at 0 degrees Aries.
+function zodiacPositions(A,date){
+ return SOLAR_BODIES.flatMap(name=>{
+   try{
+    const longitude=geoLongitude(A,name,date),a=geoLongitude(A,name,new Date(date.getTime()-43200000)),b=geoLongitude(A,name,new Date(date.getTime()+43200000));
+    const speed=normalizeLongitude(b-a+180)-180;
+    return [{name,...zodiacSector(longitude),speed,retrograde:name!=='Sun'&&name!=='Moon'&&speed<0}];
+   }catch{return [];}
+ });
+}
+function nextMoonSign(A,date){
+ try{
+  const initial=zodiacSector(geoLongitude(A,'Moon',date)).index;
+  let lo=date.getTime(),hi=lo;
+  for(let i=0;i<96;i++){hi+=3600000;if(zodiacSector(geoLongitude(A,'Moon',new Date(hi))).index!==initial)break;lo=hi;}
+  if(hi===lo)return null;
+  while(hi-lo>60000){const mid=(hi+lo)/2;if(zodiacSector(geoLongitude(A,'Moon',new Date(mid))).index===initial)lo=mid;else hi=mid;}
+  const at=new Date(hi);return {at:at.toISOString(),index:zodiacSector(geoLongitude(A,'Moon',at)).index};
+ }catch{return null;}
+}
+// Heliocentric view deliberately uses a compressed, non-scale radial axis.
+function solarSystemPositions(A,date){
+ return ORBIT_BODIES.flatMap((name,i)=>{try{
+   const v=A.HelioVector(name,date),e=A.Ecliptic(v),distance=Math.hypot(v.x,v.y,v.z);
+   if(!Number.isFinite(distance)||!Number.isFinite(e.elon))return [];
+   return [{name,distance,longitude:normalizeLongitude(e.elon),index:i}];
+ }catch{return [];}});
+}
+function orbitPoint(longitude,distance,{cx=200,cy=200}={}){
+ const r=22+150*Math.log1p(Math.max(0,distance)/.35)/Math.log1p(50/.35),a=longitude*Math.PI/180;
+ return {x:cx+r*Math.sin(a),y:cy-r*Math.cos(a),radius:r};
+}
+
+const ASPECTS=[
+ ['Conjunction','Conjunción','☌',0],['Sextile','Sextil','⚹',60],
+ ['Square','Cuadratura','□',90],['Trine','Trígono','△',120],['Opposition','Oposición','☍',180]
+];
+// Conventional angular relationships, not predictions.
+function zodiacAspects(rows,orb=5){
+ const out=[];if(!Array.isArray(rows)||!Number.isFinite(orb)||orb<0)return out;
+ for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){
+   const a=rows[i],b=rows[j];if(!Number.isFinite(a.longitude)||!Number.isFinite(b.longitude))continue;
+   const delta=Math.abs(normalizeLongitude(a.longitude-b.longitude+180)-180);
+   for(const [en,es,symbol,angle] of ASPECTS){const deviation=Math.abs(delta-angle);if(deviation<=orb)out.push({a:a.name,b:b.name,en,es,symbol,angle,separation:delta,deviation});}
+ }
+ return out.sort((a,b)=>a.deviation-b.deviation);
+}
+
+// Predict upcoming sign crossings and apparent motion reversals using the
+// same geocentric tropical longitude as the live observatory.
+const HOUR=3600000,DAY=24*HOUR;
+function bisectTime(lo,hi,unchanged){
+ while(hi-lo>60000){const mid=Math.floor((lo+hi)/2);if(unchanged(new Date(mid)))lo=mid;else hi=mid;}
+ return new Date(hi);
+}
+function nextSignIngress(A,body,date,limitDays=45){
+ try{
+  const start=date.getTime(),end=start+limitDays*DAY,step=body==='Moon'?6*HOUR:12*HOUR;
+  const sign=d=>zodiacSector(geoLongitude(A,body,d)).index;
+  const from=sign(date);let lo=start;
+  while(lo<end){const hi=Math.min(end,lo+step),to=sign(new Date(hi));
+   if(to!==from){const at=bisectTime(lo,hi,d=>sign(d)===from);return {body,at:at.toISOString(),from,to:sign(at)};}lo=hi;
+  }
+ }catch{}
+ return null;
+}
+function nextRetrogradeStation(A,body,date,limitDays=45){
+ if(!SOLAR_BODIES.includes(body)||body==='Sun'||body==='Moon')return null;
+ try{
+  const speed=d=>normalizeLongitude(geoLongitude(A,body,new Date(d.getTime()+12*HOUR))-geoLongitude(A,body,new Date(d.getTime()-12*HOUR))+180)-180;
+  const start=date.getTime(),end=start+limitDays*DAY;let lo=start,retro=speed(date)<0;
+  while(lo<end){const hi=Math.min(end,lo+DAY),next=speed(new Date(hi))<0;
+   if(next!==retro){const at=bisectTime(lo,hi,d=>(speed(d)<0)===retro);return {body,at:at.toISOString(),type:next?'retrograde':'direct'};}lo=hi;
+  }
+ }catch{}
+ return null;
+}
+const bodyEs={Sun:'Sol',Moon:'Luna',Mercury:'Mercurio',Venus:'Venus',Mars:'Marte',Jupiter:'Júpiter',Saturn:'Saturno',Uranus:'Urano',Neptune:'Neptuno',Pluto:'Plutón'};
+const ASTRO_REFERENCE='https://github.com/cosinekitty/astronomy';
+function calculatedZodiacEvents(A,date=new Date()){
+ const result=[];
+ for(const body of ['Sun','Moon']){
+  let from=date;
+  // Cache several future ingresses so the next one is available after a crossing.
+  for(let i=0;i<(body==='Moon'?6:2);i++){
+   const ingress=nextSignIngress(A,body,from,body==='Moon'?5:40);if(!ingress)break;
+   const [en,es,symbol]=ZODIAC_SIGNS[ingress.to];
+   result.push({...ingress,kind:body==='Sun'?'zodiac-sun':'zodiac-moon',symbol,en:body+' enters '+en,es:bodyEs[body]+' entra en '+es,url:ASTRO_REFERENCE});
+   from=new Date(Date.parse(ingress.at)+2*60000);
+  }
+ }
+ for(const body of SOLAR_BODIES.slice(2)){
+  const station=nextRetrogradeStation(A,body,date,45);if(!station)continue;
+  const retro=station.type==='retrograde';
+  result.push({...station,kind:retro?'zodiac-retrograde':'zodiac-direct',en:body+(retro?' stations retrograde':' stations direct'),es:bodyEs[body]+(retro?' inicia movimiento retrógrado':' retoma movimiento directo'),url:ASTRO_REFERENCE});
+ }
+ // Use precise phase search when available; attach the Moon's sign at that instant.
+ for(const [angle,en,es] of [[0,'New moon','Luna nueva'],[180,'Full moon','Luna llena']]){
+  try{
+   let start=date;
+   for(let i=0;i<2;i++){
+    const at=A.SearchMoonPhase?.(angle,start,34)?.date;
+    if(!(at instanceof Date)||!Number.isFinite(at.getTime()))break;
+    const sign=ZODIAC_SIGNS[zodiacSector(geoLongitude(A,'Moon',at)).index];
+    result.push({kind:'zodiac-phase',phase:angle===0?'new':'full',at:at.toISOString(),en:en+' in '+sign[0],es:es+' en '+sign[1],symbol:sign[2],url:ASTRO_REFERENCE});
+    start=new Date(at.getTime()+2*60000);
+   }
+  }catch{}
+ }
+ return result.sort((a,b)=>a.at.localeCompare(b.at));
+}
+Object.assign(__exports, { BRIGHT_STARS, SOLAR_BODIES, loadAstronomy, skyPositions, projectSky, SKY_PATTERNS, projectDome, bodyDetails, bodyAltitudeSeries, ZODIAC_SIGNS, ORBIT_BODIES, normalizeLongitude, zodiacSector, zodiacPositions, nextMoonSign, solarSystemPositions, orbitPoint, ASPECTS, zodiacAspects, nextSignIngress, nextRetrogradeStation, calculatedZodiacEvents });
+});
 __define("js/weather/environment.js", function (__require, __exports) {
 "use strict";
 // A single environmental-light model used by every theme. Weather is observed,
@@ -3298,6 +3522,7 @@ __define("js/weather/sky-events.js", function (__require, __exports) {
 // Eclipse dates: NASA https://science.nasa.gov/eclipses/future-eclipses/
 // Meteor shower peaks: American Meteor Society https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/
 const { moonPhase } = __require("js/weather/moon-phase.js");
+const { loadAstronomy, calculatedZodiacEvents } = __require("js/weather/celestial.js");
 const CALENDAR = [
  ['2026-11-04','Southern Taurids peak','Máximo de las Táuridas del Sur','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
  ['2026-11-17','Leonids peak','Máximo de las Leónidas','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
@@ -3338,14 +3563,62 @@ function skyEventOnDate(isoDate) {
  return {date:isoDate,en,es,url,kind,localVisibilityKnown:false};
 }
 function skyEventIconSvg(kind) {
- const core = kind === 'solar_eclipse'
+ const core = kind==='zodiac-sun'?'<path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#e6c475" stroke-width="2"/><circle cx="12" cy="12" r="6" fill="#edbb61"/><path d="M13 9h5v5" stroke="#fff2b2" stroke-width="2" fill="none"/>'
+  : kind==='zodiac-moon'||kind==='zodiac-phase'||kind==='moon'?'<circle cx="12" cy="12" r="9" fill="#47536d"/><path d="M13 3a9 9 0 0 1 0 18Q21 12 13 3" fill="#e2ddc8"/><path d="M20 2v6M17 5h6" stroke="#c0a6f2" stroke-width="2"/>'
+  : kind==='zodiac-retrograde'||kind==='zodiac-direct'?'<path d="M5 9a7 7 0 1 1 1 8" fill="none" stroke="'+(kind==='zodiac-retrograde'?'#e0a6b4':'#9edbc2')+'" stroke-width="3"/><path d="M3 3v7h7" fill="none" stroke="#e4cef8" stroke-width="2" transform="'+(kind==='zodiac-direct'?'translate(24 0) scale(-1 1)':'translate(0 0)')+'"/>'
+  : kind === 'solar_eclipse'
   ? '<circle cx="12" cy="12" r="9" fill="#d9af66"/><circle cx="11" cy="11" r="8" fill="#18223b"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="#f2d398" stroke-width="2"/>'
   : kind === 'lunar_eclipse'
   ? '<circle cx="12" cy="12" r="9" fill="#b77265"/><path d="M15 4a9 9 0 0 1 0 16" stroke="#653c58" stroke-width="5" fill="none"/>'
   : '<path d="M4 19L20 3M8 20l12-12" stroke="#e0c7ff" stroke-width="3"/><path d="M17 2h5v5" stroke="#ffe2a0" stroke-width="3" fill="none"/>';
  return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`;
 }
-Object.assign(__exports, { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg });
+
+// Shared across dashboard, forecast and wallpaper. Recalculate at most every
+// six hours while open, filtering events against the actual current instant.
+// A failed/offline engine never hides the existing curated sky calendar.
+let cache=null,pendingEvents=null,retryAt=0;
+async function loadCalculatedSkyEvents(now=new Date()){
+ if(cache&&Date.now()-cache.savedAt<6*3600000&&Math.abs(now.getTime()-cache.from)<6*3600000)return cache.rows;
+ if(pendingEvents)return pendingEvents;
+ if(Date.now()<retryAt)return cache?.rows||[];
+ pendingEvents=loadAstronomy().then(A=>{
+   const rows=calculatedZodiacEvents(A,now);
+   if(rows.length)cache={savedAt:Date.now(),from:now.getTime(),rows};
+   else retryAt=Date.now()+5*60000;
+   return rows.length?rows:cache?.rows||[];
+ }).catch(()=>{retryAt=Date.now()+5*60000;return cache?.rows||[];}).finally(()=>{pendingEvents=null;});
+ return pendingEvents;
+}
+function localEventDate(date,tz){
+ try{const parts=new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',...(tz?{timeZone:tz}:{})}).formatToParts(date);
+   const p=k=>parts.find(x=>x.type===k)?.value;return p('year')+'-'+p('month')+'-'+p('day');
+ }catch{return key(date);}
+}
+function eventLocalTime(event,tz,lang='en'){
+ if(!event.at)return '';
+ try{return new Intl.DateTimeFormat(lang==='es'?'es-MX':'en-US',{hour:'2-digit',minute:'2-digit',...(tz?{timeZone:tz}:{})}).format(new Date(event.at));}catch{return '';}
+}
+function mergeSkyAndZodiacEvents(now,calculated,{timezone=null,skyLimit=4,zodiacLimit=4}={}){
+ const today=localEventDate(now,timezone),future=(calculated||[]).filter(e=>Number.isFinite(Date.parse(e.at))&&Date.parse(e.at)>=now.getTime()).map(e=>({...e,date:localEventDate(new Date(e.at),timezone)})).sort((a,b)=>a.at.localeCompare(b.at));
+ // Preserve room for meteor showers/eclipses instead of letting lunar ingresses
+ // dominate. Replace the corresponding approximate phase with its exact event.
+ const localCalendarDate=new Date(today+'T12:00:00');
+ const astronomical=upcomingSkyEvents(localCalendarDate,30).filter(e=>e.kind!=='moon'||!future.some(z=>z.kind==='zodiac-phase'&&Math.abs(Date.parse(z.date)-Date.parse(e.date))<=2*86400000&&z.phase===(/New moon/i.test(e.en)?'new':'full')));
+ const phases=future.filter(e=>e.kind==='zodiac-phase');
+ const sky=[...astronomical,...phases].sort((a,b)=>a.date.localeCompare(b.date)||(a.at||'').localeCompare(b.at||'')).slice(0,skyLimit);
+ // Always give the next Sun and Moon sign changes a place, then stations.
+ const zodiac=[];
+ for(const kind of ['zodiac-sun','zodiac-moon']){const e=future.find(e=>e.kind===kind);if(e)zodiac.push(e);}
+ for(const e of future.filter(e=>e.kind==='zodiac-retrograde'||e.kind==='zodiac-direct'))if(zodiac.length<zodiacLimit)zodiac.push(e);
+ for(const e of future.filter(e=>e.kind==='zodiac-moon'||e.kind==='zodiac-sun'))if(zodiac.length<zodiacLimit&&!zodiac.includes(e))zodiac.push(e);
+ return [...sky,...zodiac.slice(0,zodiacLimit)].sort((a,b)=>a.date.localeCompare(b.date)||(a.at||'').localeCompare(b.at||''));
+}
+function eventIconKind(event){
+ if(event.kind==='calendar')return skyEventOnDate(event.date)?.kind||'meteor';
+ return event.kind;
+}
+Object.assign(__exports, { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, eventLocalTime, mergeSkyAndZodiacEvents, eventIconKind });
 });
 __define("js/widgets/currency.js", function (__require, __exports) {
 "use strict";
@@ -3598,7 +3871,7 @@ const { timeAgo } = __require("js/ui/format.js");
 const { articleKey, readingIndex, updateReading } = __require("js/feed/reading.js");
 const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
-const { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } = __require("js/weather/sky-events.js");
+const { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, mergeSkyAndZodiacEvents, eventIconKind, eventLocalTime } = __require("js/weather/sky-events.js");
 const { skyLighting } = __require("js/weather/environment.js");
 const { language, t } = __require("js/ui/language.js");
 const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
@@ -3865,15 +4138,25 @@ function mountRecentlyPlayed(el,{store}) {
   return live(render,run=>[storeTables(store,['settings'],run)]);
 }
 function mountSky(el,{weather}) {
- const render=()=>{const events=upcomingSkyEvents(new Date(),4);const place=weather?.getState().place?.name;
-  replace(el,h('div',{class:'w-sky'},
+ let rows=[],dead=false,loaded=false;
+ const render=async()=>{
+  const now=new Date(),place=weather?.getState()?.place,tz=place?.timezone,es=language()==='es';
+  const draw=()=>{
+   if(dead)return;
+   const events=mergeSkyAndZodiacEvents(now,rows,{timezone:tz,skyLimit:4,zodiacLimit:4});
+   replace(el,h('div',{class:'w-sky'},
     h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
-    ...events.map(e=>h('p',{class:'w-sky-event'},skyEventOnDate(e.date)?h('span',{class:'w-sky-symbol',html:skyEventIconSvg(skyEventOnDate(e.date).kind)}):null,h('span',{},e.date+' · '),
-      h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},language()==='es'?e.es:e.en))),
-    place?h('small',{},`${t('Selected location')}: ${place}`):null));
+    h('div',{class:'w-sky-scroll'},...events.map(e=>h('p',{class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':'')},
+      h('span',{class:'w-sky-symbol',html:skyEventIconSvg(eventIconKind(e))}),
+      h('span',{class:'w-sky-event-copy'},h('small',{class:'w-sky-event-date'},e.date+(e.at?' · '+eventLocalTime(e,tz,language()):'')),
+       h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},(e.symbol?e.symbol+' ':'')+(es?e.es:e.en)))))),
+    h('small',{class:'w-sky-note'},rows.length?(es?'Tránsitos tropicales calculados · no son predicciones.':'Calculated tropical transits · not predictions.'):(loaded?(es?'Tránsitos no disponibles; calendario astronómico conservado.':'Transits unavailable; sky calendar retained.'):(es?'Calculando tránsitos…':'Calculating transits…'))),
+    place?.name?h('small',{},t('Selected location')+': '+place.name):null));
+  };
+  draw();rows=await loadCalculatedSkyEvents(now);loaded=true;draw();
  };
- const inst=live(render,run=>[weather.subscribe(run)]);const timer=setInterval(()=>inst.refresh(),60*60_000);
- return {destroy(){clearInterval(timer);inst.destroy();},refresh:inst.refresh};
+ const inst=live(render,run=>[weather?.subscribe?.(run)]);const timer=setInterval(()=>inst.refresh(),5*60_000);
+ return {destroy(){dead=true;clearInterval(timer);inst.destroy();},refresh:inst.refresh};
 }
 function mountAudio(el,{audioPlayer,interactive}){if(!audioPlayer||!interactive){replace(el,note(t('Music and radio player · available in the Tracker app.')));return {destroy(){}};}return audioPlayer.mount(el);}
 const MOUNTS = { audio:mountAudio, sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };

@@ -154,3 +154,67 @@ export function zodiacAspects(rows,orb=5){
  }
  return out.sort((a,b)=>a.deviation-b.deviation);
 }
+
+// Predict upcoming sign crossings and apparent motion reversals using the
+// same geocentric tropical longitude as the live observatory.
+const HOUR=3600000,DAY=24*HOUR;
+function bisectTime(lo,hi,unchanged){
+ while(hi-lo>60000){const mid=Math.floor((lo+hi)/2);if(unchanged(new Date(mid)))lo=mid;else hi=mid;}
+ return new Date(hi);
+}
+export function nextSignIngress(A,body,date,limitDays=45){
+ try{
+  const start=date.getTime(),end=start+limitDays*DAY,step=body==='Moon'?6*HOUR:12*HOUR;
+  const sign=d=>zodiacSector(geoLongitude(A,body,d)).index;
+  const from=sign(date);let lo=start;
+  while(lo<end){const hi=Math.min(end,lo+step),to=sign(new Date(hi));
+   if(to!==from){const at=bisectTime(lo,hi,d=>sign(d)===from);return {body,at:at.toISOString(),from,to:sign(at)};}lo=hi;
+  }
+ }catch{}
+ return null;
+}
+export function nextRetrogradeStation(A,body,date,limitDays=45){
+ if(!SOLAR_BODIES.includes(body)||body==='Sun'||body==='Moon')return null;
+ try{
+  const speed=d=>normalizeLongitude(geoLongitude(A,body,new Date(d.getTime()+12*HOUR))-geoLongitude(A,body,new Date(d.getTime()-12*HOUR))+180)-180;
+  const start=date.getTime(),end=start+limitDays*DAY;let lo=start,retro=speed(date)<0;
+  while(lo<end){const hi=Math.min(end,lo+DAY),next=speed(new Date(hi))<0;
+   if(next!==retro){const at=bisectTime(lo,hi,d=>(speed(d)<0)===retro);return {body,at:at.toISOString(),type:next?'retrograde':'direct'};}lo=hi;
+  }
+ }catch{}
+ return null;
+}
+const bodyEs={Sun:'Sol',Moon:'Luna',Mercury:'Mercurio',Venus:'Venus',Mars:'Marte',Jupiter:'Júpiter',Saturn:'Saturno',Uranus:'Urano',Neptune:'Neptuno',Pluto:'Plutón'};
+const ASTRO_REFERENCE='https://github.com/cosinekitty/astronomy';
+export function calculatedZodiacEvents(A,date=new Date()){
+ const result=[];
+ for(const body of ['Sun','Moon']){
+  let from=date;
+  // Cache several future ingresses so the next one is available after a crossing.
+  for(let i=0;i<(body==='Moon'?6:2);i++){
+   const ingress=nextSignIngress(A,body,from,body==='Moon'?5:40);if(!ingress)break;
+   const [en,es,symbol]=ZODIAC_SIGNS[ingress.to];
+   result.push({...ingress,kind:body==='Sun'?'zodiac-sun':'zodiac-moon',symbol,en:body+' enters '+en,es:bodyEs[body]+' entra en '+es,url:ASTRO_REFERENCE});
+   from=new Date(Date.parse(ingress.at)+2*60000);
+  }
+ }
+ for(const body of SOLAR_BODIES.slice(2)){
+  const station=nextRetrogradeStation(A,body,date,45);if(!station)continue;
+  const retro=station.type==='retrograde';
+  result.push({...station,kind:retro?'zodiac-retrograde':'zodiac-direct',en:body+(retro?' stations retrograde':' stations direct'),es:bodyEs[body]+(retro?' inicia movimiento retrógrado':' retoma movimiento directo'),url:ASTRO_REFERENCE});
+ }
+ // Use precise phase search when available; attach the Moon's sign at that instant.
+ for(const [angle,en,es] of [[0,'New moon','Luna nueva'],[180,'Full moon','Luna llena']]){
+  try{
+   let start=date;
+   for(let i=0;i<2;i++){
+    const at=A.SearchMoonPhase?.(angle,start,34)?.date;
+    if(!(at instanceof Date)||!Number.isFinite(at.getTime()))break;
+    const sign=ZODIAC_SIGNS[zodiacSector(geoLongitude(A,'Moon',at)).index];
+    result.push({kind:'zodiac-phase',phase:angle===0?'new':'full',at:at.toISOString(),en:en+' in '+sign[0],es:es+' en '+sign[1],symbol:sign[2],url:ASTRO_REFERENCE});
+    start=new Date(at.getTime()+2*60000);
+   }
+  }catch{}
+ }
+ return result.sort((a,b)=>a.at.localeCompare(b.at));
+}
