@@ -215,7 +215,8 @@ export function createMudView({ store, weather }) {
       }));
   }
   function render(state) {
-    if(weatherTab==='sky'&&state.place){const key=JSON.stringify(state.place);if(!skyMap||skyPlaceKey!==key){skyMap=createCelestialMap({place:state.place});skyPlaceKey=key;}replace(el,placeHeader(state),tabBar(),skyMap);return;}
+    if(weatherTab==='sky'&&state.place){const key=JSON.stringify(state.place);if(!skyMap||skyPlaceKey!==key){skyMap?.stopSky?.();skyMap=createCelestialMap({place:state.place,weatherState:state});skyPlaceKey=key;}skyMap.setWeather?.(state);if(!skyMap.isConnected)replace(el,placeHeader(state),tabBar(),skyMap);return;}
+    skyMap?.stopSky?.();
     if (state.status === 'no-location' || (!state.place && state.status === 'idle')) {
       const search = createPlaceSearch({ weather, autofocus: false });
       replace(el, h('div', { class: 'mud-empty' },
@@ -282,5 +283,6 @@ export function createMudView({ store, weather }) {
     el,
     async mount() { render(weather.getState()); await weather.refresh(); weather.loadHourly?.(); },
     show() { render(weather.getState()); weather.loadHourly?.(); },
+    hide() { skyMap?.stopSky?.(); },
   };
 }
