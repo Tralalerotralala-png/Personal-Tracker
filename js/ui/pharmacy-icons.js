@@ -1,3 +1,4 @@
+import { stackSprite } from './pixel-icon.js';
 // Reusable inventory pharmacy sprites. One hand-drawn pixel palette and
 // stepped outlines for bottles, pills and squeeze sprayers; no external assets.
 export const PHARMACY_PRESETS = ['auto','bottle','bottle-pill','bottle-tablet','spray','symbol'];
@@ -110,7 +111,9 @@ function renderBottle(kind, accent, meta) {
   }).join('');
   const bottle=grid(BOTTLE,12,4);
   const overlay=(kind==='bottle-pill'?CAPSULE:isTablet?TABLET:[]).map(([y,x,row])=>grid([row],12+x,4+y)).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" shape-rendering="crispEdges" aria-hidden="true"><g data-part="bottle">${bottle}</g><g data-part="dose">${overlay}</g></svg>`;
+  const face='<g data-part="bottle">'+bottle+'</g><g data-part="dose">'+overlay+'</g>';
+  const shadow=(bottle+overlay).replace(/fill="#[0-9a-f]{6}"/gi,'fill="#66513e"');
+  return '<svg class="sprite-pharmacy-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(face,shadow)+'</svg>';
 }
 
 export function pharmacyIconSvg(name, category, meta = {}) {
@@ -133,5 +136,5 @@ export function pharmacyIconSvg(name, category, meta = {}) {
     px(6,12,2,5,paper),px(17,13,2,4,tan),px(8,20,8,1,tan),
     px(7,13,10,6,shade(accent,.72)),px(8,13,8,5,accent),px(8,14,1,3,paper),px(11,14,2,4,paper),px(10,15,4,2,paper)
   ].join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">${spray}</svg>`;
+  return '<svg class="sprite-pharmacy-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(spray,spray.replace(/fill="#[0-9a-f]{6}"/gi,'fill="#66513e"'))+'</svg>';
 }

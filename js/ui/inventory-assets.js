@@ -1,3 +1,4 @@
+import { stackSprite } from './pixel-icon.js';
 // Hand-authored, pixel-aligned inventory sprites. Each recipe is a distinct object;
 // a shared shaded palette and one-pixel outline match the pharmacy item artwork.
 const PALETTE = {d:'#342419',a:'#756c64',s:'#a8a6a0',i:'#f8e8c9',h:'#dfba86',w:'#93613a',o:'#c77b38',y:'#e6b84d',r:'#b45449',g:'#498d70',l:'#90bd83',b:'#496e9e',c:'#91bdd3',p:'#a483b4'};
@@ -64,7 +65,9 @@ export function inventoryAssetSvg(preset) {
       if(color)out.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+color+'"/>');x=end;
     }
   }
-  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" shape-rendering="crispEdges" aria-hidden="true">'+out.join('')+'</svg>';
+  const silhouette=[];
+  for(let y=0;y<34;y++)for(let x=0;x<34;){const filled=Boolean(lit(x,y));let end=x+1;while(end<34&&Boolean(lit(end,y))===filled)end++;if(filled)silhouette.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="#5e4d39"/>');x=end;}
+  const svg='<svg class="sprite-inventory-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(out.join(''),silhouette.join(''))+'</svg>';
   cache.set(preset,svg);return svg;
 }
 // Match meaningful item names, never override an explicitly selected sprite.

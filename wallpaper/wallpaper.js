@@ -2015,8 +2015,8 @@ function glyphRows(name) { return GLYPHS[name] ?? null; }
 
 // Separate offset silhouette slices give the existing pixel artwork thickness.
 // Preserve original face, palette and viewBox; CSS controls depth on hover.
-function stackSprite(face){
-  return '<g class="sprite-stack-back" aria-hidden="true">'+face+'</g><g class="sprite-stack-mid" aria-hidden="true">'+face+'</g><g class="sprite-stack-face">'+face+'</g>';
+function stackSprite(face,depth=face){
+  return '<g class="sprite-stack-back" aria-hidden="true">'+depth+'</g><g class="sprite-stack-mid" aria-hidden="true">'+depth+'</g><g class="sprite-stack-face">'+face+'</g>';
 }
 function glyphSvg(name) {
   const compactCodes={sun:0,partly:2,cloud:3,fog:45,rain:61,snow:71,storm:95};
@@ -2158,7 +2158,7 @@ function compactWeatherSvg(code,options={}) {
       return 'fill="currentColor" fill-opacity="'+(.36+.64*light).toFixed(2)+'"';
     });
 }
-Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, glyphSvg, weatherIconSvg, compactWeatherSvg });
+Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, stackSprite, glyphSvg, weatherIconSvg, compactWeatherSvg });
 });
 __define("js/wallpaper/config.js", function (__require, __exports) {
 "use strict";

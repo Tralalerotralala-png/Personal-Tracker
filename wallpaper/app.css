@@ -1893,3 +1893,24 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .celestial-earth-clouds{animation:earthCloudLight 9s steps(7,end) infinite alternate;}
 @keyframes earthCloudLight{from{opacity:.4}to{opacity:.78}}
 @media(max-width:420px){.zodiac-feature{grid-template-columns:1fr;}.zodiac-wheel{margin:auto;}}
+
+/* Real depth slices on hand-drawn inventory and pharmacy art. */
+svg:has(>.sprite-stack-face){overflow:visible;}
+.sprite-inventory-depth .sprite-stack-back,.sprite-pharmacy-depth .sprite-stack-back{transform:translate(1.4px,2px);}
+.sprite-inventory-depth .sprite-stack-mid,.sprite-pharmacy-depth .sprite-stack-mid{transform:translate(.7px,1px);}
+.sprite-pharmacy-depth .sprite-stack-face [data-part="dose"]{transition:transform .25s steps(5,end);}
+@media(hover:hover) and (pointer:fine){.tile:hover .sprite-pharmacy-depth [data-part="dose"],.row-item:hover .sprite-pharmacy-depth [data-part="dose"]{transform:translate(1px,-1px);}}
+/* General photo/image relief; do not override specialized cover animations. */
+#app img:not(.art img):not(.library-cover-art):not(.game-book img):not(.media-case-front img),dialog.sheet img:not(.art img):not(.library-cover-art):not(.media-case-front img){filter:drop-shadow(1px 1px 0 #0004) drop-shadow(2px 2px 0 #0003);transition:transform .22s ease-out,filter .22s ease-out;}
+@media(hover:hover) and (pointer:fine){
+ #app img:not(.art img):not(.library-cover-art):not(.game-book img):not(.media-case-front img):hover,dialog.sheet img:not(.art img):not(.library-cover-art):not(.media-case-front img):hover{transform:perspective(560px) translateY(-1px) rotateY(-3deg);filter:drop-shadow(2px 2px 0 #0005) drop-shadow(3px 3px 0 #0003);}
+}
+:root[data-sprite-motion="lively"] .loot-art .art>svg,:root[data-sprite-motion="lively"] .row-art .art>svg,:root[data-sprite-motion="lively"] .tile .art>img,:root[data-sprite-motion="lively"] .gear-icon>svg,:root[data-sprite-motion="lively"] .brand-glyph>svg{animation:ptSpriteIdle 6.5s steps(6,end) infinite alternate;}
+:root[data-sprite-motion="static"] .celestial-earth-clouds,:root[data-sprite-motion="static"] .celestial-star-art,:root[data-sprite-motion="static"] .celestial-corona,:root[data-sprite-motion="static"] .celestial-hero-art,:root[data-sprite-motion="static"] .sprite-pharmacy-depth [data-part="dose"]{animation:none!important;transition:none!important;}
+:root[data-sprite-motion="static"] #app img,:root[data-sprite-motion="static"] dialog.sheet img,.reduce-animations #app img,.reduce-animations dialog.sheet img,.reduce-animations .sprite-pharmacy-depth [data-part="dose"]{transition:none!important;}
+:root[data-sprite-motion="static"] #app img:hover:not(.library-cover-art),:root[data-sprite-motion="static"] dialog.sheet img:hover:not(.library-cover-art),.reduce-animations #app img:hover:not(.library-cover-art),.reduce-animations dialog.sheet img:hover:not(.library-cover-art),.reduce-animations .sprite-pharmacy-depth [data-part="dose"],:root[data-sprite-motion="static"] .sprite-pharmacy-depth [data-part="dose"]{transform:none!important;}
+@media(prefers-reduced-motion:reduce){#app img,dialog.sheet img,.sprite-pharmacy-depth [data-part="dose"]{transition:none!important;animation:none!important;}#app img:hover:not(.library-cover-art),dialog.sheet img:hover:not(.library-cover-art),.sprite-pharmacy-depth [data-part="dose"]{transform:none!important;}}
+.zodiac-aspects{display:grid;gap:6px;border-top:1px solid var(--edge);padding-top:10px;}
+.zodiac-aspect-row{display:grid;grid-template-columns:minmax(55px,1fr) minmax(65px,1.2fr) minmax(55px,1fr) auto;align-items:center;gap:4px;text-align:center;font-size:.73rem;}
+.zodiac-aspect-row>.btn{min-width:0;overflow-wrap:anywhere;}
+.zodiac-aspect-row>small{font-variant-numeric:tabular-nums;color:var(--ink-dim);}

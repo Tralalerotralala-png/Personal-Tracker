@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {zodiacSector,zodiacPositions,nextMoonSign,solarSystemPositions,orbitPoint,SOLAR_BODIES,ORBIT_BODIES} from '../js/weather/celestial.js';
+import {zodiacSector,zodiacPositions,nextMoonSign,solarSystemPositions,orbitPoint,SOLAR_BODIES,ORBIT_BODIES,zodiacAspects} from '../js/weather/celestial.js';
 import {celestialSprite} from '../js/ui/celestial-sprites.js';
 import {glyphSvg,weatherIconSvg} from '../js/ui/pixel-icon.js';
 test('tropical zodiac sectors wrap correctly',()=>{
@@ -26,4 +26,15 @@ test('Earth is in heliocentric positions, never local horizon targets',()=>{
 test('navigation and inventory glyph depth is layered and weather retains animated art',()=>{
  assert.match(glyphSvg('pack'),/sprite-stack-back/);assert.match(glyphSvg('pack'),/sprite-stack-face/);assert.match(glyphSvg('expenses'),/sprite-stack-mid/);
  assert.match(weatherIconSvg(61),/sprite-weather-depth/);assert.match(glyphSvg('rain'),/wx-compact/);
+});
+
+test('aspects use the shortest wrapped angular distance',()=>{
+ const rows=[{name:'A',longitude:359},{name:'B',longitude:1},{name:'C',longitude:91}];
+ const aspects=zodiacAspects(rows,5);
+ assert.equal(aspects.find(x=>x.a==='A'&&x.b==='B').angle,0);
+ assert.equal(aspects.find(x=>x.a==='B'&&x.b==='C').angle,90);
+ assert.equal(aspects.find(x=>x.a==='A'&&x.b==='B').separation,2);
+});
+test('observatory module loads and parses',async()=>{
+ const {createCelestialMap}=await import('../js/ui/celestial-map.js');assert.equal(typeof createCelestialMap,'function');
 });

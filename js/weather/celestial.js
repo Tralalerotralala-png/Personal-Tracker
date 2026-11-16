@@ -139,3 +139,18 @@ export function orbitPoint(longitude,distance,{cx=200,cy=200}={}){
  const r=22+150*Math.log1p(Math.max(0,distance)/.35)/Math.log1p(50/.35),a=longitude*Math.PI/180;
  return {x:cx+r*Math.sin(a),y:cy-r*Math.cos(a),radius:r};
 }
+
+export const ASPECTS=[
+ ['Conjunction','Conjunción','☌',0],['Sextile','Sextil','⚹',60],
+ ['Square','Cuadratura','□',90],['Trine','Trígono','△',120],['Opposition','Oposición','☍',180]
+];
+// Conventional angular relationships, not predictions.
+export function zodiacAspects(rows,orb=5){
+ const out=[];if(!Array.isArray(rows)||!Number.isFinite(orb)||orb<0)return out;
+ for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){
+   const a=rows[i],b=rows[j];if(!Number.isFinite(a.longitude)||!Number.isFinite(b.longitude))continue;
+   const delta=Math.abs(normalizeLongitude(a.longitude-b.longitude+180)-180);
+   for(const [en,es,symbol,angle] of ASPECTS){const deviation=Math.abs(delta-angle);if(deviation<=orb)out.push({a:a.name,b:b.name,en,es,symbol,angle,separation:delta,deviation});}
+ }
+ return out.sort((a,b)=>a.deviation-b.deviation);
+}

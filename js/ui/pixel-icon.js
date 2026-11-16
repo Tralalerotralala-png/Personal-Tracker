@@ -342,8 +342,8 @@ export function glyphRows(name) { return GLYPHS[name] ?? null; }
 
 // Separate offset silhouette slices give the existing pixel artwork thickness.
 // Preserve original face, palette and viewBox; CSS controls depth on hover.
-function stackSprite(face){
-  return '<g class="sprite-stack-back" aria-hidden="true">'+face+'</g><g class="sprite-stack-mid" aria-hidden="true">'+face+'</g><g class="sprite-stack-face">'+face+'</g>';
+export function stackSprite(face,depth=face){
+  return '<g class="sprite-stack-back" aria-hidden="true">'+depth+'</g><g class="sprite-stack-mid" aria-hidden="true">'+depth+'</g><g class="sprite-stack-face">'+face+'</g>';
 }
 export function glyphSvg(name) {
   const compactCodes={sun:0,partly:2,cloud:3,fog:45,rain:61,snow:71,storm:95};
