@@ -22,7 +22,7 @@ import { createGameBackupService } from './game-backups.js';
 import { loadHub, openPersonalHub, createPersonalHubView, startBrowserReminders } from './ui/personal-hub.js';
 import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
-import { openSettings } from './ui/settings.js';
+import { openSettings, createAnalogClockSettings } from './ui/settings.js';
 import { openQuickCapture } from './ui/quick-capture.js';
 
 const root = document.getElementById('app');
@@ -68,6 +68,7 @@ async function applyDisplay() {
 }
 applyDisplay();
 window.addEventListener('tracker-theme-refresh', applyDisplay);
+window.addEventListener('tracker-clock-settings',async()=>{if(document.querySelector('.clock-customizer-sheet[open]'))return;const ui=await store.getSetting('ui');const sheet=openSheet({title:t('Analog clock'),body:createAnalogClockSettings(store,ui)});sheet.el.classList.add('clock-customizer-sheet');});
 
 // ---- sync indicator ----------------------------------------------------------------
 const SYNC_TEXT = {

@@ -12,6 +12,7 @@ import { openSourcesSheet } from './feed.js';
 import { openLayoutEditor } from './layout-editor.js';
 import { openWallpaperSettings } from './wallpaper-settings.js';
 import { skyLighting } from '../weather/environment.js';
+import {clockAppearance,analogClockSvg} from '../widgets/registry.js';
 
 export async function openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) {
   const { store, auth, mode } = ctx;
@@ -60,6 +61,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       h('button', { class: 'btn small desktop-only', type: 'button', onclick: () => openMudSettings({ store, weather }) }, 'Tune the mud model')));
 
   // -- optional second clock inside the Overview weather / mud widget
+  const analogBlock=createAnalogClockSettings(store,ui);
   const clockZone = h('input', { type: 'text', value: ui?.extra_clock_timezone ?? '',
     placeholder: 'e.g. GMT-4 or Europe/London', 'aria-label': 'Second clock time zone' });
   const clockLabel = h('input', { type: 'text', value: ui?.extra_clock_label ?? '',
@@ -414,7 +416,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   // Compact settings categories: only the selected section is visible.
   const groups = [
     ['general', 'General', [languageBlock, account, install]],
-    ['overview', 'Overview & weather', [mudBlock, clockSettings, feedBlock, layoutBlock, wallpaperBlock]],
+    ['overview', 'Overview & weather', [mudBlock, clockSettings, analogBlock, feedBlock, layoutBlock, wallpaperBlock]],
     ['pack', 'Pack', [cats, rarity]],
     ['appearance', 'Appearance', [display, typography, navigation]],
     ['data', 'Data & tools', [personalHub, backup]],
@@ -443,4 +445,17 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   }
   show(selected);
   openSheet({ title: t('Settings'), body: h('div', { class: 'settings settings-organized' }, tabs, content) });
+}
+
+export function createAnalogClockSettings(store,ui={}){
+ const es=language()==='es',tr=(a,b)=>es?b:a;
+ let draft=clockAppearance(ui);const preview=h('div',{class:'analog-settings-preview'}),feedback=h('p',{class:'hint',role:'status'});
+ const select=(key,values)=>h('select',{'aria-label':key,onchange:e=>{draft[key]=e.target.value;draw();}},values.map(([v,en,sp])=>h('option',{value:v,selected:v===draft[key]},tr(en,sp))));
+ const style=select('style',[['square','Pixel square','Cuadrado pixel'],['round','Round','Redondo'],['retro','Retro','Retro'],['minimal','Minimal','Minimalista'],['roman','Roman numerals','Números romanos']]),size=select('size',[['small','Small','Pequeño'],['medium','Medium','Mediano'],['large','Large','Grande']]);
+ const options=[['visible','Show analog clock','Mostrar reloj analógico'],['numbers','Show numerals','Mostrar números'],['seconds','Second hand','Segundero']].map(([key,en,sp])=>h('label',{class:'check'},h('input',{type:'checkbox',checked:draft[key],onchange:e=>{draft[key]=e.target.checked;draw();}}),tr(en,sp)));
+ const colors=[['face','Face','Esfera','#202639'],['hands','Hands','Manecillas','#e9e0cb'],['accent','Accent','Acento','#b9a2f4']].map(([key,en,sp,initial])=>{const input=h('input',{type:'color',value:draft[key]||initial,oninput:e=>{draft[key]=e.target.value;draw();}});return h('div',{class:'analog-color-field'},h('label',{},tr(en,sp),input),h('button',{class:'btn small',type:'button',onclick:()=>{draft[key]=null;input.value=initial;draw();}},tr('Theme','Tema')));});
+ function draw(){preview.innerHTML=analogClockSvg(new Date(),{analog_clock:draft});preview.style.opacity=draft.visible?'1':'.45';}
+ draw();
+ const section=h('section',{class:'set-block analog-clock-settings'},h('h3',{},tr('Analog clock','Reloj analógico')),preview,h('label',{},tr('Clock face','Diseño'),style),h('label',{},tr('Size','Tamaño'),size),options,colors,h('button',{class:'btn primary small',type:'button',onclick:async e=>{const btn=e.currentTarget;btn.disabled=true;try{await store.setSetting('ui',{...(await store.getSetting('ui')),analog_clock:{...draft}});feedback.textContent=tr('Clock appearance saved.','Apariencia guardada.');}catch{feedback.textContent=tr('Could not save clock.','No se pudo guardar el reloj.');}finally{btn.disabled=false;}}},tr('Save appearance','Guardar apariencia')),feedback);
+ return section;
 }

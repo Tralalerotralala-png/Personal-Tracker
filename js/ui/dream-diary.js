@@ -52,7 +52,7 @@ const safeText=(value,max=10000)=>String(value||'').slice(0,max);
 export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
  let session=null, timeout=null, sheet=null, failures=0, blockedUntil=0;
- let activeDraftTimer=null, editorDirty=false;
+ let activeDraftTimer=null, editorDirty=false, pendingCapture=null, openCaptureEditor=null;
  let writeChain=Promise.resolve();
  const dialogs=new Set();
  const L=()=>labels[language()];
@@ -103,7 +103,7 @@ export function createDreamDiaryView({store}) {
  function openEntries(){
   if(!session)return;
   const wrap=h('div',{class:'journal-shell'}),tabs=h('div',{class:'hub-tabs'}),list=h('div',{class:'journal-list'});
-  let active='dreams';
+  let active=pendingCapture||'dreams';
   const tabsNames=['dreams','sleep','moods','habits','vault'];
   const dateDisplay=d=>d||today();
   const button=(txt,fn)=>h('button',{class:'btn small',type:'button',onclick:fn},txt);
@@ -232,8 +232,11 @@ export function createDreamDiaryView({store}) {
   wrap.append(h('div',{class:'journal-actions'},button(L().change,changePin),button(L().lock,lock)),tabs,list);
   replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
   draw();touch();
+  openCaptureEditor=type=>{if(!session||editorDirty)return;active=type;draw();edit(type);};
+  if(pendingCapture){const type=pendingCapture;pendingCapture=null;openCaptureEditor(type);}
  }
  window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});
+ window.addEventListener('tracker-private-capture',e=>{const type=e.detail?.type;if(!['dreams','sleep','moods','habits','vault'].includes(type))return;pendingCapture=type;if(session&&openCaptureEditor){pendingCapture=null;openCaptureEditor(type);}else if(!el.hidden)openLocked();});
  landing();
- return {el,mount:async()=>landing(),show:()=>{if(!session)landing();},hide:()=>{}};
+ return {el,mount:async()=>{if(!session&&!pendingCapture)landing();},show:()=>{if(!session){if(pendingCapture)openLocked();else landing();}},hide:()=>{}};
 }

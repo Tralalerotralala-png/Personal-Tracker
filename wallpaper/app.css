@@ -1994,3 +1994,66 @@ svg:has(>.sprite-stack-face){overflow:visible;}
 
 /* The live moon and forecast art share the same extruded edge treatment. */
 .hotbar .slot:is([data-route="mud"],[data-route="diary"]) .slot-icon svg{filter:drop-shadow(1px 1px 0 #10152d99) drop-shadow(1px 2px 0 #10152d55);}
+
+/* Capture palette: compact searchable action deck. */
+.quick-capture{display:grid;gap:12px;min-width:0;}
+.quick-capture-types{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,104px),1fr));gap:5px;max-height:min(32vh,280px);overflow:auto;}
+.quick-capture-kind{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:54px;padding:6px;font-size:.75rem;text-align:center;overflow-wrap:anywhere;}
+.quick-capture-kind>span{font-size:1.2rem;color:var(--accent);}
+.quick-capture-kind.primary>span{color:inherit;}
+.quick-capture-fields{display:grid;gap:8px;}
+.quick-capture-fields>label,.quick-capture-pair>label{display:grid;gap:4px;min-width:0;}
+.quick-capture-fields :is(input,select,textarea){min-width:0;max-width:100%;width:100%;}
+.quick-capture-fields .check{display:flex;align-items:center;gap:6px;}
+.quick-capture-fields .check input{width:auto;}
+.quick-capture-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+/* Clock face is clickable, uniformly aligned, and independently sized. */
+.widget .w-weather-clock .w-analog-clock{border:0;background:none;color:inherit;padding:0;align-self:center;justify-self:center;width:100%;max-width:var(--clock-size,58px);height:auto;aspect-ratio:1;}
+.w-analog-clock.clock-size-small{--clock-size:36px;}.w-analog-clock.clock-size-medium{--clock-size:58px;}.w-analog-clock.clock-size-large{--clock-size:86px;}
+.widget .w-weather-clock .w-analog-clock svg{width:100%;height:100%;}
+button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analog-clock:focus-visible{outline:2px solid var(--accent);}
+.widget .w-mud-dashboard .w-weather-clock.no-analog{grid-template-columns:repeat(2,minmax(0,1fr));}
+.widget .w-mud-dashboard .w-weather-clock.no-analog.one-clock{grid-template-columns:minmax(0,1fr);}
+.analog-clock-settings{display:grid;gap:9px;}
+.analog-settings-preview{display:grid;place-items:center;background:var(--panel-2);padding:10px;}
+.analog-settings-preview svg{height:116px;width:116px;}
+.analog-color-field{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.analog-color-field>label{display:flex;align-items:center;gap:8px;}
+/* Scrolling is page-first, except over the slender scrollbar rail or after
+   activating the widget's own scroll mode. Expand always restores full scroll. */
+.widget-head-tools{display:flex;align-items:center;gap:2px;flex:0 0 auto;}
+.widget-scroll-toggle{border:0;background:transparent;color:var(--ink-dim);font:inherit;padding:3px 5px;line-height:1;cursor:pointer;}
+.widget-scroll-toggle[aria-pressed=true]{color:var(--accent);outline:1px solid var(--accent);}
+.overview .ov-grid>.widget:not(.widget-scroll-active)>.widget-body,.overview .ov-grid>.widget:not(.widget-scroll-active) :is(.w-feed-scroll,.w-sky-scroll,.audio-list){overscroll-behavior:auto;}
+.overview .ov-grid>.widget.widget-scroll-active>.widget-body{overscroll-behavior:contain;}
+@media(pointer:coarse){.overview .ov-grid>.widget:not(.widget-scroll-active)>.widget-body{overflow:clip;touch-action:pan-y;}.overview .ov-grid>.widget:not(.widget-scroll-active) :is(.w-feed-scroll,.w-sky-scroll,.audio-list){overflow:clip;touch-action:pan-y;}.overview .ov-grid>.widget.widget-scroll-active>.widget-body{overflow:auto;max-height:60vh;}.overview .ov-grid>.widget.widget-scroll-active :is(.w-feed-scroll,.w-sky-scroll,.audio-list){overflow:auto;}}
+@media(max-width:899px){.overview .ov-grid>.widget:not(.widget-scroll-active)>.widget-body{overflow:visible;}}
+/* Slim transport, expandable library and a smaller floating footprint. */
+.floating-audio{right:10px;width:min(290px,calc(100vw - 20px));bottom:calc(var(--hotbar-h) + var(--safe-b) + 50px);}
+.floating-audio .audio-player{padding:7px;max-height:min(58vh,450px);}
+.audio-player,.audio-body,.audio-library{gap:5px;}
+.audio-heading{gap:3px;padding-bottom:4px;flex-wrap:wrap;}
+.audio-heading>strong{font-size:.75rem;min-width:68px;}
+.audio-heading .btn{padding:3px 5px;font-size:.7rem;}
+.audio-now{padding:5px;gap:5px;}
+.audio-track-title{font-size:.78rem;}
+.audio-transport .btn{padding:4px 7px;}
+.audio-timeline small{font-size:.65rem;}
+.audio-library-details{display:grid;gap:6px;min-width:0;}
+.audio-library-details[hidden],.audio-status:empty{display:none!important;}
+.audio-list{max-height:120px;}
+.audio-compact .audio-equalizer{height:16px;}
+.audio-compact .audio-now{min-height:27px;}
+/* Layout workstation: flexible placement controls with real zoom and history. */
+.ed-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--edge);}
+.ed-tools label{display:flex;align-items:center;gap:5px;font-size:.75rem;}
+.ed-tools select{max-width:170px;min-width:0;padding:4px;font-size:.78rem;}
+.ed-stage{padding:10px;overscroll-behavior:contain;min-width:0;min-height:0;}
+.ed-widget-name{background:none;border:0;color:var(--ink);font:inherit;text-align:left;cursor:pointer;min-width:0;overflow-wrap:anywhere;}
+.ed-widget-name:hover{color:var(--accent);}
+.ed-widget-name.dim{color:var(--ink-dim);}
+.ed-selected-actions{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0;}
+.ed-field input{width:100%;min-width:0;box-sizing:border-box;}
+.ed-resize{width:27px;height:27px;}
+.ed-canvas[data-profile=mobile] .ed-resize{width:100%;height:12px;clip-path:none;opacity:.65;}
+@media(max-width:899px){.ed-main{grid-template-rows:minmax(180px,1.1fr) minmax(140px,1fr);}.ed-side{padding:8px;}.ed-head{padding:7px;gap:5px;}.ed-head h2{font-size:1rem;}.ed-tools{padding:5px;}.ed-main .ed-stage{padding:7px;}}

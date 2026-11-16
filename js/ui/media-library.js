@@ -69,5 +69,5 @@ export function createMediaLibraryView({store,backups=null}) {
    const filter=h('select',{'aria-label':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
- return {el,mount:load,show:render,hide:()=>{}};
+ return {el,mount:load,show:load,hide:()=>{}};
 }

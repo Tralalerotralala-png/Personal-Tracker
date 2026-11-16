@@ -101,9 +101,13 @@ export function createAudioPlayer({store}){
  }
  const dockButton=h('button',{class:'btn small ghost',type:'button',onclick:toggleDock},tr('Dock','Acoplar'));
  const minimize=h('button',{class:'btn small ghost',type:'button',title:tr('Minimize','Minimizar'),onclick:()=>{expanded=false;prefs.expanded=false;savePrefs();place();}},'−');
- heading.append(h('strong',{},'♫ ',tr('Audio player','Reproductor')),dockButton,minimize);
- body.append(h('div',{class:'audio-now'},title,h('span',{class:'audio-equalizer','aria-hidden':'true'},...Array.from({length:5},()=>h('i',{})))),h('div',{class:'audio-transport'},previous,playback,next,volume),h('div',{class:'audio-timeline'},progress,timeLabel),h('div',{class:'inline-actions'},musicTab,radioTab),library,status);
- panel.append(heading,body);
+ let libraryOpen=Boolean(prefs.libraryOpen);
+ const libraryToggle=h('button',{class:'btn small ghost audio-library-toggle',type:'button','aria-expanded':String(libraryOpen),onclick:()=>{libraryOpen=!libraryOpen;prefs.libraryOpen=libraryOpen;savePrefs();syncLibrary();}},tr('Library','Biblioteca'));
+ const libraryDetails=h('div',{class:'audio-library-details'},h('div',{class:'inline-actions'},musicTab,radioTab),library);
+ function syncLibrary(){libraryDetails.hidden=!libraryOpen;panel.classList.toggle('audio-compact',!libraryOpen);libraryToggle.setAttribute('aria-expanded',String(libraryOpen));}
+ heading.append(h('strong',{},'♫ ',tr('Audio player','Reproductor')),libraryToggle,dockButton,minimize);
+ body.append(h('div',{class:'audio-now'},title,h('span',{class:'audio-equalizer','aria-hidden':'true'},...Array.from({length:5},()=>h('i',{})))),h('div',{class:'audio-transport'},previous,playback,next,volume),h('div',{class:'audio-timeline'},progress,timeLabel),libraryDetails,status);
+ panel.append(heading,body);syncLibrary();
  function place(){
   if(dockHost){if(panel.parentNode!==dockHost)dockHost.append(panel);floating.hidden=true;minimize.hidden=true;dockButton.textContent=tr('Float','Flotante');return;}
   floating.hidden=false;minimize.hidden=false;dockButton.textContent=tr('Dock','Acoplar');replace(floating,expanded?panel:launcher);

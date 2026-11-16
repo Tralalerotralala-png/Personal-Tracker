@@ -3,6 +3,7 @@
 import { h, replace } from './dom.js';
 import { createWidgetCard } from '../widgets/registry.js';
 import { loadLayout } from '../widgets/store.js';
+import { readingOrder } from '../widgets/layout.js';
 import { openLayoutEditor } from './layout-editor.js';
 import { keyOf } from '../calendar/recurrence.js';
 
@@ -23,7 +24,7 @@ export function createOverviewView({ store, ctx }) {
     const grid = h('div', { class: 'ov-grid', role: 'list' });
     const today = new Date();
     lastDay = keyOf(today.getFullYear(), today.getMonth()+1, today.getDate());
-    for (const item of layout) {
+    for (const item of (p==='mobile'?readingOrder(layout):layout)) {
       const card = createWidgetCard(item.id, ctx, { link: true });
       card.el.setAttribute('role', 'listitem');
       if (p === 'desktop') {

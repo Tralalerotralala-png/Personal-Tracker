@@ -106,3 +106,44 @@ export function snapDelta(dxPx, dyPx, cellW, cellH) {
 }
 
 export const sameLayout = (a, b) => JSON.stringify(readingOrder(a)) === JSON.stringify(readingOrder(b));
+
+export function fitItem(layout,id,target,bounds,def={},mode='strict'){
+ const cur=layout.find(x=>x.id===id);if(!cur)return null;
+ const next={...cur,...target,id};
+ if(![next.x,next.y,next.w,next.h].every(Number.isInteger)||next.w<(def.minW??1)||next.h<(def.minH??1)||!inBounds(next,bounds))return null;
+ if(mode==='strict')return canPlace(layout,next,bounds,id)?layout.map(x=>x.id===id?next:x):null;
+ const others=layout.filter(x=>x.id!==id),conflicts=others.filter(x=>overlaps(x,next));
+ const fixed=[next,...others.filter(x=>!overlaps(x,next))];
+ // Prefer a direct swap when the moved widget's old slot fits its neighbor.
+ for(const old of conflicts){
+  const swapped={...old,x:cur.x,y:cur.y};
+  if(conflicts.length===1&&canPlace(fixed,swapped,bounds)){fixed.push(swapped);continue;}
+  let best=null,score=Infinity,last=bounds.rows??MAX_ROWS;
+  for(let y=0;y+old.h<=last;y++)for(let x=0;x+old.w<=bounds.cols;x++){
+   const candidate={...old,x,y};if(!canPlace(fixed,candidate,bounds))continue;
+   const cost=Math.abs(y-old.y)*2+Math.abs(x-old.x)+(y<old.y?.25:0);
+   if(cost<score){best=candidate;score=cost;}
+  }
+  if(!best)return null;fixed.push(best);
+ }
+ return layout.map(x=>fixed.find(y=>y.id===x.id));
+}
+export function compactWidgets(layout,bounds){
+ const out=[];
+ for(const old of readingOrder(layout)){
+  let next={...old};
+  while(next.y>0&&canPlace(out,{...next,y:next.y-1},bounds))next.y--;
+  if(!canPlace(out,next,bounds)){const spot=findFreeSpot(out,old.w,old.h,bounds);if(!spot)return null;next={...old,...spot};}
+  out.push(next);
+ }
+ return out;
+}
+export function packPhoneLayout(layout){
+ let y=0;return readingOrder(layout).map(x=>{const next={...x,x:0,y,w:12};y+=x.h;return next;});
+}
+export function movePhoneWidget(layout,id,delta){
+ const ordered=readingOrder(layout),i=ordered.findIndex(x=>x.id===id),j=i+delta;
+ if(i<0||j<0||j>=ordered.length)return null;
+ [ordered[i],ordered[j]]=[ordered[j],ordered[i]];
+ let y=0;return ordered.map(x=>{const next={...x,x:0,y,w:12};y+=x.h;return next;});
+}

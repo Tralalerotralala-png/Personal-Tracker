@@ -50,7 +50,26 @@ const note = (text) => h('p', { class: 'w-note' }, text);
 
 // ---- mud ---------------------------------------------------------------------------------
 
-function mountMud(el, { weather, store }) {
+
+export function clockAppearance(ui={}){
+ const raw=ui?.analog_clock||{},color=v=>/^#[0-9a-f]{6}$/i.test(v||'')?v:null;
+ return {style:['square','round','retro','minimal','roman'].includes(raw.style)?raw.style:'square',size:['small','medium','large'].includes(raw.size)?raw.size:'medium',visible:raw.visible!==false,seconds:raw.seconds===true,numbers:raw.numbers!==false,face:color(raw.face),hands:color(raw.hands),accent:color(raw.accent)};
+}
+export function analogClockSvg(now=new Date(),ui={}){
+ const a=clockAppearance(ui),face=a.face||'var(--panel-2)',ink=a.hands||'var(--ink)',accent=a.accent||'var(--accent)';
+ const round=['round','roman','minimal'].includes(a.style);
+ const frame=round?'<circle cx="50" cy="50" r="46" fill="'+face+'" stroke="var(--edge-hi)" stroke-width="5"/>' : '<rect x="3" y="3" width="94" height="94" rx="'+(a.style==='retro'?12:2)+'" fill="'+face+'" stroke="var(--edge-hi)" stroke-width="5"/>';
+ const line=(deg,len,width,col)=>{const r=deg*Math.PI/180;return '<line x1="50" y1="50" x2="'+(50+Math.sin(r)*len)+'" y2="'+(50-Math.cos(r)*len)+'" stroke="'+col+'" stroke-width="'+width+'" stroke-linecap="square"/>';};
+ let ticks='';const roman=['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];
+ for(let i=0;i<12;i++){const r=i*Math.PI/6,x=Math.sin(r),y=-Math.cos(r),major=i%3===0;
+  if(a.style!=='minimal'||major)ticks+='<line x1="'+(50+x*36)+'" y1="'+(50+y*36)+'" x2="'+(50+x*41)+'" y2="'+(50+y*41)+'" stroke="'+ink+'" opacity=".72" stroke-width="'+(major?3:1.5)+'"/>';
+  if(a.numbers&&(a.style==='roman'||a.style==='retro'||major&&a.style!=='minimal'))ticks+='<text x="'+(50+x*28)+'" y="'+(50+y*28+3)+'" fill="'+ink+'" text-anchor="middle" font-size="'+(a.style==='roman'?7:9)+'">'+(a.style==='roman'?roman[i]:i||12)+'</text>';
+ }
+ const hr=(now.getHours()%12+now.getMinutes()/60)*30,min=(now.getMinutes()+now.getSeconds()/60)*6;
+ return '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Analog clock">'+frame+ticks+line(hr,23,6,ink)+line(min,33,4,accent)+(a.seconds?line(now.getSeconds()*6,39,1.5,'#e67d83'):'')+'<rect x="47" y="47" width="6" height="6" fill="'+accent+'"/></svg>';
+}
+
+function mountMud(el, { weather, store, interactive }) {
   let ui = {};
   const readSettings = async () => { ui = (await store.getSetting('ui')) ?? {}; run(); };
   const render = () => {
@@ -58,16 +77,9 @@ function mountMud(el, { weather, store }) {
     const now = new Date();
     const clock = (tz) => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz });
     const extra = ui?.extra_clock_timezone;
-    const hour = now.getHours() % 12 + now.getMinutes() / 60;
-    const minute = now.getMinutes() + now.getSeconds() / 60;
-    const hand = (angle, length, width, color) => `<line x1="50" y1="50" x2="${50 + Math.sin(angle * Math.PI / 180) * length}" y2="${50 - Math.cos(angle * Math.PI / 180) * length}" stroke="${color}" stroke-width="${width}" stroke-linecap="square"/>`;
-    const ticks = Array.from({ length: 12 }, (_, i) => {
-      const a = i * Math.PI / 6;
-      return `<line x1="${50 + Math.sin(a) * 36}" y1="${50 - Math.cos(a) * 36}" x2="${50 + Math.sin(a) * 41}" y2="${50 - Math.cos(a) * 41}" stroke="var(--ink-dim)" stroke-width="${i % 3 === 0 ? 4 : 2}"/>`;
-    }).join('');
-    const analog = h('span', { class: 'w-analog-clock', title: clock(undefined),
-      html: `<svg viewBox="0 0 100 100" role="img" aria-label="Analog clock ${clock(undefined)}" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="94" height="94" rx="2" fill="var(--panel-2)" stroke="var(--edge-hi)" stroke-width="5"/>${ticks}${hand(hour * 30,25,6,'var(--ink)')}${hand(minute * 6,34,4,'var(--accent)')}<rect x="47" y="47" width="6" height="6" fill="var(--accent)"/></svg>` });
-    const localClock = h('div', { class: 'w-weather-clock' },
+    const appearance=clockAppearance(ui);
+    const analog=appearance.visible?h(interactive?'button':'span',{class:'w-analog-clock clock-size-'+appearance.size,type:interactive?'button':null,title:interactive?(language()==='es'?'Configurar reloj':'Customize clock'):clock(undefined),'aria-label':interactive?(language()==='es'?'Configurar reloj':'Customize clock'):null,html:analogClockSvg(now,ui),onclick:interactive?()=>window.dispatchEvent(new Event('tracker-clock-settings')):null}):null;
+    const localClock = h('div', { class: 'w-weather-clock'+(appearance.visible?'':' no-analog')+(!extra?' one-clock':'') },
       analog,
       h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined)),
         h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
@@ -112,7 +124,8 @@ function mountMud(el, { weather, store }) {
     return [weather.subscribe(trigger), storeTables(store, ['settings'], readSettings)];
   });
   readSettings();
-  const timer = setInterval(() => inst.refresh(), 30_000);
+  const timer = setInterval(() => {if(clockAppearance(ui).seconds){const node=el.querySelector('.w-analog-clock');if(node)node.innerHTML=analogClockSvg(new Date(),ui);}if(new Date().getSeconds()<2||!clockAppearance(ui).seconds&&Date.now()-lastClockRender>30000){lastClockRender=Date.now();inst.refresh();}}, 1000);
+  let lastClockRender=Date.now();
   return { destroy() { clearInterval(timer); inst.destroy(); }, refresh: inst.refresh };
 }
 
@@ -316,20 +329,23 @@ export function mountWidget(id, el, ctx) {
 // A widget with its frame: { el, destroy }. Interactive frames link their title to the matching tab.
 export function createWidgetCard(id, ctx, { link = false } = {}) {
   const def = WIDGET_DEFS[id];
-  const body = h('div', { class: 'widget-body' });
+  const body = h('div', { class: 'widget-body',tabindex:link?0:null });
   const title = link && def.route
     ? h('a', { class: 'widget-title', href: `#${def.route}` }, def.title)
     : link && id === 'phrase'
       ? h('button', { class: 'widget-title widget-title-action', type: 'button', onclick: openPhraseHistory }, def.title)
       : h('span', { class: 'widget-title' }, def.title);
-  let expanded=null;
+  let expanded=null,scrolling=false;
+  const scrollToggle=link?h('button',{class:'widget-scroll-toggle',type:'button','aria-pressed':'false','aria-label':language()==='es'?'Activar desplazamiento interno':'Enable widget scrolling',title:language()==='es'?'Activar desplazamiento interno':'Enable widget scrolling',onclick:()=>{scrolling=!scrolling;el.classList.toggle('widget-scroll-active',scrolling);scrollToggle.setAttribute('aria-pressed',String(scrolling));if(scrolling)body.focus({preventScroll:true});}},'↕'):null;
+  const routeWheel=e=>{if(scrolling||expanded||e.ctrlKey||e.altKey||e.target.closest?.('input,select,textarea')||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;const r=body.getBoundingClientRect();if(e.clientX>=r.right-22)return;let host=el.parentElement;while(host&&host!==document.body){const cs=getComputedStyle(host);if(/auto|scroll/.test(cs.overflowY)&&host.scrollHeight>host.clientHeight+1)break;host=host.parentElement;}const scroller=host&&host!==document.body?host:document.scrollingElement;if(!scroller)return;const scale=e.deltaMode===1?16:e.deltaMode===2?scroller.clientHeight:1;e.preventDefault();scroller.scrollTop+=e.deltaY*scale;};
+  if(link)body.addEventListener('wheel',routeWheel,{passive:false});
   const expand=link?h('button',{class:'widget-expand',type:'button','aria-label':language()==='es'?'Ampliar widget':'Expand widget',title:language()==='es'?'Ampliar widget':'Expand widget',onclick:()=>{
     if(expanded)return;
     const frame=h('section',{class:'widget widget-expanded wd-'+id},body);
     expanded=openSheet({title:t(def.title),size:'normal',body:frame,onClose:()=>{expanded=null;if(el.isConnected)el.append(body);expand.focus();}});
     expanded.el.classList.add('widget-expanded-sheet');
   }},'⤢'):null;
-  const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title,expand), body);
+  const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title,h('div',{class:'widget-head-tools'},scrollToggle,expand)), body);
   const inst = mountWidget(id, body, { ...ctx, interactive: link });
   return { el, destroy: () => {expanded?.close();inst.destroy();} };
 }
