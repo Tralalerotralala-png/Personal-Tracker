@@ -94,9 +94,9 @@ export function createAudioPlayer({store}){
  }
  const profile=()=>matchMedia('(min-width:900px)').matches?'desktop':'mobile';
  async function toggleDock(){
-  try{const p=profile(),layout=await loadLayout(store,p);if(dockHost||layout.some(x=>x.id==='audio')){
+  try{const p=profile(),layout=await loadLayout(store,p);if(dockHost){
     await saveLayout(store,p,removeItem(layout,'audio'));expanded=true;prefs.expanded=true;savePrefs();if(!dockHost)place();
-   }else{const next=addItem(layout,'audio',WIDGET_DEFS.audio,boundsFor(p));if(!next){toast(tr('No room in the layout.','No hay espacio en el diseño.'));return;}await saveLayout(store,p,next);location.hash='#overview';}
+   }else if(layout.some(x=>x.id==='audio')){location.hash='#overview';}else{const next=addItem(layout,'audio',WIDGET_DEFS.audio,boundsFor(p));if(!next){toast(tr('No room in the layout.','No hay espacio en el diseño.'));return;}await saveLayout(store,p,next);location.hash='#overview';}
   }catch{toast(tr('Could not change widget placement.','No se pudo cambiar la ubicación del widget.'));}
  }
  const dockButton=h('button',{class:'btn small ghost',type:'button',onclick:toggleDock},tr('Dock','Acoplar'));

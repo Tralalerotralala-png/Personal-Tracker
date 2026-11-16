@@ -277,6 +277,7 @@ export function createMudView({ store, weather }) {
   }
 
   weather.subscribe(render);
+  setInterval(()=>{if(weatherTab==='sky'&&skyMap?.isConnected&&!el.hidden&&document.visibilityState!=='hidden')skyMap.refreshSky?.();},60_000);
   return {
     el,
     async mount() { render(weather.getState()); await weather.refresh(); weather.loadHourly?.(); },
