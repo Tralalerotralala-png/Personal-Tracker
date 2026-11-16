@@ -36,7 +36,7 @@ test('existing phone layouts are migrated once to include all current widgets, w
   await store.setSetting('layout_version',5);
   assert.equal(await upgradeLayouts(store),true);
   const mobile = await loadLayout(store,'mobile');
-  assert.deepEqual(new Set(mobile.map(x=>x.id)), new Set(WIDGET_IDS.filter(x=>x!=='clock')));
+  assert.deepEqual(new Set(mobile.map(x=>x.id)), new Set(WIDGET_IDS.filter(x=>x!=='clock'&&x!=='audio')));
   assert.ok(mobile.every(x=>x.x===0&&x.w===12));
   assert.ok(mobile.every((x,i)=>x.y === (i===0?0:mobile[i-1].y+mobile[i-1].h)));
   assert.deepEqual(await loadLayout(store,'desktop'),desktop);
@@ -48,7 +48,7 @@ test('existing phone layouts are migrated once to include all current widgets, w
 
 test('default phone layout is complete and packed without blank slots', () => {
   const mobile=DEFAULT_LAYOUTS.mobile;
-  assert.deepEqual(new Set(mobile.map(x=>x.id)), new Set(WIDGET_IDS.filter(x=>x!=='clock')));
+  assert.deepEqual(new Set(mobile.map(x=>x.id)), new Set(WIDGET_IDS.filter(x=>x!=='clock'&&x!=='audio')));
   for(let i=0;i<mobile.length;i++) assert.equal(mobile[i].y, i ? mobile[i-1].y+mobile[i-1].h : 0);
 });
 
@@ -57,4 +57,13 @@ test('repository config, if present, must not contain a secret or service-role c
   if(!existsSync(file)) return;
   const content=readFileSync(file,'utf8');
   assert.equal(/sb_secret_|service_role|sk-[A-Za-z0-9_-]{20,}/i.test(content),false,'Do not commit privileged credentials to the public app.');
+});
+
+test('audio is an opt-in app widget, not forced into saved phone layouts or wallpaper', async()=>{
+  const store=createStore({adapter:createMemoryAdapter()});
+  const docked=[{id:'audio',x:0,y:0,w:12,h:4}];
+  await store.upsert('widget_layout',{profile:'mobile',layout:docked});
+  assert.deepEqual(await loadLayout(store,'mobile'),docked);
+  await store.upsert('widget_layout',{profile:'wallpaper',layout:[...docked,{id:'clock',x:0,y:4,w:3,h:2}]});
+  assert.ok(!(await loadLayout(store,'wallpaper')).some(x=>x.id==='audio'));
 });
