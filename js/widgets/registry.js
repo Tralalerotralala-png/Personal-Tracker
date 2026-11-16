@@ -3,7 +3,7 @@
 // the layout editor preview and (next stage) the wallpaper.
 //
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
-import { h, replace, daysSince } from '../ui/dom.js';
+import { h, replace, daysSince, openSheet, toast } from '../ui/dom.js';
 import { WIDGET_DEFS } from './defs.js';
 import { mountCurrency } from './currency.js';
 import { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
@@ -222,9 +222,12 @@ function mountFeed(el, { feed, store }) {
           return h('li',{class:`${it.matched?.length?'hit ':''}${saved.read?'feed-read':''}`},
             it.link && /^https?:\/\//i.test(it.link) ? h('a',{class:'w-title w-headline-link',href:it.link,target:'_blank',rel:'noopener noreferrer',
               onclick:store?.readOnly?null:()=>{updateReading(store,it,{read:true}).catch(()=>{});}},it.title):h('span',{class:'w-title'},it.title),
-            h('span',{class:'w-meta'},`${saved.read?'Read · ':'New · '}${it.source_name}${it.published?', '+timeAgo(it.published):''}`),
-            store?.readOnly?null:h('button',{class:'w-feed-save',type:'button','aria-label':saved.saved?'Remove bookmark':'Save for later',
-              onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆'));
+            h('span',{class:'w-meta'},(saved.read?(language()==='es'?'Leída · ':'Read · '):(language()==='es'?'Nueva · ':'New · '))+it.source_name+(it.published?', '+timeAgo(it.published):'')),
+            store?.readOnly?null:h('div',{class:'w-feed-tools'},
+              h('button',{class:'w-feed-read-toggle',type:'button','aria-pressed':String(Boolean(saved.read)),title:language()==='es'?(saved.read?'Marcar como no leída':'Marcar como leída'):(saved.read?'Mark unread':'Mark read'),'aria-label':language()==='es'?(saved.read?'Marcar como no leída':'Marcar como leída'):(saved.read?'Mark unread':'Mark read'),
+                onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await updateReading(store,it,{read:!saved.read});}catch{toast(language()==='es'?'No se pudo guardar el estado':'Could not save reading status');}finally{b.disabled=false;}}},saved.read?'✓':'○'),
+              h('button',{class:'w-feed-save',type:'button','aria-pressed':String(Boolean(saved.saved)),'aria-label':saved.saved?'Remove bookmark':'Save for later',
+                onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆')));
         }))),
       s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
     const viewport = el.querySelector('.w-feed-scroll');
@@ -319,7 +322,14 @@ export function createWidgetCard(id, ctx, { link = false } = {}) {
     : link && id === 'phrase'
       ? h('button', { class: 'widget-title widget-title-action', type: 'button', onclick: openPhraseHistory }, def.title)
       : h('span', { class: 'widget-title' }, def.title);
-  const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title), body);
+  let expanded=null;
+  const expand=link?h('button',{class:'widget-expand',type:'button','aria-label':language()==='es'?'Ampliar widget':'Expand widget',title:language()==='es'?'Ampliar widget':'Expand widget',onclick:()=>{
+    if(expanded)return;
+    const frame=h('section',{class:'widget widget-expanded wd-'+id},body);
+    expanded=openSheet({title:t(def.title),size:'normal',body:frame,onClose:()=>{expanded=null;if(el.isConnected)el.append(body);expand.focus();}});
+    expanded.el.classList.add('widget-expanded-sheet');
+  }},'⤢'):null;
+  const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title,expand), body);
   const inst = mountWidget(id, body, { ...ctx, interactive: link });
-  return { el, destroy: () => inst.destroy() };
+  return { el, destroy: () => {expanded?.close();inst.destroy();} };
 }

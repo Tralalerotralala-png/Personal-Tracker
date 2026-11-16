@@ -4,7 +4,7 @@ import { startTranslations, t, locale } from './ui/language.js';
 document.documentElement.lang = locale();
 import { createPhotos } from './photos.js';
 import { h, toast, openSheet } from './ui/dom.js';
-import { glyphSvg, weatherGlyph, weatherIconSvg } from './ui/pixel-icon.js';
+import { glyphSvg, weatherGlyph, weatherIconSvg, navGlyphSvg, packAppearance, PACK_SHAPES, PACK_COLORS } from './ui/pixel-icon.js';
 import { createInventoryView } from './ui/inventory.js';
 import { createMudView } from './ui/mud.js';
 import { createCalendarView } from './ui/calendar.js';
@@ -161,7 +161,26 @@ function applyTypography() {
 applyTypography();
 window.addEventListener('tracker-display-change', applyTypography);
 const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href: `#${key}`, 'data-route': key },
-  h('span', { class: 'slot-icon', html: glyphSvg(glyph) }), h('span', { class: 'slot-label' }, label)));
+  h('span', { class: 'slot-icon', html: navGlyphSvg(key==='hub'?'hub':glyph) }), h('span', { class: 'slot-label' }, label)));
+const packNav=navButtons.find(n=>n.dataset.route==='inventory');
+const packIcon=packNav?.querySelector('.slot-icon');
+const PACK_KEY='tracker-pack-appearance-v1';
+const readPack=()=>{try{return packAppearance(JSON.parse(localStorage.getItem(PACK_KEY)||'{}'));}catch{return packAppearance();}};
+let packSheet=null;
+function refreshPackIcon(){if(packIcon)packIcon.innerHTML=navGlyphSvg('pack',readPack());}
+function customizePack(){
+ if(packSheet)return;
+ let draft=readPack();const es=document.documentElement.lang.startsWith('es'),tr=(a,b)=>es?b:a;
+ const preview=h('div',{class:'pack-icon-preview'}),choices=h('div',{class:'pack-icon-choices'}),colors=h('div',{class:'pack-color-choices'});
+ const picker=h('input',{type:'color',value:draft.color,'aria-label':tr('Custom backpack color','Color personalizado de mochila')});
+ const names=[['Classic','Clásica'],['Rucksack','Excursionismo'],['Satchel','Bolso'],['Tactical','Táctica']];
+ function draw(){preview.innerHTML=navGlyphSvg('pack',draft);picker.value=draft.color;choices.replaceChildren(...PACK_SHAPES.map((shape,i)=>h('button',{class:'btn pack-shape-choice'+(draft.shape===shape?' primary':''),type:'button','aria-pressed':String(draft.shape===shape),onclick:()=>{draft={...draft,shape};draw();}},h('span',{html:navGlyphSvg('pack',{...draft,shape})}),tr(...names[i]))));colors.replaceChildren(...PACK_COLORS.map(color=>{const b=h('button',{class:'pack-swatch',type:'button','aria-label':color,'aria-pressed':String(color===draft.color),onclick:()=>{draft={...draft,color};draw();}});b.style.backgroundColor=color;return b;}));}
+ picker.oninput=()=>{draft={...draft,color:picker.value};draw();};draw();
+ packSheet=openSheet({title:tr('Customize backpack','Personalizar mochila'),body:[preview,choices,h('label',{},tr('Color','Color')),colors,picker],footer:[h('button',{class:'btn',type:'button',onclick:()=>{draft=packAppearance();draw();}},tr('Reset','Restablecer')),h('button',{class:'btn primary',type:'button',onclick:()=>{try{localStorage.setItem(PACK_KEY,JSON.stringify(packAppearance(draft)));refreshPackIcon();packSheet?.close();}catch{toast(tr('Could not save appearance','No se pudo guardar la apariencia'));}}},tr('Save','Guardar'))],onClose:()=>{packSheet=null;}});
+}
+refreshPackIcon();
+if(packNav){packNav.title='Double-click or right-click to customize backpack';packNav.addEventListener('dblclick',e=>{e.preventDefault();customizePack();});packNav.addEventListener('contextmenu',e=>{e.preventDefault();customizePack();});packNav.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.shiftKey){e.preventDefault();customizePack();}});}
+window.addEventListener('tracker-customize-pack',customizePack);
 const moonNavIcon = navButtons.find(n => n.dataset.route === 'diary')?.querySelector('.slot-icon');
 function refreshMoonNav(){ if(moonNavIcon) moonNavIcon.innerHTML=moonPhaseSvg(); }
 refreshMoonNav(); setInterval(refreshMoonNav, 60*60*1000);
@@ -203,6 +222,8 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('tracker-theme-refresh',refreshEnvironmentalLight);
 
 const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
+// Touch/keyboard alternative is on the Pack view itself.
+const packCustomize=h('button',{class:'btn small pack-customize-button',type:'button',onclick:customizePack},'Customize backpack');inventory.el.prepend(packCustomize);
 // Desktop-only draggable sidebar edge. Width is device-local and never synced.
 const sidebarWidthKey = 'tracker-sidebar-width';
 const sidebarMin = 92, sidebarMax = 310, sidebarDefault = 104;

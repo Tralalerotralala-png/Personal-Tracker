@@ -712,7 +712,12 @@ async function readingIndex(store) {
   const data = await store.getSetting(READING_KEY,{});
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
 }
-async function updateReading(store,item,patch) {
+const readingWrites=new WeakMap();
+function updateReading(store,item,patch){
+ const next=(readingWrites.get(store)||Promise.resolve()).catch(()=>{}).then(()=>writeReading(store,item,patch));
+ readingWrites.set(store,next);return next;
+}
+async function writeReading(store,item,patch) {
   const key=articleKey(item);
   if(!key)return;
   const current=await readingIndex(store);
@@ -1362,6 +1367,7 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Customize backpack','Personalizar mochila'],
  ['Audio player','Reproductor de audio'],['Music and radio player · available in the Tracker app.','Reproductor de música y radio · disponible en la app Tracker.'],
  ['Boxes','Cajas'],['Box','Caja'],['Add another box','Agregar otra caja'],['Each box has its own quantity and capacity. Your pack shows their combined total.','Cada caja tiene su propia cantidad y capacidad. Tu mochila muestra el total de todas.'],['Each box needs a valid current and maximum quantity.','Cada caja debe tener una cantidad actual y máxima válidas.'],['Remove box?','¿Quitar caja?'],['This removes its quantity from the total when you save.','Su cantidad se restará del total cuando guardes.'],['Quantity is too large.','La cantidad es demasiado grande.'],
  ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Reportes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
@@ -2158,7 +2164,65 @@ function compactWeatherSvg(code,options={}) {
       return 'fill="currentColor" fill-opacity="'+(.36+.64*light).toFixed(2)+'"';
     });
 }
-Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, stackSprite, glyphSvg, weatherIconSvg, compactWeatherSvg });
+
+// Dedicated 32px navigation art; old compact glyph APIs remain stable for
+// inline weather/status indicators. All icons share outline, depth and light.
+const PACK_SHAPES=['classic','rucksack','satchel','tactical'];
+const PACK_COLORS=['#d84d54','#d39b4e','#509e85','#5c8fd1','#9d79c8','#9a9ba5'];
+function packAppearance(value={}){
+ return {shape:PACK_SHAPES.includes(value?.shape)?value.shape:'classic',color:/^#[0-9a-f]{6}$/i.test(value?.color||'')?value.color.toLowerCase():PACK_COLORS[0]};
+}
+function tone(color,mix){
+ const values=color.slice(1).match(/../g).map(n=>parseInt(n,16));
+ return '#'+values.map(v=>Math.round(mix<0?v*(1+mix):v+(255-v)*mix).toString(16).padStart(2,'0')).join('');
+}
+function navGlyphSvg(name,appearance={}){
+ if(name==='expenses'){
+  // Existing detailed pie art, normalized to the shared 32px canvas.
+  const src=glyphSvg(name),face=src.slice(src.indexOf('>')+1,-6);
+  return '<svg class="nav-pixel-sprite" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-hidden="true"><g transform="translate(3 3)">'+face+'</g></svg>';
+ }
+ const cells=Array.from({length:32},()=>Array(32).fill(null));
+ const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)if(i>=0&&i<32&&j>=0&&j<32)cells[j][i]=c;};
+ const shape=(x,y,w,h,c)=>{rect(x+2,y,w-4,h,c);rect(x,y+2,w,h-4,c);};
+ const pack=packAppearance(appearance),pal=({board:'#d6ad70',weather:'#e5b75f',calendar:'#9cabd9',feed:'#b4c3a0',moon:'#b1a0db',games:'#70bab9',hub:'#cf9ecb',gear:'#a8b0c4'})[name]||pack.color;
+ const dark='#202338',edge=tone(pal,-.44),mid=pal,light=tone(pal,.38),highlight=tone(pal,.68),shade=tone(pal,-.22),metal='#d9cba8';
+ if(name==='pack'){
+  // straps behind fabric; distinct silhouettes and pockets for each style.
+  if(pack.shape==='satchel'){
+   shape(5,10,23,18,dark);shape(7,11,19,15,mid);rect(5,5,4,11,edge);rect(8,4,16,3,light);rect(24,5,3,12,edge);rect(7,13,19,7,light);rect(7,20,19,2,edge);rect(14,18,5,5,metal);rect(15,19,3,3,edge);rect(9,24,15,1,shade);
+  }else{
+   const wide=pack.shape==='tactical',tall=pack.shape==='rucksack',x=wide?5:7,w=wide?23:19,y=tall?4:7,h=tall?24:21;
+   shape(x-3,y+5,5,h-7,edge);shape(x+w-1,y+5,5,h-7,edge);
+   shape(11,2,11,7,dark);rect(13,4,7,3,light);rect(14,5,5,2,null);
+   shape(x,y,w,h,dark);shape(x+2,y+2,w-4,h-4,mid);rect(x+3,y+3,w-6,2,light);rect(x+2,y+4,2,h-8,light);rect(x+w-4,y+5,2,h-9,shade);
+   if(tall){shape(x+2,y+2,w-4,7,shade);rect(x+3,y+3,w-6,2,light);rect(x+3,y+10,w-6,2,edge);}
+   shape(x+3,y+12,w-6,7,edge);shape(x+4,y+13,w-8,5,mid);rect(x+5,y+13,w-10,1,light);
+   rect(x+5,y+15,w-10,1,shade);rect(x+5,y+16,2,2,metal);
+   if(wide){for(const off of [4,8]){rect(x+3,y+off,w-6,2,edge);rect(x+4,y+off,w-8,1,shade);}rect(x+8,y+5,5,3,metal);}
+   else{rect(x+4,y+8,2,4,edge);rect(x+w-6,y+8,2,4,edge);rect(x+4,y+10,2,2,metal);rect(x+w-6,y+10,2,2,metal);}
+  }
+ }else if(name==='board'||name==='hub'){
+  shape(3,4,26,24,dark);shape(5,6,22,20,mid);rect(6,7,20,2,light);rect(7,11,8,12,edge);rect(17,11,8,5,edge);rect(17,18,8,5,edge);rect(8,12,6,3,'#e7d4b0');rect(18,12,6,2,'#9ad3c0');rect(18,19,6,2,'#b4b9e3');rect(8,18,5,1,highlight);rect(8,20,4,1,highlight);
+  if(name==='hub'){shape(11,10,10,12,dark);rect(14,12,4,8,light);rect(12,14,8,4,light);}
+ }else if(name==='calendar'){
+  shape(4,6,24,23,dark);shape(6,8,20,19,'#dfd9cd');rect(6,8,20,6,mid);rect(6,8,20,2,light);rect(9,3,4,8,edge);rect(21,3,4,8,edge);rect(10,4,2,5,highlight);rect(22,4,2,5,highlight);for(let i=0;i<3;i++)for(let j=0;j<3;j++)rect(9+i*6,16+j*3,3,2,i===1&&j===1?'#cb6869':shade);
+ }else if(name==='feed'){
+  shape(4,5,25,23,dark);shape(6,7,21,19,'#d9d7bf');rect(7,8,18,4,edge);rect(8,9,10,2,light);rect(7,14,8,7,mid);rect(17,14,8,2,shade);rect(17,17,8,1,edge);rect(17,20,8,1,edge);rect(7,23,18,1,edge);rect(26,10,3,14,shade);
+ }else if(name==='games'){
+  shape(3,10,26,15,dark);shape(5,11,22,12,mid);rect(7,11,18,2,light);rect(6,20,20,2,edge);rect(10,13,3,10,edge);rect(7,16,9,3,edge);rect(10,14,2,8,highlight);rect(8,17,7,1,highlight);rect(21,13,3,3,'#eaad72');rect(24,16,3,3,'#d889a4');rect(18,16,3,3,'#a5d09e');rect(21,19,3,3,'#a5b7dc');
+ }else if(name==='moon'||name==='weather'){
+  for(let y=4;y<27;y++)for(let x=4;x<27;x++){const r=Math.hypot(x-15,y-15);if(r<11.8&&(name==='weather'||Math.hypot(x-21,y-11)>9))cells[y][x]=r>10.6?edge:(x+y<27?highlight:light);}
+  if(name==='weather'){for(const [a,b] of [[14,1],[14,27],[1,14],[27,14],[5,5],[25,25],[5,25],[25,5]])rect(a,b,3,3,mid);shape(11,17,18,11,'#49617d');shape(13,15,9,10,'#c5d3e7');shape(11,19,18,8,'#a0b4cf');rect(14,18,8,2,'#e0e6ee');}
+  else{rect(9,17,3,3,shade);rect(11,22,4,2,shade);rect(22,5,2,5,highlight);rect(20,7,6,1,highlight);}
+ }else{
+  const rows=GLYPHS[name]||GLYPHS.gear;rows.forEach((r,y)=>[...r].forEach((c,x)=>{if(c==='#')rect(4+x*2,4+y*2,2,2,mid);}));
+ }
+ let face='',silhouette='';
+ for(let y=0;y<32;y++)for(let x=0;x<32;){const c=cells[y][x];let end=x+1;while(end<32&&cells[y][end]===c)end++;if(c){face+='<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+c+'"/>';silhouette+='<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="#303044"/>';}x=end;}
+ return '<svg class="nav-pixel-sprite" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(face,silhouette)+'</svg>';
+}
+Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, stackSprite, glyphSvg, weatherIconSvg, compactWeatherSvg, PACK_SHAPES, PACK_COLORS, packAppearance, navGlyphSvg });
 });
 __define("js/wallpaper/config.js", function (__require, __exports) {
 "use strict";
@@ -3631,6 +3695,8 @@ const CRYPTO = { BTC: 'bitcoin', ETH: 'ethereum', LTC: 'litecoin', SOL: 'solana'
 const OPTIONS = ['MXN','USD','EUR','GBP','CAD','JPY','CNY','CHF','BRL','ARS','BTC','ETH','LTC','SOL','DOGE'];
 const DEFAULT_PAIRS = [{ from:'MXN', to:'USD', amount:1 },{ from:'BTC', to:'MXN', amount:1 }];
 const CACHE_PREFIX = 'tracker-rate-v1-';
+const historyRequests=new Map();
+const tr=(en,es)=>language()==='es'?es:en;
 const isCrypto = code => Object.hasOwn(CRYPTO,code);
 const fmt = (n, code) => Number(n).toLocaleString(language()==='es'?'es-MX':'en-US',{maximumFractionDigits:isCrypto(code)?8: n<0.01?8:4});
 const cacheKey = (from,to) => CACHE_PREFIX+from+'-'+to;
@@ -3639,6 +3705,7 @@ function readCache(from,to) {
 }
 function writeCache(from,to,rate,change24h=null){
  const row={rate, change24h, at:Date.now()};try{localStorage.setItem(cacheKey(from,to),JSON.stringify(row));}catch{}
+ recordRate(from,to,row);
  return row;
 }
 async function fetchRate(from,to,{ force=false }={}) {
@@ -3669,30 +3736,110 @@ async function fetchRate(from,to,{ force=false }={}) {
   return writeCache(from,to,rate,change24h);
  }catch(e){if(old)return {...old,stale:true};throw e;}
 }
+
+const historyKey=(from,to)=>'tracker-rate-history-v1-'+from+'-'+to;
+const remoteKey=(from,to,days)=>'tracker-remote-history-v1-'+from+'-'+to+'-'+days;
+function getLocal(key,fallback){try{return JSON.parse(localStorage.getItem(key)||'null')??fallback;}catch{return fallback;}}
+function putLocal(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
+function cleanRateHistory(rows){
+ const byTime=new Map();for(const row of Array.isArray(rows)?rows:[])if(Array.isArray(row)&&Number.isFinite(row[0])&&Number.isFinite(row[1])&&row[1]>0)byTime.set(row[0],row[1]);
+ return [...byTime].sort((a,b)=>a[0]-b[0]);
+}
+function recordRate(from,to,info){
+ if(!Number.isFinite(info?.rate)||!Number.isFinite(info.at)||info.rate<=0||info.stale)return;
+ const key=historyKey(from,to),hour=Math.floor(info.at/3600000)*3600000;
+ putLocal(key,cleanRateHistory([...getLocal(key,[]),[hour,info.rate]]).filter(([at])=>at>=Date.now()-90*86400000).slice(-2160));
+}
+function invertHistory(rows){return cleanRateHistory(rows).map(([at,rate])=>[at,1/rate]);}
+function ratioHistory(a,b){
+ const daily=rows=>new Map(cleanRateHistory(rows).map(([at,n])=>[new Date(at).toISOString().slice(0,10),n]));
+ const x=daily(a),y=daily(b);return [...x].flatMap(([d,n])=>y.get(d)>0?[[Date.parse(d),n/y.get(d)]]:[]).sort((a,b)=>a[0]-b[0]);
+}
+async function fetchRateHistory(from,to,days=7,{fetchImpl=globalThis.fetch,now=new Date()}={}){
+ if(!OPTIONS.includes(from)||!OPTIONS.includes(to)||![7,30].includes(days))throw Error('Unsupported history pair');
+ if(from===to)return {rows:[[now.getTime()-days*86400000,1],[now.getTime(),1]],source:'identity'};
+ const key=remoteKey(from,to,days),old=getLocal(key,null),cutoff=now.getTime()-days*86400000;
+ if(old?.rows&&Date.now()-old.at<6*3600000)return old;
+ if(historyRequests.has(key))return historyRequests.get(key);
+ const work=(async()=>{
+  try{
+   let rows,source;
+   const get=async url=>{const r=await fetchImpl(url,{signal:typeof AbortSignal!=='undefined'&&AbortSignal.timeout?AbortSignal.timeout(12000):undefined});if(!r.ok)throw Error('History unavailable');return r.json();};
+   if(isCrypto(from)||isCrypto(to)){
+    const series=async(coin,fiat)=>cleanRateHistory((await get('https://api.coingecko.com/api/v3/coins/'+CRYPTO[coin]+'/market_chart?vs_currency='+fiat.toLowerCase()+'&days='+days)).prices);
+    if(isCrypto(from)&&isCrypto(to)){const [a,b]=await Promise.all([series(from,'USD'),series(to,'USD')]);rows=ratioHistory(a,b);}
+    else{const a=await series(isCrypto(from)?from:to,isCrypto(from)?to:from);rows=isCrypto(from)?a:invertHistory(a);}
+    source='CoinGecko';
+   }else{
+    const start=new Date(cutoff).toISOString().slice(0,10),end=now.toISOString().slice(0,10);
+    const response=await get('https://api.frankfurter.dev/v1/'+start+'..'+end+'?base='+from+'&symbols='+to);
+    rows=Object.entries(response.rates||{}).map(([d,r])=>[Date.parse(d),r?.[to]]);source='Frankfurter';
+   }
+   rows=cleanRateHistory(rows).filter(([at])=>at>=cutoff-86400000&&at<=now.getTime());
+   if(rows.length<2)throw Error('Insufficient history');
+   const result={rows,source,at:Date.now()};putLocal(key,result);return result;
+  }catch{
+   const local=cleanRateHistory(getLocal(historyKey(from,to),[])).filter(([at])=>at>=cutoff&&at<=now.getTime());
+   if(old?.rows?.length>=2)return {...old,stale:true};
+   return {rows:local,source:'local',stale:true};
+  }
+ })().finally(()=>historyRequests.delete(key));
+ historyRequests.set(key,work);return work;
+}
+function rateTrend(rows){
+ const clean=cleanRateHistory(rows);if(clean.length<2)return null;
+ const first=clean[0][1],last=clean.at(-1)[1],min=Math.min(...clean.map(r=>r[1])),max=Math.max(...clean.map(r=>r[1]));
+ return {first,last,min,max,change:(last/first-1)*100};
+}
+function chartFor(history,from,to,days){
+ const rows=cleanRateHistory(history.rows),trend=rateTrend(rows);
+ const source=history.source==='local'?tr('Recorded on this device','Registrado en este dispositivo'):history.source==='identity'?tr('Same currency','Misma moneda'):history.source;
+ if(!trend)return h('p',{class:'hint currency-history-status'},tr('History unavailable — recorded rates will build a graph over time.','Historial no disponible; las tasas registradas formarán una gráfica con el tiempo.'));
+ const start=rows[0][0],end=rows.at(-1)[0],span=Math.max(1,end-start),spread=trend.max-trend.min;
+ const coords=rows.map(([at,rate])=>[6+248*(at-start)/span,spread?64-56*(rate-trend.min)/spread:36]);
+ const color=trend.change>=0?'#78cda7':'#e18d91',points=coords.map(([x,y])=>x.toFixed(2)+','+y.toFixed(2)).join(' ');
+ const dateLabel=at=>new Intl.DateTimeFormat(language()==='es'?'es-MX':'en-US',{month:'short',day:'numeric'}).format(new Date(at));
+ const svg='<svg viewBox="0 0 260 72" role="img" aria-label="'+from+'/'+to+' '+days+' '+tr('day exchange rate history','días de historial cambiario')+'"><path d="M6 8H254M6 36H254M6 64H254" stroke="currentColor" stroke-opacity=".18" stroke-dasharray="3 4"/><polygon points="6,70 '+points+' 254,70" fill="'+color+'" opacity=".12"/><polyline points="'+points+'" stroke="'+color+'" stroke-width="2" fill="none" stroke-linejoin="round"/><circle cx="'+coords.at(-1)[0]+'" cy="'+coords.at(-1)[1]+'" r="3" fill="'+color+'"/></svg>';
+ const samples=h('select',{'aria-label':tr('Inspect historical observation','Consultar dato histórico')},...rows.filter((_,i)=>i%Math.max(1,Math.ceil(rows.length/60))===0||i===rows.length-1).map(([at,rate])=>h('option',{value:String(at),selected:at===end},dateLabel(at)+' · '+fmt(rate,to))));
+ return h('div',{class:'currency-trend'},h('div',{class:'currency-trend-head'},h('strong',{},'1 '+from+' / '+to),h('span',{class:trend.change>=0?'currency-up':'currency-down'},(trend.change>=0?'+':'')+trend.change.toFixed(2)+'%')),
+   h('div',{class:'currency-chart',html:svg}),h('div',{class:'currency-chart-dates'},h('span',{},dateLabel(start)),h('span',{},dateLabel(end))),h('small',{},tr('Low','Mín.')+' '+fmt(trend.min,to)+' · '+tr('High','Máx.')+' '+fmt(trend.max,to)),samples,h('small',{},source+(history.stale?' · '+tr('cached / limited','caché / limitado'):'')+' · '+tr('rate per unit','tasa por unidad')));
+}
+
 function mountCurrency(el,{store}) {
  let dead=false, pairs=[], running=0;
+ const readOnly=Boolean(store?.readOnly);
  const makeOption=(code,selected)=>h('option',{value:code,selected:code===selected},code);
  const select=(value)=>h('select',{class:'currency-select'},...OPTIONS.map(c=>makeOption(c,value)));
- async function save(){await store.setSetting('currency_pairs_v1',pairs);}
+ async function save(){if(!readOnly)await store.setSetting('currency_pairs_v1',pairs).catch(()=>{});}
  function draw(){
    if(dead)return;
-   const heading=h('div',{class:'currency-actions'},h('button',{class:'btn small',onclick:()=>{
+   const heading=h('div',{class:'currency-actions'},readOnly?null:h('button',{class:'btn small',onclick:()=>{
      pairs.push({from:'USD',to:'MXN',amount:1});save();draw();
    }},t('Add pair')),h('button',{class:'btn small',onclick:()=>update(true)},t('Refresh')));
    const rows=pairs.map((pair,index)=>{
      const from=select(pair.from),to=select(pair.to),amount=h('input',{type:'number',min:0,step:'any',value:pair.amount,'aria-label':t('Amount')});
-     const result=h('div',{class:'currency-result'},'…');
-     const refresh=()=>fetchRate(pair.from,pair.to).then(info=>{
-       if(dead||!result.isConnected)return;
+     const result=h('div',{class:'currency-result'},'…'),graph=h('div',{class:'currency-history'});
+     const range=h('select',{'aria-label':tr('Chart period','Periodo de gráfica')},...[7,30].map(n=>h('option',{value:n,selected:(pair.days||7)===n},n+' '+tr('days','días'))));
+     let request=0;
+     const refreshGraph=async()=>{const seq=++request,fromCode=pair.from,toCode=pair.to,days=Number(range.value)||7;
+       replace(graph,h('p',{class:'hint'},tr('Loading history…','Cargando historial…')));
+       try{const history=await fetchRateHistory(fromCode,toCode,days);if(!dead&&graph.isConnected&&seq===request)replace(graph,chartFor(history,fromCode,toCode,days));}
+       catch{if(!dead&&graph.isConnected&&seq===request)replace(graph,h('p',{class:'hint'},tr('History unavailable','Historial no disponible')));}
+     };
+     range.onchange=()=>{pair.days=Number(range.value);save();refreshGraph();};
+     let rateRequest=0;
+     const refresh=()=>{const seq=++rateRequest,fromCode=pair.from,toCode=pair.to;return fetchRate(fromCode,toCode).then(info=>{
+       if(dead||!result.isConnected||seq!==rateRequest)return;
+       recordRate(fromCode,toCode,info);
        result.replaceChildren(h('strong',{},`${fmt(pair.amount*info.rate,pair.to)} ${pair.to}`),
          h('small',{},`${t('Last updated')}: ${new Date(info.at).toLocaleString()}${info.stale?' · '+t('Cached'):''}`));
-     }).catch(()=>{if(result.isConnected)result.textContent=t('Rate unavailable');});
-     const commit=()=>{pair.from=from.value;pair.to=to.value;pair.amount=Math.max(0,Number(amount.value)||0);save();refresh();};
+     }).catch(()=>{if(result.isConnected&&seq===rateRequest)result.textContent=t('Rate unavailable');});};
+     const commit=()=>{pair.from=from.value;pair.to=to.value;pair.amount=Math.max(0,Number(amount.value)||0);save();refresh();refreshGraph();};
      from.addEventListener('change',commit);to.addEventListener('change',commit);amount.addEventListener('change',commit);
      const row=h('div',{class:'currency-pair'},h('div',{class:'currency-inputs'},amount,from,
        h('button',{class:'btn small',title:t('Swap'),'aria-label':t('Swap'),onclick:()=>{[pair.from,pair.to]=[pair.to,pair.from];save();draw();}},'⇄'),to,
-       h('button',{class:'btn small',title:t('Remove'),'aria-label':t('Remove'),onclick:()=>{pairs.splice(index,1);save();draw();}},'×')),result);
-     queueMicrotask(refresh);return row;
+       readOnly?null:h('button',{class:'btn small',title:t('Remove'),'aria-label':t('Remove'),onclick:()=>{pairs.splice(index,1);save();draw();}},'×')),result,h('div',{class:'currency-range'},h('small',{},tr('Exchange rate history','Historial del tipo de cambio')),range),graph);
+     queueMicrotask(()=>{refresh().finally(refreshGraph);});return row;
    });
    replace(el,heading,...rows,pairs.length?null:h('p',{class:'hint'},language()==='es'?'Agrega un par de monedas.':'Add a currency pair.'));
  }
@@ -3703,13 +3850,13 @@ function mountCurrency(el,{store}) {
  }
  store.getSetting('currency_pairs_v1').then(saved=>{
    if(dead)return;
-   pairs=Array.isArray(saved)?saved.filter(p=>OPTIONS.includes(p.from)&&OPTIONS.includes(p.to)&&Number.isFinite(Number(p.amount))).map(p=>({...p,amount:Number(p.amount)})):DEFAULT_PAIRS.map(p=>({...p}));
+   pairs=Array.isArray(saved)?saved.filter(p=>OPTIONS.includes(p.from)&&OPTIONS.includes(p.to)&&Number.isFinite(Number(p.amount))).map(p=>({...p,amount:Number(p.amount),days:p.days===30?30:7})):DEFAULT_PAIRS.map(p=>({...p}));
    draw();
  }).catch(()=>{pairs=DEFAULT_PAIRS.map(p=>({...p}));draw();});
  const timer=setInterval(()=>update(),5*60_000);
  return {destroy(){dead=true;clearInterval(timer);},refresh:draw};
 }
-Object.assign(__exports, { mountCurrency });
+Object.assign(__exports, { cleanRateHistory, invertHistory, ratioHistory, fetchRateHistory, rateTrend, mountCurrency });
 });
 __define("js/widgets/defs.js", function (__require, __exports) {
 "use strict";
@@ -3860,7 +4007,7 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 // the layout editor preview and (next stage) the wallpaper.
 //
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
-const { h, replace, daysSince } = __require("js/ui/dom.js");
+const { h, replace, daysSince, openSheet, toast } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
 const { mountCurrency } = __require("js/widgets/currency.js");
 const { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
@@ -4079,9 +4226,12 @@ function mountFeed(el, { feed, store }) {
           return h('li',{class:`${it.matched?.length?'hit ':''}${saved.read?'feed-read':''}`},
             it.link && /^https?:\/\//i.test(it.link) ? h('a',{class:'w-title w-headline-link',href:it.link,target:'_blank',rel:'noopener noreferrer',
               onclick:store?.readOnly?null:()=>{updateReading(store,it,{read:true}).catch(()=>{});}},it.title):h('span',{class:'w-title'},it.title),
-            h('span',{class:'w-meta'},`${saved.read?'Read · ':'New · '}${it.source_name}${it.published?', '+timeAgo(it.published):''}`),
-            store?.readOnly?null:h('button',{class:'w-feed-save',type:'button','aria-label':saved.saved?'Remove bookmark':'Save for later',
-              onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆'));
+            h('span',{class:'w-meta'},(saved.read?(language()==='es'?'Leída · ':'Read · '):(language()==='es'?'Nueva · ':'New · '))+it.source_name+(it.published?', '+timeAgo(it.published):'')),
+            store?.readOnly?null:h('div',{class:'w-feed-tools'},
+              h('button',{class:'w-feed-read-toggle',type:'button','aria-pressed':String(Boolean(saved.read)),title:language()==='es'?(saved.read?'Marcar como no leída':'Marcar como leída'):(saved.read?'Mark unread':'Mark read'),'aria-label':language()==='es'?(saved.read?'Marcar como no leída':'Marcar como leída'):(saved.read?'Mark unread':'Mark read'),
+                onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await updateReading(store,it,{read:!saved.read});}catch{toast(language()==='es'?'No se pudo guardar el estado':'Could not save reading status');}finally{b.disabled=false;}}},saved.read?'✓':'○'),
+              h('button',{class:'w-feed-save',type:'button','aria-pressed':String(Boolean(saved.saved)),'aria-label':saved.saved?'Remove bookmark':'Save for later',
+                onclick:()=>{updateReading(store,it,{saved:!saved.saved}).catch(()=>{});}},saved.saved?'★':'☆')));
         }))),
       s.items.length > limit ? h('a', { class: 'w-feed-more', href: '#feed' }, language() === 'es' ? 'Ver todas las noticias' : 'See all headlines') : null));
     const viewport = el.querySelector('.w-feed-scroll');
@@ -4176,9 +4326,16 @@ function createWidgetCard(id, ctx, { link = false } = {}) {
     : link && id === 'phrase'
       ? h('button', { class: 'widget-title widget-title-action', type: 'button', onclick: openPhraseHistory }, def.title)
       : h('span', { class: 'widget-title' }, def.title);
-  const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title), body);
+  let expanded=null;
+  const expand=link?h('button',{class:'widget-expand',type:'button','aria-label':language()==='es'?'Ampliar widget':'Expand widget',title:language()==='es'?'Ampliar widget':'Expand widget',onclick:()=>{
+    if(expanded)return;
+    const frame=h('section',{class:'widget widget-expanded wd-'+id},body);
+    expanded=openSheet({title:t(def.title),size:'normal',body:frame,onClose:()=>{expanded=null;if(el.isConnected)el.append(body);expand.focus();}});
+    expanded.el.classList.add('widget-expanded-sheet');
+  }},'⤢'):null;
+  const el = h('section', { class: `widget wd-${id}`, 'aria-label': def.title }, h('header', { class: 'widget-head' }, title,expand), body);
   const inst = mountWidget(id, body, { ...ctx, interactive: link });
-  return { el, destroy: () => inst.destroy() };
+  return { el, destroy: () => {expanded?.close();inst.destroy();} };
 }
 Object.assign(__exports, { mountWidget, createWidgetCard });
 });

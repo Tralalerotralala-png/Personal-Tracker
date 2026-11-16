@@ -9,7 +9,12 @@ export async function readingIndex(store) {
   const data = await store.getSetting(READING_KEY,{});
   return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
 }
-export async function updateReading(store,item,patch) {
+const readingWrites=new WeakMap();
+export function updateReading(store,item,patch){
+ const next=(readingWrites.get(store)||Promise.resolve()).catch(()=>{}).then(()=>writeReading(store,item,patch));
+ readingWrites.set(store,next);return next;
+}
+async function writeReading(store,item,patch) {
   const key=articleKey(item);
   if(!key)return;
   const current=await readingIndex(store);

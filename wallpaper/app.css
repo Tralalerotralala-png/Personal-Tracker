@@ -1926,3 +1926,68 @@ svg:has(>.sprite-stack-face){overflow:visible;}
 .w-sky-zodiac .w-sky-symbol{filter:drop-shadow(1px 1px 0 #1b2045);}
 .widget .w-sky{display:flex;flex-direction:column;min-height:0;max-height:100%;gap:4px;}
 
+
+/* Cards stay usable down to their existing minimum grid slots. Preserve saved
+   coordinates; content scrolls instead of disappearing behind overflow:hidden. */
+.widget-head{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0;}
+.widget-title{min-width:0;overflow-wrap:anywhere;}
+.widget-expand{border:0;background:transparent;color:var(--ink-dim);cursor:pointer;font:inherit;font-size:1.05rem;line-height:1;padding:3px 5px;flex:0 0 auto;}
+.widget-expand:focus-visible,.widget-expand:hover{color:var(--accent);outline:1px solid var(--accent);}
+.widget>.widget-body{min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--edge-hi) transparent;}
+.widget-body>*{min-width:0;max-width:100%;}
+.widget-body :is(button,input,select,textarea){min-width:0;max-width:100%;}
+.widget-body :is(.w-title,.w-meta,.w-note,.w-weather-place,.w-mud-place){overflow-wrap:anywhere;}
+.widget .w-mud-dashboard,.widget .w-mud-dashboard .w-mud-bottom,.widget .w-mud-dashboard .w-mud-compact{height:auto;min-height:0;overflow:visible;grid-template-rows:auto auto;}
+.widget .w-mud-dashboard .w-forecast-cards{height:auto;min-height:0;overflow:visible;grid-template-columns:repeat(auto-fit,minmax(min(100%,78px),1fr));grid-auto-rows:minmax(100px,auto);grid-template-rows:none;}
+.widget .w-mud-dashboard .w-forecast-day{height:auto;min-height:100px;overflow:visible;}
+.widget .w-mud-dashboard .w-forecast-condition,.widget .w-mud-dashboard .w-clock-date{display:block;}
+.widget .w-mud-dashboard .w-forecast-day .mud-bar{display:flex;}
+.widget .w-mud-dashboard .w-weather-clock .w-time-unit strong{font-size:clamp(.77rem,2.4cqw,1.35rem);}
+@container widget (max-width:360px){.widget .w-mud-dashboard .w-weather-top{grid-template-columns:1fr;}.widget .w-mud-dashboard .w-weather-clock{grid-template-columns:repeat(2,minmax(0,1fr));}.widget .w-mud-dashboard .w-analog-clock{grid-column:1/-1;justify-self:center;}.widget .w-mud-dashboard .w-forecast-cards{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.widget .game-cover-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,90px),1fr));}
+.widget .game-book{min-width:0;max-width:100%;}
+.widget .w-sky{max-height:none;}
+.widget .w-sky-scroll{max-height:none;}
+.widget-expanded-sheet .sheet-body{min-height:0;}
+.widget-expanded{min-height:0;max-height:70vh;container:widget / inline-size;}
+.widget-expanded>.widget-body{height:auto;max-height:65vh;overflow:auto;}
+.widget-expanded .w-feed-preview{height:auto;}
+.widget-expanded .w-feed-scroll{max-height:50vh;}
+.privacy-display .widget-expanded:is(.wd-calendar,.wd-loot,.wd-stats,.wd-currency,.wd-recent,.wd-games) .widget-body{visibility:hidden;pointer-events:none;}
+@media(max-width:899px){.overview .ov-grid>.widget>.widget-body{overflow:visible;}.overview .ov-grid .wd-sky .w-sky-scroll{max-height:320px;}}
+/* Feed toggles are separate, touchable controls; no text overlap. */
+.w-feed li{position:relative;padding-right:0;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:6px;}
+.w-feed li>.w-title{grid-column:1;grid-row:1;}
+.w-feed li>.w-meta{grid-column:1;grid-row:2;min-width:0;}
+.w-feed-tools{grid-column:2;grid-row:1/span 2;display:flex;align-items:center;gap:4px;align-self:start;}
+.w-feed-tools .w-feed-save,.w-feed-read-toggle{position:static;min-width:29px;min-height:29px;border:1px solid var(--edge);background:var(--panel-2);color:var(--accent);padding:2px;font:inherit;cursor:pointer;}
+.w-feed-read-toggle[aria-pressed=true]{color:#83cfa6;}
+.w-feed-read-toggle:focus-visible,.w-feed-tools .w-feed-save:focus-visible{outline:2px solid var(--accent);}
+@container widget (max-width:230px){.w-feed li{grid-template-columns:minmax(0,1fr);}.w-feed-tools{grid-column:1;grid-row:3;justify-content:flex-end;}}
+/* Historical rates remain readable in narrow widget slots. */
+.currency-inputs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto minmax(0,1fr) auto;gap:4px;}
+.currency-inputs input,.currency-inputs select{width:100%;min-width:0;max-width:none;box-sizing:border-box;}
+.currency-range,.currency-trend-head,.currency-chart-dates{display:flex;align-items:center;justify-content:space-between;gap:5px;flex-wrap:wrap;}
+.currency-range select{font-size:.75rem;max-width:100%;padding:4px;}
+.currency-trend{display:grid;gap:4px;min-width:0;padding:6px;border:1px solid var(--edge);}
+.currency-trend small,.currency-chart-dates{font-size:.72rem;color:var(--ink-dim);}
+.currency-trend-head{font-size:.75rem;}
+.currency-chart svg{display:block;width:100%;height:auto;min-height:42px;max-height:110px;color:var(--ink-dim);}
+.currency-trend select{width:100%;font-size:.72rem;}
+.currency-up{color:#78cda7;}.currency-down{color:#e18d91;}
+@container widget (max-width:340px){.currency-inputs{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;}.currency-inputs input{grid-column:1/-1;}.currency-pair{padding:6px;}}
+/* All navigation art uses an equal optical footprint, including dynamic skies. */
+.hotbar .slot .slot-icon{width:36px;height:36px;flex-basis:36px;}
+.hotbar .slot .slot-icon svg{width:32px;height:32px;max-width:100%;max-height:100%;overflow:visible;}
+.hotbar .slot .slot-icon .nav-pixel-sprite .sprite-stack-back{transform:translate(1px,1.5px);}
+.hotbar .slot .slot-icon .nav-pixel-sprite .sprite-stack-mid{transform:translate(.5px,.75px);}
+@media(max-width:480px){.hotbar .slot .slot-icon{width:28px;height:28px;flex-basis:28px;}.hotbar .slot .slot-icon svg{width:25px;height:25px;}}
+.pack-customize-button{align-self:flex-start;margin:0 0 8px;}
+.pack-icon-preview{display:grid;place-items:center;min-height:108px;background:var(--panel-2);border:1px solid var(--edge);margin-bottom:10px;}
+.pack-icon-preview svg{width:90px;height:90px;overflow:visible;}
+.pack-icon-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px;}
+.pack-shape-choice{display:grid;justify-items:center;gap:5px;min-width:0;}
+.pack-shape-choice svg{width:48px;height:48px;overflow:visible;}
+.pack-color-choices{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0;}
+.pack-swatch{width:32px;height:32px;border:2px solid var(--edge-hi);cursor:pointer;}
+.pack-swatch[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px;}
