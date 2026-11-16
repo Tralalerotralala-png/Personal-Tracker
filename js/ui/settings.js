@@ -174,6 +174,16 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100})});
   const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked})});
   const presets = {
+    sakura: {"name":"Sakura Dusk","accent_color":"#ec9cbb","background_color":"#201522","panel_color":"#302239","panel_secondary_color":"#47304b","text_color":"#ffedf4","muted_color":"#c4a1ba","border_color":"#77546d"},
+    arctic: {"name":"Arctic Aurora","accent_color":"#83e3c6","background_color":"#111e2a","panel_color":"#1b3040","panel_secondary_color":"#254454","text_color":"#ecf7fa","muted_color":"#a0c0cc","border_color":"#456c7e"},
+    forge: {"name":"Ember Forge","accent_color":"#f59e62","background_color":"#1d1213","panel_color":"#312023","panel_secondary_color":"#482c2a","text_color":"#ffe5c9","muted_color":"#c7a092","border_color":"#80554c"},
+    moss: {"name":"Moss & Stone","accent_color":"#b2ce7b","background_color":"#1c2318","panel_color":"#2a3825","panel_secondary_color":"#3c4b32","text_color":"#edf0dc","muted_color":"#b1bd98","border_color":"#596c45"},
+    cyber: {"name":"Neon Arcade","accent_color":"#ff78cc","background_color":"#111023","panel_color":"#211a39","panel_secondary_color":"#322455","text_color":"#f3ecff","muted_color":"#bfc0dd","border_color":"#7554a9"},
+    lunar: {"name":"Lunar Silver","accent_color":"#bed1f1","background_color":"#141923","panel_color":"#242c38","panel_secondary_color":"#344253","text_color":"#eef4ff","muted_color":"#a2b3c9","border_color":"#536781"},
+    copper: {"name":"Copper Coast","accent_color":"#d6a66b","background_color":"#172525","panel_color":"#233737","panel_secondary_color":"#314946","text_color":"#f2eadb","muted_color":"#b6c3ad","border_color":"#677b6b"},
+    dawn: {"name":"Lavender Dawn","accent_color":"#7853a4","background_color":"#ece8f6","panel_color":"#fbf8ff","panel_secondary_color":"#dfd6ee","text_color":"#352b45","muted_color":"#675877","border_color":"#ae9dc1"},
+    blueprint: {"name":"Blueprint","accent_color":"#75c9f9","background_color":"#0b1829","panel_color":"#122b43","panel_secondary_color":"#193d5d","text_color":"#e0f3ff","muted_color":"#9bbbd4","border_color":"#467094"},
+    rosewood: {"name":"Rosewood","accent_color":"#e4ad98","background_color":"#25191c","panel_color":"#39272b","panel_secondary_color":"#50363a","text_color":"#fff0e7","muted_color":"#c9a5a0","border_color":"#84615b"},
     classic: { name:'Original / Classic', accent_color:'#43b9ad', background_color:'#17130f', panel_color:'#231c15', panel_secondary_color:'#2e251c', text_color:'#eadfc4', muted_color:'#a39475', border_color:'#4a3b2a' },
     pipboy: { name:'Vault Terminal', accent_color:'#65ff7c', background_color:'#07120a', panel_color:'#0c1c10', panel_secondary_color:'#142a19', text_color:'#a4ffad', muted_color:'#64ae70', border_color:'#2d7540' },
     amber: { name:'Amber CRT', accent_color:'#ffb347', background_color:'#180e08', panel_color:'#29190e', panel_secondary_color:'#362414', text_color:'#ffda99', muted_color:'#b38a55', border_color:'#79512a' },
@@ -214,7 +224,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const saveTheme=h('button',{class:'btn',type:'button',onclick:async()=>{
     const name=prompt(language()==='es'?'Nombre del nuevo tema':'Name your new theme');if(!name?.trim())return;
     const value=await store.getSetting('ui')||{};const palettes=[...(value.custom_theme_presets||[])];
-    if(palettes.length>=12){toast(language()==='es'?'Máximo de 12 temas':'Maximum 12 saved themes');return;}
+    if(palettes.length>=30){toast(language()==='es'?'Máximo de 30 temas':'Maximum 30 saved themes');return;}
     const colors=Object.fromEntries(paletteKeys.map(key=>[key,value[key]||presets.classic[key]]));
     palettes.push({name:name.trim().slice(0,42),colors});
     await store.setSetting('ui',{...value,custom_theme_presets:palettes});drawSavedThemes(palettes);toast(t('Save'));

@@ -1362,6 +1362,7 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Audio player','Reproductor de audio'],['Music and radio player · available in the Tracker app.','Reproductor de música y radio · disponible en la app Tracker.'],
  ['Boxes','Cajas'],['Box','Caja'],['Add another box','Agregar otra caja'],['Each box has its own quantity and capacity. Your pack shows their combined total.','Cada caja tiene su propia cantidad y capacidad. Tu mochila muestra el total de todas.'],['Each box needs a valid current and maximum quantity.','Cada caja debe tener una cantidad actual y máxima válidas.'],['Remove box?','¿Quitar caja?'],['This removes its quantity from the total when you save.','Su cantidad se restará del total cuando guardes.'],['Quantity is too large.','La cantidad es demasiado grande.'],
  ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Reportes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
 
@@ -3437,6 +3438,7 @@ __define("js/widgets/defs.js", function (__require, __exports) {
 // Widget metadata (no DOM code, so tests and the wallpaper can read it).
 // Sizes are in grid cells on the 12-column layout.
 const WIDGET_DEFS = {
+  audio: { title:'Audio player', minW:4,minH:3,defaultW:5,defaultH:4,route:null,appOnly:true },
   mud:      { title: 'Weather',          minW: 3, minH: 2, defaultW: 6, defaultH: 3, route: 'mud' },
   calendar: { title: 'Coming up',             minW: 3, minH: 3, defaultW: 4, defaultH: 4, route: 'calendar' },
   loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
@@ -3868,7 +3870,8 @@ function mountSky(el,{weather}) {
  const inst=live(render,run=>[weather.subscribe(run)]);const timer=setInterval(()=>inst.refresh(),60*60_000);
  return {destroy(){clearInterval(timer);inst.destroy();},refresh:inst.refresh};
 }
-const MOUNTS = { sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
+function mountAudio(el,{audioPlayer,interactive}){if(!audioPlayer||!interactive){replace(el,note(t('Music and radio player · available in the Tracker app.')));return {destroy(){}};}return audioPlayer.mount(el);}
+const MOUNTS = { audio:mountAudio, sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];
@@ -3902,7 +3905,8 @@ const { DEFAULT_LAYOUTS } = __require("js/data/defaults.js");
 const boundsFor = (profile) => ({ cols: PROFILES[profile].cols, rows: PROFILES[profile].rows });
 
 function cleanLayout(raw, profile) {
-  return normalizeLayout(raw, WIDGET_DEFS, boundsFor(profile));
+  const input=profile==='wallpaper'&&Array.isArray(raw)?raw.filter(w=>!WIDGET_DEFS[w?.id]?.appOnly):raw;
+  return normalizeLayout(input, WIDGET_DEFS, boundsFor(profile));
 }
 
 async function loadLayout(store, profile) {

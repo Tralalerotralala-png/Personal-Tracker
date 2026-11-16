@@ -2,6 +2,7 @@
 export const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 export const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Audio player','Reproductor de audio'],['Music and radio player · available in the Tracker app.','Reproductor de música y radio · disponible en la app Tracker.'],
  ['Boxes','Cajas'],['Box','Caja'],['Add another box','Agregar otra caja'],['Each box has its own quantity and capacity. Your pack shows their combined total.','Cada caja tiene su propia cantidad y capacidad. Tu mochila muestra el total de todas.'],['Each box needs a valid current and maximum quantity.','Cada caja debe tener una cantidad actual y máxima válidas.'],['Remove box?','¿Quitar caja?'],['This removes its quantity from the total when you save.','Su cantidad se restará del total cuando guardes.'],['Quantity is too large.','La cantidad es demasiado grande.'],
  ['Personal Hub','Centro personal'],['Transactions','Movimientos'],['Budgets','Presupuestos'],['Bill calculator','Calculadora de cuentas'],['Reports','Reportes'],['Income','Ingresos'],['Spent','Gastado'],['Net balance','Saldo neto'],['New transaction','Nuevo movimiento'],['Food','Comida'],['Groceries','Supermercado'],['Housing','Vivienda'],['Transport','Transporte'],['Health','Salud'],['Shopping','Compras'],['Entertainment','Entretenimiento'],['Subscriptions','Suscripciones'],['Education','Educación'],['Travel','Viajes'],['Bills','Servicios'],['Other','Otros'],
 

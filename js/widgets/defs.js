@@ -1,6 +1,7 @@
 // Widget metadata (no DOM code, so tests and the wallpaper can read it).
 // Sizes are in grid cells on the 12-column layout.
 export const WIDGET_DEFS = {
+  audio: { title:'Audio player', minW:4,minH:3,defaultW:5,defaultH:4,route:null,appOnly:true },
   mud:      { title: 'Weather',          minW: 3, minH: 2, defaultW: 6, defaultH: 3, route: 'mud' },
   calendar: { title: 'Coming up',             minW: 3, minH: 3, defaultW: 4, defaultH: 4, route: 'calendar' },
   loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },

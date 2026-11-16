@@ -7,7 +7,8 @@ import { DEFAULT_LAYOUTS } from '../data/defaults.js';
 export const boundsFor = (profile) => ({ cols: PROFILES[profile].cols, rows: PROFILES[profile].rows });
 
 export function cleanLayout(raw, profile) {
-  return normalizeLayout(raw, WIDGET_DEFS, boundsFor(profile));
+  const input=profile==='wallpaper'&&Array.isArray(raw)?raw.filter(w=>!WIDGET_DEFS[w?.id]?.appOnly):raw;
+  return normalizeLayout(input, WIDGET_DEFS, boundsFor(profile));
 }
 
 export async function loadLayout(store, profile) {

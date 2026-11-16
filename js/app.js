@@ -12,6 +12,7 @@ import { createWeatherService } from './weather/service.js';
 import { createFeedService } from './feed/service.js';
 import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
+import { createAudioPlayer } from './ui/audio-player.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createMediaLibraryView } from './ui/media-library.js';
 import { moonPhaseSvg } from './weather/moon-phase.js';
@@ -117,7 +118,8 @@ const inventory = createInventoryView({ store, photos, auth, config: ctx.config 
 const mud = createMudView({ store, weather });
 const calendar = createCalendarView({ store, weather });
 const feedView = createFeedView({ store, feed, proxySuggestion });
-const overview = createOverviewView({ store, ctx: { store, weather, feed } });
+const audioPlayer = createAudioPlayer({ store });
+const overview = createOverviewView({ store, ctx: { store, weather, feed, audioPlayer } });
 const diary = createDreamDiaryView({ store });
 const games = createMediaLibraryView({ store, backups:gameBackups });
 const hubView = createPersonalHubView({ store });
@@ -358,7 +360,7 @@ const header = h('header', { class: 'top' },
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-root.replaceChildren(header, main, nav);
+root.replaceChildren(header, main, nav, audioPlayer.el);
 startTranslations(document.body);
 
 const mounted = new Set();
@@ -387,7 +389,7 @@ setInterval(() => { if (document.visibilityState === 'visible') { weather.refres
 if (mode === 'cloud') {
   const login = createLogin({ auth });
   const gate = (signedIn) => {
-    if (signedIn) login.el.remove(); else if (!login.el.isConnected) document.body.append(login.el);
+    if (signedIn) login.el.remove(); else { audioPlayer.pause(); if (!login.el.isConnected) document.body.append(login.el); }
   };
   gate(Boolean(await auth.getSession()));
   auth.onAuthChange((_event, session) => gate(Boolean(session)));

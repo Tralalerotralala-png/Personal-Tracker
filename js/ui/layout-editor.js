@@ -118,7 +118,7 @@ export async function openLayoutEditor({ store, ctx, profile: startProfile = 'wa
 
   function renderList() {
     const placed = new Set(layout().map((o) => o.id));
-    replace(list, WIDGET_IDS.map((id) => h('li', {},
+    replace(list, WIDGET_IDS.filter(id=>profile!=='wallpaper'||!WIDGET_DEFS[id].appOnly).map((id) => h('li', {},
       h('span', { class: placed.has(id) ? '' : 'dim' }, WIDGET_DEFS[id].title),
       placed.has(id)
         ? h('button', { class: 'btn small ghost', type: 'button', 'aria-label': `Remove ${WIDGET_DEFS[id].title}`, onclick: () => removeWidget(id) }, 'Remove')

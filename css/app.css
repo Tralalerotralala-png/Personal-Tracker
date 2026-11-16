@@ -1724,3 +1724,47 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 @keyframes compactFlash{0%,92%,100%{opacity:.75}94%,97%{opacity:1}}
 .reduce-animations .wx-compact g{animation:none!important;}
 @media(prefers-reduced-motion:reduce){.wx-compact g{animation:none!important;}}
+
+/* One audio session, mounted in the dashboard or in a floating corner. */
+.floating-audio{position:fixed;right:16px;bottom:calc(var(--hotbar-h) + var(--safe-b) + 84px);z-index:8;width:min(344px,calc(100vw - 32px));display:flex;justify-content:flex-end;pointer-events:none;}
+.floating-audio[hidden],.audio-player [hidden]{display:none!important;}
+.floating-audio>*{pointer-events:auto;}
+.audio-launcher{display:flex;align-items:center;gap:8px;box-shadow:3px 4px 0 #0007;}
+.audio-cassette{color:var(--accent);font-size:1.4rem;}
+.audio-player{display:grid;gap:8px;min-width:0;width:100%;color:var(--ink);}
+.floating-audio .audio-player{max-height:min(70vh,560px);overflow:auto;background:var(--panel);border:2px solid var(--edge-hi);padding:12px;box-shadow:6px 8px 0 #0006;}
+.audio-heading{display:flex;align-items:center;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--edge);padding-bottom:6px;}
+.audio-heading>strong{flex:1;font-size:.85rem;}
+.audio-body,.audio-library{display:grid;gap:8px;min-width:0;}
+.audio-now{display:flex;align-items:center;gap:8px;background:var(--panel-2);padding:8px;}
+.audio-track-title{flex:1;min-width:0;overflow-wrap:anywhere;font-size:.86rem;}
+.audio-equalizer{display:flex;align-items:flex-end;gap:2px;height:21px;flex:none;}
+.audio-equalizer i{display:block;width:3px;height:5px;background:var(--accent);}
+.audio-playing .audio-equalizer i{animation:audioBars .8s steps(4,end) infinite alternate;}
+.audio-equalizer i:nth-child(2n){animation-delay:-.32s}.audio-equalizer i:nth-child(3n){animation-delay:-.57s}
+@keyframes audioBars{from{height:4px}to{height:21px}}
+.audio-transport,.audio-timeline,.audio-radio-url{display:flex;align-items:center;gap:6px;min-width:0;}
+.audio-transport input,.audio-timeline input,.audio-radio-url input{flex:1;min-width:0;width:0;}
+.audio-timeline small{font-size:.72rem;white-space:nowrap;}
+.audio-radio-search{display:grid;grid-template-columns:52px minmax(0,1fr);gap:5px;}
+.audio-radio-search input{min-width:0;width:100%;}
+.audio-radio-search input[type=search],.audio-radio-search button{grid-column:1/-1;}
+.audio-list{display:grid;gap:4px;max-height:155px;overflow:auto;}
+.audio-list-row{display:flex;align-items:center;gap:4px;}
+.audio-list-play{flex:1;min-width:0;overflow-wrap:anywhere;text-align:left;font-size:.8rem;}
+.audio-list-play small{display:block;color:var(--ink-dim);}
+.audio-status{margin:0;font-size:.75rem;}
+@media(prefers-reduced-motion:reduce){.audio-playing .audio-equalizer i{animation:none;}}
+.reduce-animations .audio-playing .audio-equalizer i{animation:none;}
+/* Local horizon/zenith star chart. */
+.celestial-panel{display:grid;gap:12px;padding:14px;border:2px solid var(--edge);background:var(--panel);min-width:0;}
+.celestial-panel h2,.celestial-panel h3,.celestial-panel p{margin:0;}
+.celestial-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+.celestial-controls input[type=range]{flex:1;min-width:110px;}
+.celestial-map{width:min(100%,600px);margin:auto;color:#a8b8df;}
+.celestial-map svg{width:100%;height:auto;display:block;}
+.celestial-point{cursor:pointer;}
+.celestial-list{display:flex;flex-wrap:wrap;gap:5px;}
+.celestial-detail{padding:10px;background:var(--panel-2);border:1px solid var(--edge);display:flex;gap:12px;align-items:center;}
+.celestial-object-icon{width:58px;height:58px;flex:none;}
+.celestial-object-icon svg{width:100%;height:100%;}

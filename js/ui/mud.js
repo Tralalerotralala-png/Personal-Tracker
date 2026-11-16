@@ -10,6 +10,7 @@ import { glyphSvg, weatherGlyph, weatherIconSvg } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
 import { describeModel, COMPONENTS } from '../weather/mud.js';
 import { openMudSettings } from './mud-settings.js';
+import { createCelestialMap } from './celestial-map.js';
 
 const fmt = (n) => (n === null || n === undefined ? 'no data' : n >= 10 ? String(Math.round(n)) : String(Math.round(n * 10) / 10));
 
@@ -75,6 +76,8 @@ export function openHowScored({ weather, store }) {
 
 export function createMudView({ store, weather }) {
   const el = h('div', { class: 'view mud-view' });
+  let weatherTab='forecast', skyMap=null, skyPlaceKey='';
+  function tabBar(){return h('div',{class:'hub-tabs weather-tabs'},...[["forecast",language()==='es'?'Pronóstico':'Forecast'],['sky',language()==='es'?'Mapa celeste':'Celestial map']].map(([id,label])=>h('button',{class:'btn small '+(weatherTab===id?'primary':''),type:'button',onclick:()=>{weatherTab=id;render(weather.getState());}},label)));}
 
   function placeHeader(state) {
     const p = state.place;
@@ -212,6 +215,7 @@ export function createMudView({ store, weather }) {
       }));
   }
   function render(state) {
+    if(weatherTab==='sky'&&state.place){const key=JSON.stringify(state.place);if(!skyMap||skyPlaceKey!==key){skyMap=createCelestialMap({place:state.place});skyPlaceKey=key;}replace(el,placeHeader(state),tabBar(),skyMap);return;}
     if (state.status === 'no-location' || (!state.place && state.status === 'idle')) {
       const search = createPlaceSearch({ weather, autofocus: false });
       replace(el, h('div', { class: 'mud-empty' },
@@ -221,11 +225,11 @@ export function createMudView({ store, weather }) {
       return;
     }
     if (state.status === 'loading' && !state.rows.length) {
-      replace(el, placeHeader(state), h('p', { class: 'hint' }, 'Loading the forecast...'));
+      replace(el, placeHeader(state), tabBar(), h('p', { class: 'hint' }, 'Loading the forecast...'));
       return;
     }
     if (state.status === 'error' && !state.rows.length) {
-      replace(el, placeHeader(state),
+      replace(el, placeHeader(state), tabBar(),
         h('div', { class: 'empty' }, h('p', {}, state.error ?? 'The forecast could not be loaded.'),
           h('button', { class: 'btn primary', type: 'button', onclick: () => weather.refresh({ force: true }) }, 'Try again')));
       return;
@@ -238,6 +242,7 @@ export function createMudView({ store, weather }) {
 
     replace(el,
       placeHeader(state),
+      tabBar(),
       banner(state),
       weatherPanel(state, today, future),
       h('details',{class:'wx-forecast-review'},

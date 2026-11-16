@@ -291,7 +291,8 @@ function mountSky(el,{weather}) {
  const inst=live(render,run=>[weather.subscribe(run)]);const timer=setInterval(()=>inst.refresh(),60*60_000);
  return {destroy(){clearInterval(timer);inst.destroy();},refresh:inst.refresh};
 }
-const MOUNTS = { sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
+function mountAudio(el,{audioPlayer,interactive}){if(!audioPlayer||!interactive){replace(el,note(t('Music and radio player · available in the Tracker app.')));return {destroy(){}};}return audioPlayer.mount(el);}
+const MOUNTS = { audio:mountAudio, sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };
 
 export function mountWidget(id, el, ctx) {
   const mount = MOUNTS[id];
