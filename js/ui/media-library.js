@@ -69,5 +69,6 @@ export function createMediaLibraryView({store,backups=null}) {
    const filter=h('select',{'aria-label':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
- return {el,mount:load,show:load,hide:()=>{}};
+ window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
+ return {el,mount:load,show:render,hide:()=>{}};
 }

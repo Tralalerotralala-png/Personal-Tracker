@@ -79,7 +79,7 @@ function mountMud(el, { weather, store, interactive }) {
     const extra = ui?.extra_clock_timezone;
     const appearance=clockAppearance(ui);
     const analog=appearance.visible?h(interactive?'button':'span',{class:'w-analog-clock clock-size-'+appearance.size,type:interactive?'button':null,title:interactive?(language()==='es'?'Configurar reloj':'Customize clock'):clock(undefined),'aria-label':interactive?(language()==='es'?'Configurar reloj':'Customize clock'):null,html:analogClockSvg(now,ui),onclick:interactive?()=>window.dispatchEvent(new Event('tracker-clock-settings')):null}):null;
-    const localClock = h('div', { class: 'w-weather-clock'+(appearance.visible?'':' no-analog')+(!extra?' one-clock':'') },
+    const localClock = h('div', { class: 'w-weather-clock clock-column-'+appearance.size+(appearance.visible?'':' no-analog')+(!extra?' one-clock':'') },
       analog,
       h('div', { class: 'w-time-unit' }, h('span', {}, t('LOCAL TIME')), h('strong', {}, clock(undefined)),
         h('small', { class: 'w-clock-date' }, now.toLocaleDateString(language() === 'es' ? 'es-MX' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))),
@@ -124,8 +124,8 @@ function mountMud(el, { weather, store, interactive }) {
     return [weather.subscribe(trigger), storeTables(store, ['settings'], readSettings)];
   });
   readSettings();
-  const timer = setInterval(() => {if(clockAppearance(ui).seconds){const node=el.querySelector('.w-analog-clock');if(node)node.innerHTML=analogClockSvg(new Date(),ui);}if(new Date().getSeconds()<2||!clockAppearance(ui).seconds&&Date.now()-lastClockRender>30000){lastClockRender=Date.now();inst.refresh();}}, 1000);
-  let lastClockRender=Date.now();
+  let lastMinute=Math.floor(Date.now()/60000);
+  const timer = setInterval(() => {const now=new Date();if(clockAppearance(ui).seconds){const node=el.querySelector('.w-analog-clock');if(node)node.innerHTML=analogClockSvg(now,ui);}const minute=Math.floor(now.getTime()/60000);if(minute!==lastMinute){lastMinute=minute;inst.refresh();}}, 1000);
   return { destroy() { clearInterval(timer); inst.destroy(); }, refresh: inst.refresh };
 }
 

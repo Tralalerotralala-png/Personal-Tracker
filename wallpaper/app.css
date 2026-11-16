@@ -2057,3 +2057,17 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 .ed-resize{width:27px;height:27px;}
 .ed-canvas[data-profile=mobile] .ed-resize{width:100%;height:12px;clip-path:none;opacity:.65;}
 @media(max-width:899px){.ed-main{grid-template-rows:minmax(180px,1.1fr) minmax(140px,1fr);}.ed-side{padding:8px;}.ed-head{padding:7px;gap:5px;}.ed-head h2{font-size:1rem;}.ed-tools{padding:5px;}.ed-main .ed-stage{padding:7px;}}
+
+/* The chosen face size also controls the actual grid column, not just the SVG. */
+.widget .w-mud-dashboard .w-weather-clock.clock-column-small{--clock-column:36px;}
+.widget .w-mud-dashboard .w-weather-clock.clock-column-medium{--clock-column:58px;}
+.widget .w-mud-dashboard .w-weather-clock.clock-column-large{--clock-column:86px;}
+.widget .w-mud-dashboard .w-weather-clock:not(.no-analog){grid-template-columns:minmax(0,var(--clock-column,58px)) repeat(2,minmax(0,1fr));}
+.widget .w-mud-dashboard .w-weather-clock.one-clock:not(.no-analog){grid-template-columns:minmax(0,var(--clock-column,58px)) minmax(0,1fr);}
+.widget .w-mud-dashboard .w-weather-clock .w-analog-clock{max-width:var(--clock-size,58px);justify-self:center;}
+.widget .w-mud-dashboard .w-weather-clock .w-analog-clock svg{width:100%;height:100%;}
+@container widget (max-width:360px){.widget .w-mud-dashboard .w-weather-clock:not(.no-analog){grid-template-columns:repeat(2,minmax(0,1fr));}.widget .w-mud-dashboard .w-weather-clock.one-clock:not(.no-analog){grid-template-columns:minmax(0,1fr);}.widget .w-mud-dashboard .w-weather-clock .w-analog-clock{grid-column:1/-1;}}
+.ed-item.ed-displaced{outline:2px dashed var(--accent);opacity:.8;}
+.ed-item:not(.dragging){transition:left .14s ease,top .14s ease;}
+@media(prefers-reduced-motion:reduce){.ed-item{transition:none!important;}}
+.reduce-animations .ed-item{transition:none!important;}

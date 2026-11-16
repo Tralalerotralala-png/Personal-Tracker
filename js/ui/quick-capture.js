@@ -4,7 +4,7 @@ import {uuid} from '../data/util.js';
 import {language} from './language.js';
 import {updateReading} from '../feed/reading.js';
 export const captureKey=(kind,id)=>'hub_'+kind+':'+id;
-const tr=(a,b)=>language()==='es'?b:a;
+const tr=(a,b)=>{try{return language()==='es'?b:a;}catch{return a;}};
 const text=(v,max=200)=>String(v??'').trim().slice(0,max);
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');};
 const validDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')&&Number.isFinite(Date.parse(d))&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
@@ -100,7 +100,7 @@ export function openQuickCapture({store}){
   if(busy)return;
   if(privateTypes.has(chosen)){const type=chosen;activeCapture?.close();window.dispatchEvent(new CustomEvent('tracker-private-capture',{detail:{type}}));location.hash='#diary';return;}
   busy=true;saveButton.disabled=again.disabled=true;error.textContent='';
-  try{await saveQuickCapture(store,{kind:chosen,title:title.value,body:body.value,date:date.value,amount:amount.value,currency:currency.value,category:category.value,account:account.value,repeat:repeat.value,time:timed.checked?time.value:'',endTime:endTime.value,quantity:quantity.value,categoryId:cat.value,locationId:location.value,rarity:rarity.value,creator:creator.value,platform:creator.value,status:status.value,url:url.value});if(keep){title.value=body.value=amount.value=url.value='';title.focus();toast(tr('Saved','Guardado'));refreshLists();}else{activeCapture?.close();toast(tr('Saved','Guardado'));}}
+  try{if(chosen==='event'&&timed.checked&&!time.value)throw Error(tr('Choose a starting time.','Elige una hora de inicio.'));await saveQuickCapture(store,{kind:chosen,title:title.value,body:body.value,date:date.value,amount:amount.value,currency:currency.value,category:category.value,account:account.value,repeat:repeat.value,time:timed.checked?time.value:'',endTime:endTime.value,quantity:quantity.value,categoryId:cat.value,locationId:location.value,rarity:rarity.value,creator:creator.value,platform:creator.value,status:status.value,url:url.value});window.dispatchEvent(new CustomEvent('tracker-quick-capture-saved',{detail:{kind:chosen}}));if(keep){title.value=body.value=amount.value=url.value='';title.focus();toast(tr('Saved','Guardado'));refreshLists();}else{activeCapture?.close();toast(tr('Saved','Guardado'));}}
   catch(e){error.textContent=e.message;}finally{busy=false;saveButton.disabled=again.disabled=false;}
  }
  function refreshLists(){Promise.all([store.list('categories'),store.list('locations')]).then(([c,l])=>{categories=c;locations=l;fillPlaces();}).catch(()=>{});}

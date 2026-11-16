@@ -232,7 +232,7 @@ export function createDreamDiaryView({store}) {
   wrap.append(h('div',{class:'journal-actions'},button(L().change,changePin),button(L().lock,lock)),tabs,list);
   replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
   draw();touch();
-  openCaptureEditor=type=>{if(!session||editorDirty)return;active=type;draw();edit(type);};
+  openCaptureEditor=type=>{if(!session)return;if(editorDirty){toast(language()==='es'?'Guarda el editor actual primero.':'Save the current journal editor first.');return;}active=type;draw();edit(type);};
   if(pendingCapture){const type=pendingCapture;pendingCapture=null;openCaptureEditor(type);}
  }
  window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});

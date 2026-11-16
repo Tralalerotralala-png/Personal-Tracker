@@ -121,7 +121,7 @@ export function fitItem(layout,id,target,bounds,def={},mode='strict'){
   let best=null,score=Infinity,last=bounds.rows??MAX_ROWS;
   for(let y=0;y+old.h<=last;y++)for(let x=0;x+old.w<=bounds.cols;x++){
    const candidate={...old,x,y};if(!canPlace(fixed,candidate,bounds))continue;
-   const cost=Math.abs(y-old.y)*2+Math.abs(x-old.x)+(y<old.y?.25:0);
+   const cost=Math.abs(y-old.y)*2+Math.abs(x-old.x)+(y<old.y ? .25 : 0);
    if(cost<score){best=candidate;score=cost;}
   }
   if(!best)return null;fixed.push(best);

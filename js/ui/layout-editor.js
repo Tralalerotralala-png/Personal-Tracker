@@ -61,7 +61,7 @@ export async function openLayoutEditor({ store, ctx, profile: startProfile = 'wa
       stage,
       h('aside', { class: 'ed-side' },
         h('h3', {}, 'Widgets'), list, selPanel,
-        h('p', { class: 'hint' }, 'Drag a widget to move it and its bottom-right corner to resize. With a widget selected, arrow keys move it and Shift with arrow keys resizes it. Delete removes it.'),
+        h('p', { class: 'hint' }, 'Drag to move or resize. Move / swap around relocates overlapping widgets; Strict placement keeps neighbors fixed. Phone layout is a full-width ordered list. Undo or redo changes before saving.'),
         live)));
 
   // ---- geometry -------------------------------------------------------------------------------
@@ -75,7 +75,7 @@ export async function openLayoutEditor({ store, ctx, profile: startProfile = 'wa
       return { canvasW, canvasH, cellW, cellH: canvasH / P.rows };
     }
     const rows = Math.max(10, layoutHeight(layout()) + 3);
-    return { canvasW, canvasH: rows * ROW_PX, cellW, cellH: ROW_PX };
+    return { canvasW, canvasH: rows * ROW_PX * zoom, cellW, cellH: ROW_PX * zoom };
   }
 
   function place(el, item, m) {
@@ -164,7 +164,7 @@ export async function openLayoutEditor({ store, ctx, profile: startProfile = 'wa
   // ---- add / remove --------------------------------------------------------------------------------
   function addWidget(id) {
     const next = addItem(layout(), id, WIDGET_DEFS[id], bounds());
-    if (!next) { toast('No room for that widget. Make some space first.'); announce('No room for that widget'); return; }
+    if (!next || profile==='mobile'&&layoutHeight(packPhoneLayout(next))>60) { toast('No room for that widget. Make some space first.'); announce('No room for that widget'); return; }
     remember(profile==='mobile'?packPhoneLayout(next):next);
     selected = id;
     sync();
@@ -219,7 +219,8 @@ export async function openLayoutEditor({ store, ctx, profile: startProfile = 'wa
     }
     drag.next = next;
     drag.valid = Boolean(next);
-    showGhost(target, drag.valid, m);
+    for(const item of layout())if(item.id!==id){const candidate=next?.find(x=>x.id===item.id)||item;const preview=items.get(item.id)?.el;if(preview){place(preview,candidate,m);preview.classList.toggle('ed-displaced',Boolean(next&&(candidate.x!==item.x||candidate.y!==item.y)));}}
+    showGhost(next?.find(x=>x.id===id)||target, drag.valid, m);
   }
 
   function endDrag(e, commitIt) {
@@ -229,6 +230,7 @@ export async function openLayoutEditor({ store, ctx, profile: startProfile = 'wa
     d.el.classList.remove('dragging');
     d.el.style.transform = '';
     ghost.hidden = true;
+    for(const {el} of items.values())el.classList.remove('ed-displaced');
     if (commitIt && d.valid && d.next) {
       remember(d.next);
       const it = d.next.find((o) => o.id === d.id);
