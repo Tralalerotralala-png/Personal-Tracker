@@ -1826,3 +1826,7 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 @media(max-width:550px){.celestial-observatory{padding:8px;}.celestial-map.celestial-stage{max-height:none;}.celestial-detail-actions{width:100%;}.celestial-stage-readout{flex-direction:column;}}
 @media(prefers-reduced-motion:reduce){.celestial-star-art,.celestial-corona,.celestial-selection-ring,.celestial-hero-art{animation:none!important;}}
 .reduce-animations .celestial-star-art,.reduce-animations .celestial-corona,.reduce-animations .celestial-selection-ring,.reduce-animations .celestial-hero-art{animation:none!important;}
+
+.celestial-altitude-section{display:grid;gap:6px;}
+.celestial-altitude-chart{background:var(--panel-2);border:1px solid var(--edge);padding:8px;}
+.celestial-altitude-chart svg{display:block;width:100%;height:auto;color:var(--ink-dim);}

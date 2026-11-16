@@ -34,7 +34,7 @@ function disk(name,phase){
   }else if(name==='Venus'||name==='Sun')texture=.12*noise(x*.44,y*.76);
   else{
     const crater=[[-5,-3,3.5],[5,3,2.8],[2,-6,2],[-4,6,2.3]].some(([cx,cy,cr])=>Math.hypot(x-cx,y-cy)<cr);
-    texture=.12*noise(x,y)-(crater?.2:0);
+    texture=.12*noise(x,y)-(crater ? .2 : 0);
     if(name==='Pluto'&&Math.hypot(x-2,y-4)<4)texture+=.24;
     if(name==='Mars'&&y<-10) return '#efdcc4';
   }

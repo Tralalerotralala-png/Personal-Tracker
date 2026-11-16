@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {projectDome,BRIGHT_STARS,SKY_PATTERNS,bodyDetails} from '../js/weather/celestial.js';
+import {projectDome,BRIGHT_STARS,SKY_PATTERNS,bodyDetails,bodyAltitudeSeries} from '../js/weather/celestial.js';
 import {celestialSprite,celestialSpriteSvg} from '../js/ui/celestial-sprites.js';
 test('dome camera rotation preserves zenith and puts cardinal points on the horizon',()=>{
  const zenith0=projectDome(0,90,{yaw:0,tilt:46}),zenith90=projectDome(0,90,{yaw:90,tilt:46});
@@ -23,4 +23,11 @@ test('details use observer coordinates, J2000 constellation and next rise/set',(
  const A={Observer:class{},Equator:(_b,_d,_o,ofDate)=>{assert.equal(ofDate,false);return {ra:1,dec:2}},Constellation:(ra,dec)=>({name:'Orion'}),Illumination:()=>({mag:-2,phase_fraction:.8}),SearchRiseSet:()=>({date:new Date('2026-11-16T08:00Z')})};
  const result=bodyDetails(A,{lat:20,lon:-101},new Date(),{name:'Jupiter',kind:'body'});
  assert.equal(result.constellation,'Orion');assert.equal(result.magnitude,-2);assert.equal(result.rise,'2026-11-16T08:00:00.000Z');
+});
+
+test('altitude chart samples exactly 24 hours centered on the selected instant',()=>{
+ const A={Observer:class{},Equator:(_b,d)=>({ra:d.getUTCHours(),dec:0}),Horizon:(_d,_o,ra)=>({altitude:ra-12})};
+ const date=new Date('2026-11-16T12:00Z');
+ const series=bodyAltitudeSeries(A,{lat:20,lon:-101},date,{name:'Moon',kind:'body'});
+ assert.equal(series.length,25);assert.deepEqual(series[12],{hours:0,altitude:0});assert.equal(series[0].hours,-12);assert.equal(series.at(-1).hours,12);
 });

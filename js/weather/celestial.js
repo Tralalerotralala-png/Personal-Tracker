@@ -71,3 +71,18 @@ export function bodyDetails(A,place,date,object){
  }catch{}
  return out;
 }
+
+export function bodyAltitudeSeries(A,place,date,object){
+ if(!A||!object||!Number.isFinite(place?.lat)||!Number.isFinite(place?.lon))return [];
+ try{
+  const observer=new A.Observer(place.lat,place.lon,Math.max(-500,Number(place.elevation_m)||0));
+  let key=object.name;
+  if(object.kind==='star'){const row=BRIGHT_STARS.find(s=>s[0]===key);if(!row)return [];A.DefineStar('Star1',row[1],row[2],100);key='Star1';}
+  return Array.from({length:25},(_,i)=>{
+   const hours=i-12,instant=new Date(date.getTime()+hours*3600000);
+   const eq=A.Equator(key,instant,observer,true,true),hor=A.Horizon(instant,observer,eq.ra,eq.dec,'normal');
+   if(!Number.isFinite(hor.altitude))throw Error('invalid altitude');
+   return {hours,altitude:hor.altitude};
+  });
+ }catch{return [];}
+}
