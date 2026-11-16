@@ -18,7 +18,7 @@ test('history preserves valid observed rates, inversions and dated ratios',()=>{
 });
 test('fiat history uses dated real provider responses and does not invent rates',async()=>{
  const now=new Date('2026-11-15T00:00:00Z');
- const result=await fetchRateHistory('USD','MXN',7,{now,fetchImpl:async url=>{assert.match(url,/frankfurter.dev\\/v1\\//);return {ok:true,json:async()=>({rates:{'2026-11-09':{MXN:18},'2026-11-13':{MXN:18.1}}})};}});
+ const result=await fetchRateHistory('USD','MXN',7,{now,fetchImpl:async url=>{assert.ok(url.startsWith('https://api.frankfurter.dev/v1/'));return {ok:true,json:async()=>({rates:{'2026-11-09':{MXN:18},'2026-11-13':{MXN:18.1}}})};}});
  assert.equal(result.source,'Frankfurter');assert.equal(result.rows.length,2);
 });
 test('rapid reading writes preserve bookmark and both articles',async()=>{
