@@ -1,12 +1,12 @@
 import {h,replace,openSheet} from './dom.js';
 import {language} from './language.js';
-import {loadAstronomy,skyPositions,projectSky,projectDome,bodyDetails,bodyAltitudeSeries,SKY_PATTERNS,BRIGHT_STARS} from '../weather/celestial.js';
+import {loadAstronomy,skyPositions,projectSky,projectDome,bodyDetails,bodyAltitudeSeries,SKY_PATTERNS,BRIGHT_STARS,ZODIAC_SIGNS,zodiacPositions,nextMoonSign,solarSystemPositions,orbitPoint} from '../weather/celestial.js';
 import {celestialSprite,celestialSpriteSvg} from './celestial-sprites.js';
 import {localizedMoonPhase,moonPhase} from '../weather/moon-phase.js';
 import {skyEventOnDate} from '../weather/sky-events.js';
 import {dateKeyAt} from '../weather/environment.js';
 const tr=(a,b)=>language()==='es'?b:a;
-const translations={Sun:'Sol',Moon:'Luna',Mercury:'Mercurio',Venus:'Venus',Mars:'Marte',Jupiter:'Júpiter',Saturn:'Saturno',Uranus:'Urano',Neptune:'Neptuno',Pluto:'Plutón','Big Dipper':'Carro Mayor',Cassiopeia:'Casiopea','Southern Cross':'Cruz del Sur','Summer Triangle':'Triángulo de verano','Winter Triangle':'Triángulo de invierno'};
+const translations={Earth:'Tierra',Sun:'Sol',Moon:'Luna',Mercury:'Mercurio',Venus:'Venus',Mars:'Marte',Jupiter:'Júpiter',Saturn:'Saturno',Uranus:'Urano',Neptune:'Neptuno',Pluto:'Plutón','Big Dipper':'Carro Mayor',Cassiopeia:'Casiopea','Southern Cross':'Cruz del Sur','Summer Triangle':'Triángulo de verano','Winter Triangle':'Triángulo de invierno'};
 const label=name=>language()==='es'?(translations[name]||name):name;
 const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
@@ -14,6 +14,7 @@ const deg=n=>finite(n)?n.toFixed(1)+'°':'—';
 const AU_KM=149597870.7;
 // Rounded mean diameters and descriptive classes; NASA Solar System Sizes / Facts.
 const FACTS={
+ Earth:[12742,'Home world · rocky planet','Nuestro planeta · planeta rocoso','Earth is the observer’s home world. The local sky is seen from its surface, so Earth belongs in the Sun-centered view rather than at a fictitious altitude.','La Tierra es nuestro planeta. El cielo local se observa desde su superficie, por lo que aparece en la vista centrada en el Sol y no en una altitud ficticia.'],
  Sun:[1392700,'Star','Estrella','Our solar system’s central star; its visible surface is the photosphere.','La estrella central del sistema solar; su superficie visible es la fotosfera.'],
  Moon:[3475,'Natural satellite','Satélite natural','Earth’s rocky companion; its changing phases follow the Sun–Earth–Moon geometry.','Compañera rocosa de la Tierra; sus fases dependen de la geometría Sol–Tierra–Luna.'],
  Mercury:[4880,'Rocky planet','Planeta rocoso','The innermost planet has an ancient, heavily cratered surface.','El planeta más cercano al Sol tiene una superficie antigua y llena de cráteres.'],
@@ -25,7 +26,7 @@ const FACTS={
  Neptune:[49244,'Ice giant','Gigante helado','The outermost major planet has a dynamic, windy atmosphere.','El planeta mayor más lejano tiene una atmósfera dinámica y ventosa.'],
  Pluto:[2377,'Dwarf planet','Planeta enano','An icy Kuiper Belt world with varied terrain.','Un mundo helado del cinturón de Kuiper con terreno variado.']
 };
-const size={Sun:21,Moon:19,Mercury:11,Venus:14,Mars:13,Jupiter:18,Saturn:21,Uranus:14,Neptune:14,Pluto:10};
+const size={Earth:17,Sun:21,Moon:19,Mercury:11,Venus:14,Mars:13,Jupiter:18,Saturn:21,Uranus:14,Neptune:14,Pluto:10};
 const reduced=()=>document.documentElement.classList.contains('reduce-animations')||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function altitudeChart(series){
@@ -39,6 +40,9 @@ function altitudeChart(series){
 export function createCelestialMap({place,weatherState=null}){
  const panel=h('section',{class:'celestial-panel celestial-observatory'});
  const map=h('div',{class:'celestial-map celestial-stage',tabindex:0,'aria-label':tr('Sky chart. Arrow keys rotate, plus and minus zoom.','Mapa celeste. Flechas para girar, más y menos para acercar.')});
+ const solarMap=h('div',{class:'solar-system-map'}),zodiacPanel=h('div',{class:'zodiac-panel'});
+ const solarSection=h('details',{class:'celestial-extra solar-system-section',open:true});
+ const zodiacSection=h('details',{class:'celestial-extra zodiac-section',open:true});
  const detail=h('div',{class:'celestial-detail'}),list=h('div',{class:'celestial-list'}),status=h('p',{class:'hint celestial-status',role:'status'});
  const when=h('strong',{class:'celestial-clock'}),readout=h('span',{class:'celestial-camera-readout'}),hint=h('span',{class:'celestial-tip'});
  const offset=h('input',{type:'range',min:-48,max:48,step:'any',value:0,'aria-label':tr('Hours from now','Horas desde ahora')});
@@ -46,6 +50,8 @@ export function createCelestialMap({place,weatherState=null}){
  const stars=h('input',{type:'checkbox',checked:true}),patterns=h('input',{type:'checkbox',checked:true}),names=h('input',{type:'checkbox',checked:true}),below=h('input',{type:'checkbox',checked:true});
  const speed=h('select',{'aria-label':tr('Time speed','Velocidad del tiempo')},[1,6,24,60].map(n=>h('option',{value:n,selected:n===6},n+' '+tr('min/sec','min/s'))));
  let A=null,positions=[],selected='Moon',view='dome',yaw=0,tilt=46,zoom=1,panX=0,panY=0,tracking=false,playing=false,lastTick=0,raf=0,focusAnim=0,drag=null,suppressClick=false,sceneDate=new Date(),sheet=null,weather=weatherState;
+ let zodiac=[],orbits=[],lastExtra=0,lastExtraScene=0,moonIngress=null;
+ const earth={name:'Earth',kind:'observer',altitude:null,azimuth:null};
  const pointers=new Map();
  const btn=(text,fn,extra={})=>h('button',{class:'btn small',type:'button',onclick:fn,...extra},text);
  const dome=btn(tr('3D dome','Cúpula 3D'),()=>switchView('dome'),{class:'btn small primary','aria-pressed':'true'});
@@ -55,34 +61,38 @@ export function createCelestialMap({place,weatherState=null}){
  const localTime=d=>new Intl.DateTimeFormat(language()==='es'?'es-MX':'en-US',{timeZone:place?.timezone||undefined,dateStyle:'medium',timeStyle:'short'}).format(d);
  const point=(az,alt)=>view==='dome'?projectDome(az,alt,{yaw,tilt}):{...projectSky(az-yaw,alt),depth:alt/90};
  const renderSprite=(name,kind,date)=>celestialSpriteSvg(name,{kind,phase:name==='Moon'?moonPhase(date).fraction:null});
- function current(){return positions.find(x=>x.name===selected);}
+ const findObject=name=>name==='Earth'?earth:positions.find(x=>x.name===name);
+ function current(){return findObject(selected);}
  function select(name,open=false){
-  const object=positions.find(x=>x.name===name);if(!object)return;
+  const object=findObject(name);if(!object)return;
   if(selected!==name){selected=name;tracking=false;track.setAttribute('aria-pressed','false');track.classList.remove('primary');}
-  drawSelection();paint();
+  drawSelection();paint();paintSolar();
   if(open)openInfo(object);
  }
  function drawSelection(){
   const p=current();if(!p)return;
+  if(p.kind==='observer'){replace(detail,h('div',{class:'celestial-object-icon',html:renderSprite('Earth','body',sceneDate)}),h('div',{class:'celestial-object-copy'},h('h3',{},label('Earth')),h('p',{},tr('Your observing world','Tu planeta de observación')),h('small',{class:'hint'},place?.name||'')),h('div',{class:'celestial-detail-actions'},btn(tr('Object info','Información'),()=>openInfo(p),{class:'btn primary small'}),btn(tr('Solar system','Sistema solar'),()=>focusBody('Earth',false))));return;}
   replace(detail,h('div',{class:'celestial-object-icon',html:renderSprite(p.name,p.kind,sceneDate)}),
    h('div',{class:'celestial-object-copy'},h('h3',{},label(p.name)),h('p',{},tr('Altitude','Altitud')+' '+deg(p.altitude)+' · '+tr('Azimuth','Acimut')+' '+deg(p.azimuth)),h('small',{class:'hint'},p.altitude>=0?tr('Above horizon','Sobre el horizonte'):tr('Below horizon','Bajo el horizonte'))),
    h('div',{class:'celestial-detail-actions'},btn(tr('Object info','Información'),()=>openInfo(p),{class:'btn primary small'}),btn(tr('Locate','Localizar'),()=>focusBody(p.name,false)),track));
   for(const b of list.querySelectorAll('button'))b.classList.toggle('primary',b.dataset.body===selected);
  }
  function openInfo(p){
-  const date=new Date(sceneDate),details=bodyDetails(A,place,date,p),fact=FACTS[p.name];
+  const date=new Date(sceneDate),isEarth=p.kind==='observer',details=isEarth?{}:bodyDetails(A,place,date,p),fact=FACTS[p.name];
   const measure=(a,b,value)=>h('div',{class:'celestial-fact'},h('small',{},tr(a,b)),h('strong',{},value));
   const format=d=>d?localTime(new Date(d)):tr('Not within 48 h / unavailable','No en 48 h / no disponible');
   const catalog=BRIGHT_STARS.find(row=>row[0]===p.name);
-  const series=bodyAltitudeSeries(A,place,date,p);
-  const entries=[measure('Altitude','Altitud',deg(p.altitude)),measure('Azimuth','Acimut',deg(p.azimuth)),measure('Right ascension','Ascensión recta',finite(p.ra)?p.ra.toFixed(3)+' h':'—'),measure('Declination','Declinación',deg(p.dec))];
+  const series=isEarth?[]:bodyAltitudeSeries(A,place,date,p);
+  const entries=isEarth?[measure('Observation location','Lugar de observación',place?.name||'—'),measure('Reference frame','Sistema de referencia',tr('Earth surface','Superficie terrestre'))]:[measure('Altitude','Altitud',deg(p.altitude)),measure('Azimuth','Acimut',deg(p.azimuth)),measure('Right ascension','Ascensión recta',finite(p.ra)?p.ra.toFixed(3)+' h':'—'),measure('Declination','Declinación',deg(p.dec))];
   if(details.constellation)entries.push(measure('Constellation','Constelación',details.constellation));
   if(finite(p.distance))entries.push(measure('Observer distance','Distancia al observador',p.name==='Moon'?Math.round(p.distance*AU_KM).toLocaleString()+' km':p.distance.toFixed(3)+' AU'));
   if(fact)entries.push(measure('Mean diameter','Diámetro medio',fact[0].toLocaleString()+' km'));
   if(finite(details.magnitude))entries.push(measure('Apparent magnitude','Magnitud aparente',details.magnitude.toFixed(2)));
   if(finite(details.phaseFraction))entries.push(measure('Illuminated fraction','Fracción iluminada',Math.round(details.phaseFraction*100)+'%'));
   if(catalog)entries.push(measure('Catalog RA / Dec','AR / Dec del catálogo',catalog[1].toFixed(3)+' h / '+deg(catalog[2])));
-  entries.push(measure('Next rise','Próxima salida',format(details.rise)),measure('Next set','Próxima puesta',format(details.set)));
+  if(!isEarth){entries.push(measure('Next rise','Próxima salida',format(details.rise)),measure('Next set','Próxima puesta',format(details.set)));const z=zodiac.find(row=>row.name===p.name);if(z)entries.push(measure('Tropical zodiac','Zodiaco tropical',signText(z)));}
+  const orbit=orbits.find(row=>row.name===p.name);if(orbit)entries.push(measure('Distance from Sun','Distancia al Sol',orbit.distance.toFixed(3)+' AU'));
+  if(isEarth)entries.push(measure('Orbital period','Periodo orbital',tr('365.26 days (approx.)','365.26 días (aprox.)')));
   sheet?.close();
   const body=h('div',{class:'celestial-info-page'},h('div',{class:'celestial-hero'},h('div',{class:'celestial-hero-orbit'}),h('div',{class:'celestial-hero-art',html:renderSprite(p.name,p.kind,date)}),h('span',{class:'celestial-hero-tag'},fact?fact[language()==='es'?2:1]:tr('Catalog star','Estrella del catálogo'))),
    h('p',{class:'hint'},localTime(date)+' · '+(place?.name||'')),h('p',{},fact?fact[language()==='es'?4:3]:tr('A named bright star in the selected reference catalog.','Una estrella brillante del catálogo de referencia.')),
@@ -90,13 +100,13 @@ export function createCelestialMap({place,weatherState=null}){
    series.length>1?h('section',{class:'celestial-altitude-section'},h('h3',{},tr('24-hour altitude path','Trayectoria de altitud · 24 h')),h('span',{class:'hint'},tr('12 hours before / after selected time · dashed line is the horizon','12 horas antes y después del instante seleccionado · línea punteada: horizonte')),h('div',{class:'celestial-altitude-chart',html:altitudeChart(series)})):null,
    h('p',{class:'hint'},tr('Calculated for the selected instant. The artwork is illustrative; terrain, clouds and daylight affect visibility. Star distances are not estimated from placeholder catalog parallax. Never view the Sun directly.','Cálculos para el instante seleccionado. Las ilustraciones son artísticas; el terreno, las nubes y la luz afectan la visibilidad. No se estiman distancias estelares con paralajes de referencia. Nunca mires directamente al Sol.')),
    fact?h('a',{href:'https://science.nasa.gov/solar-system/',target:'_blank',rel:'noopener noreferrer'},tr('Solar system reference · NASA','Referencia del sistema solar · NASA')):null);
-  sheet=openSheet({title:label(p.name),body,footer:[btn(tr('Locate in sky','Localizar en el cielo'),()=>{sheet?.close();focusBody(p.name,false);},{class:'btn primary small'}),btn(tr('Track object','Seguir objeto'),()=>{sheet?.close();focusBody(p.name,true);})],onClose:()=>{sheet=null;}});
+  sheet=openSheet({title:label(p.name),body,footer:isEarth?[btn(tr('Solar system','Sistema solar'),()=>{sheet?.close();focusBody('Earth',false);},{class:'btn primary small'})]:[btn(tr('Locate in sky','Localizar en el cielo'),()=>{sheet?.close();focusBody(p.name,false);},{class:'btn primary small'}),btn(tr('Track object','Seguir objeto'),()=>{sheet?.close();focusBody(p.name,true);})],onClose:()=>{sheet=null;}});
  }
  function drawList(){
   const q=search.value.trim().toLowerCase();
-  const visible=positions.filter(p=>(stars.checked||p.kind!=='star')&&(below.checked||p.altitude>=0)&&(!q||label(p.name).toLowerCase().includes(q)||p.name.toLowerCase().includes(q))).sort((a,b)=>(a.kind==='body'?0:1)-(b.kind==='body'?0:1)||b.altitude-a.altitude);
+  const visible=[earth,...positions].filter(p=>(stars.checked||p.kind!=='star')&&(p.kind==='observer'||below.checked||p.altitude>=0)&&(!q||label(p.name).toLowerCase().includes(q)||p.name.toLowerCase().includes(q))).sort((a,b)=>(a.kind==='observer'?-1:a.kind==='body'?0:1)-(b.kind==='observer'?-1:b.kind==='body'?0:1)||(b.altitude??-99)-(a.altitude??-99));
   replace(list,...(visible.length?visible.map(p=>h('button',{class:'btn small ghost celestial-catalog-entry'+(p.name===selected?' primary':''),type:'button',dataset:{body:p.name},onclick:()=>select(p.name,true)},
-    h('span',{class:'celestial-catalog-icon',html:renderSprite(p.name,p.kind,sceneDate)}),h('span',{},label(p.name)),h('small',{},deg(p.altitude)))):[h('p',{class:'hint'},tr('No matching objects.','No hay objetos que coincidan.'))]));
+    h('span',{class:'celestial-catalog-icon',html:renderSprite(p.name,p.kind,sceneDate)}),h('span',{},label(p.name)),h('small',{},p.kind==='observer'?tr('Home','Hogar'):deg(p.altitude)))):[h('p',{class:'hint'},tr('No matching objects.','No hay objetos que coincidan.'))]));
  }
  function curve(azs,alts){return azs.map((a,i)=>{const p=point(a,alts[i]);return (i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1);}).join(' ');}
  function paint(){
@@ -137,8 +147,10 @@ export function createCelestialMap({place,weatherState=null}){
   const m=moonPhase(sceneDate),event=skyEventOnDate(dateKeyAt(sceneDate,place.timezone));
   const cloud=Number(weather?.current?.cloud_cover);
   status.textContent=localizedMoonPhase(m.label,language())+' · '+Math.round((1-Math.cos(m.fraction*2*Math.PI))*50)+'% '+tr('lit (approx.)','iluminada (aprox.)')+(Number.isFinite(cloud)&&weather?.current?.cloud_cover!=null&&Math.abs(Number(offset.value))<.25?' · '+tr('Current model cloud cover','Nubosidad actual del modelo')+' '+cloud+'%':'')+(event?' · '+(language()==='es'?event.es:event.en)+' · '+tr('local visibility unverified','visibilidad local no verificada'):'');
-  if(tracking&&current()&&current().altitude>=0)centerOn(current());
-  paint();drawList();drawSelection();
+  if(tracking&&current()&&current().kind!=='observer'&&current().altitude>=0)centerOn(current());
+  paint();drawList();
+  if(!lastExtra||(Date.now()-lastExtra>=900&&Math.abs(sceneDate.getTime()-lastExtraScene)>30000)||Math.abs(sceneDate.getTime()-lastExtraScene)>3600000){refreshExtra();lastExtra=Date.now();lastExtraScene=sceneDate.getTime();}
+  drawSelection();
  }
  function centerOn(p){
   if(!p||p.altitude<0)return;
@@ -146,6 +158,7 @@ export function createCelestialMap({place,weatherState=null}){
   panX=(200-c.x)*zoom;panY=(200-c.y)*zoom;
  }
  function focusBody(name,follow){
+  if(name==='Earth'){selected='Earth';tracking=false;drawSelection();paint();paintSolar();solarSection.open=true;solarSection.scrollIntoView({block:'nearest',behavior:reduced()?'auto':'smooth'});return;}
   const p=positions.find(o=>o.name===name);if(!p)return;
   selected=name;tracking=follow;track.classList.toggle('primary',follow);track.setAttribute('aria-pressed',String(follow));
   if(p.altitude<0){drawSelection();paint();hint.textContent=tr('This object is below the horizon. Use the time slider to find it above ground.','Este objeto está bajo el horizonte. Cambia la hora para localizarlo.');return;}
@@ -167,11 +180,44 @@ export function createCelestialMap({place,weatherState=null}){
   if(elapsed>=250){const next=Number(offset.value)+elapsed/1000*Number(speed.value)/60;offset.value=String(clamp(next,-48,48));lastTick=now;refresh();if(next>=48){playing=false;play.textContent='▶ '+tr('Time','Tiempo');return;}}
   requestAnimationFrame(tick);
  }
+
+ const signName=i=>ZODIAC_SIGNS[i]?.[language()==='es'?1:0]||'—';
+ const signText=z=>ZODIAC_SIGNS[z.index][2]+' '+signName(z.index)+' '+z.degree.toFixed(1)+'°';
+ function paintSolar(){
+  if(!orbits.length)return;
+  const orbitRings=orbits.map(p=>{const r=orbitPoint(p.longitude,p.distance).radius;return '<circle cx="200" cy="200" r="'+r.toFixed(2)+'" class="celestial-orbit-guide"/>';}).join('');
+  const markers=orbits.map(p=>{
+    const c=orbitPoint(p.longitude,p.distance),w=p.name==='Earth'?21:p.name==='Jupiter'||p.name==='Saturn'?23:14;
+    const outline=p.name===selected?'<circle r="'+(w/2+5)+'" class="celestial-selection-ring" fill="none" stroke="#e3d0ff" stroke-dasharray="3 3"/>':'';
+    return '<g class="celestial-point" data-orbit="'+p.name+'" transform="translate('+c.x.toFixed(2)+' '+c.y.toFixed(2)+')"><title>'+label(p.name)+' · '+p.distance.toFixed(2)+' AU</title>'+outline+'<circle r="14" fill="transparent"/><g transform="translate('+(-w/2)+' '+(-w/2)+') scale('+w/32+')">'+celestialSprite(p.name)+'</g><text y="'+(w/2+10)+'" class="celestial-marker-label" text-anchor="middle">'+label(p.name)+'</text></g>';
+  }).join('');
+  solarMap.innerHTML='<svg viewBox="0 0 400 400" role="img" aria-label="'+tr('Sun-centered solar system, schematic scale','Sistema solar centrado en el Sol, escala esquemática')+'"><rect width="400" height="400" fill="#101528"/>'+orbitRings+'<g class="celestial-point" data-orbit="Sun" transform="translate(184 184)">'+celestialSprite('Sun')+'</g>'+markers+'</svg>';
+ }
+ function refreshExtra(){
+  zodiac=zodiacPositions(A,sceneDate);orbits=solarSystemPositions(A,sceneDate);
+  moonIngress=nextMoonSign(A,sceneDate);paintSolar();
+  if(!zodiac.length){replace(zodiacPanel,h('p',{class:'hint'},tr('Zodiac calculations unavailable.','Cálculos zodiacales no disponibles.')));return;}
+  const sun=zodiac.find(p=>p.name==='Sun'),moon=zodiac.find(p=>p.name==='Moon'),retro=zodiac.filter(p=>p.retrograde);
+  const wheel='<svg viewBox="0 0 260 260" role="img" aria-label="'+tr('Tropical zodiac longitude wheel','Rueda de longitudes del zodiaco tropical')+'"><circle cx="130" cy="130" r="118" fill="#13182c" stroke="#647698"/><circle cx="130" cy="130" r="91" fill="none" stroke="#647698"/>'+
+   ZODIAC_SIGNS.map((s,i)=>{const a=i*Math.PI/6,b=(i+.5)*Math.PI/6;return '<path d="M'+(130+91*Math.sin(a))+' '+(130-91*Math.cos(a))+'L'+(130+118*Math.sin(a))+' '+(130-118*Math.cos(a))+'" stroke="#647698"/><text x="'+(130+105*Math.sin(b))+'" y="'+(134-105*Math.cos(b))+'" fill="#ddd0ff" font-size="15" text-anchor="middle">'+s[2]+'</text>';}).join('')+
+   zodiac.map((z,i)=>{const a=z.longitude*Math.PI/180,r=74-(i%3)*14,w=18,x=130+r*Math.sin(a),y=130-r*Math.cos(a);return '<g data-orbit="'+z.name+'" class="celestial-point" transform="translate('+(x-w/2)+' '+(y-w/2)+') scale('+w/32+')"><title>'+label(z.name)+' · '+signText(z)+'</title>'+celestialSprite(z.name,{phase:z.name==='Moon'?moonPhase(sceneDate).fraction:null})+'</g>';}).join('')+'</svg>';
+  replace(zodiacPanel,h('div',{class:'zodiac-feature'},h('div',{class:'zodiac-wheel',html:wheel}),h('div',{class:'zodiac-summary'},
+    sun?h('div',{},h('small',{},tr('Sun sign','Signo solar')),h('strong',{},signText(sun))):null,
+    moon?h('div',{},h('small',{},tr('Moon sign','Signo lunar')),h('strong',{},signText(moon))):null,
+    moonIngress?h('p',{class:'hint'},tr('Moon enters ','La Luna entra en ')+signName(moonIngress.index)+' · '+localTime(new Date(moonIngress.at))):null,
+    h('p',{class:'hint'},tr('Apparent retrograde: ','Retrógrados aparentes: ')+(retro.length?retro.map(p=>label(p.name)).join(', '):tr('None','Ninguno'))))),
+    h('div',{class:'zodiac-planet-list'},...zodiac.map(z=>h('button',{class:'btn small ghost zodiac-position',type:'button',onclick:()=>select(z.name,true)},h('span',{class:'celestial-catalog-icon',html:renderSprite(z.name,'body',sceneDate)}),h('span',{},label(z.name)),h('strong',{},signText(z)),z.retrograde?h('small',{title:tr('Apparent retrograde','Retrógrado aparente')},'℞'):null))),
+    h('p',{class:'hint'},tr('Tropical signs are equal 30° sectors from the March equinox, not physical constellation boundaries. This is a calculated astrological coordinate convention, not a prediction. Updates with the sky clock.','Los signos tropicales son sectores iguales de 30° desde el equinoccio de marzo, no límites físicos de constelaciones. Es una convención de coordenadas astrológicas calculadas, no una predicción. Se actualiza con el reloj celeste.')));
+ }
+ solarSection.append(h('summary',{},tr('Solar system · Earth and planets','Sistema solar · Tierra y planetas')),h('div',{class:'celestial-solar-home'},h('span',{class:'celestial-object-icon',html:celestialSpriteSvg('Earth')}),h('div',{},h('strong',{},tr('Earth · your home world','Tierra · nuestro planeta')),h('p',{class:'hint'},place?.name||tr('Selected observing location','Lugar de observación seleccionado'))),btn(tr('Explore Earth','Explorar la Tierra'),()=>select('Earth',true))),solarMap,h('div',{class:'celestial-orbit-buttons'},...['Sun','Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'].map(n=>btn(label(n),()=>select(n,true)))),h('p',{class:'hint'},tr('Sun-centered positions calculated for the selected time. Compressed distances; orbit guides and planet sizes are schematic.','Posiciones centradas en el Sol calculadas para el instante seleccionado. Distancias comprimidas; órbitas y tamaños esquemáticos.')));
+ zodiacSection.append(h('summary',{},tr('Live zodiac · planetary transits','Zodiaco en vivo · tránsitos planetarios')),zodiacPanel);
+ for(const host of [solarMap,zodiacPanel])host.addEventListener('click',e=>{const n=e.target.closest?.('[data-orbit]')?.dataset.orbit;if(n)select(n,true);});
+
  const toggles=h('div',{class:'celestial-toggles'},...[['Bright stars','Estrellas brillantes',stars],['Guide patterns','Figuras guía',patterns],['Labels','Etiquetas',names],['List below horizon','Listar bajo el horizonte',below]].map(([a,b,input])=>h('label',{class:'check'},input,tr(a,b))));
  const controls=h('div',{class:'celestial-controls'},dome,flat,btn('−',()=>changeZoom(.8),{'aria-label':tr('Zoom out','Alejar')}),btn('+',()=>changeZoom(1.25),{'aria-label':tr('Zoom in','Acercar')}),btn(tr('Reset view','Restablecer vista'),resetCamera),btn('↶',()=>{stopTracking();yaw-=30;schedulePaint();},{'aria-label':tr('Rotate left','Girar a la izquierda')}),btn('↷',()=>{stopTracking();yaw+=30;schedulePaint();},{'aria-label':tr('Rotate right','Girar a la derecha')}));
  panel.append(h('div',{class:'celestial-title'},h('div',{},h('h2',{},tr('Celestial observatory','Observatorio celeste')),h('p',{class:'hint'},tr('Local sky · calculated positions','Cielo local · posiciones calculadas'))),when),
   h('div',{class:'celestial-time-dock'},btn(tr('Now','Ahora'),()=>{offset.value=0;playing=false;play.textContent='▶ '+tr('Time','Tiempo');refresh();}),play,speed,offset),
-  controls,h('div',{class:'celestial-map-wrap'},map,h('div',{class:'celestial-stage-readout'},readout,hint)),toggles,detail,status,
+  controls,h('div',{class:'celestial-map-wrap'},map,h('div',{class:'celestial-stage-readout'},readout,hint)),toggles,detail,status,solarSection,zodiacSection,
   h('div',{class:'celestial-catalog-header'},h('h3',{},tr('Object catalog','Catálogo de objetos')),search),list,
   h('p',{class:'hint'},tr('Drag to rotate the dome, shift-drag to pan, wheel or pinch to zoom. Tap any object for details. Icons are not to scale. Bright-star guide patterns are illustrative, not constellation boundaries. Real positions calculated by Astronomy Engine (MIT); weather model cloud cover does not guarantee visibility. Never look directly at the Sun.','Arrastra para girar, con Mayús para desplazar, rueda o pellizca para acercar. Toca un objeto para ver detalles. Iconos fuera de escala. Las figuras guía no son límites de constelaciones. Posiciones calculadas por Astronomy Engine (MIT); la nubosidad no garantiza visibilidad. Nunca mires directamente al Sol.')));
  map.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;stopTracking();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});map.setPointerCapture?.(e.pointerId);if(pointers.size===2){const [a,b]=[...pointers.values()];drag={pinch:Math.hypot(a.x-b.x,a.y-b.y),zoom};suppressClick=true;return;}drag={x:e.clientX,y:e.clientY,yaw,tilt,panX,panY,shift:e.shiftKey,moved:false,target:e.target.closest?.('[data-body]')?.dataset.body};suppressClick=false;});

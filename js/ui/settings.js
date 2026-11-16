@@ -172,6 +172,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const paletteColors = [ ['Background', 'background_color', '#17130f'], ['Panels', 'panel_color', '#231c15'], ['Secondary panels', 'panel_secondary_color', '#2e251c'], ['Text', 'text_color', '#eadfc4'], ['Muted text', 'muted_color', '#a39475'], ['Borders', 'border_color', '#4a3b2a'] ];
   const customColors = paletteColors.map(([label,key,def]) => h('label', { class: 'theme-color-field' }, h('span', {}, label), h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(ui?.[key] || '') ? ui[key] : def, onchange: async e => { await store.setSetting('ui', { ...(await store.getSetting('ui')), [key]:e.target.value,theme_preset:'custom' }); updateChoices('custom'); window.dispatchEvent(new Event('tracker-theme-refresh')); } })));
   const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100})});
+  const spriteMotion=h('select',{'aria-label':'Sprite animation',onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),sprite_motion:e.target.value});window.dispatchEvent(new Event('tracker-theme-refresh'));}},[['static','Static sprite depth','Profundidad estática'],['subtle','Reactive sprites','Sprites interactivos'],['lively','Animated idle sprites','Sprites animados en reposo']].map(([value,en,es])=>h('option',{value,selected:(ui?.sprite_motion||'subtle')===value},language()==='es'?es:en)));
   const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked})});
   const presets = {
     sakura: {"name":"Sakura Dusk","accent_color":"#ec9cbb","background_color":"#201522","panel_color":"#302239","panel_secondary_color":"#47304b","text_color":"#ffedf4","muted_color":"#c4a1ba","border_color":"#77546d"},
@@ -314,6 +315,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('label', {}, 'Accent color'), accentColor,
     h('p', { class: 'hint' }, 'Customize each part of the palette. Changes sync with your account.'), ...customColors,
     h('label', {}, 'Panel opacity'), panelOpacity,
+    h('label',{},language()==='es'?'Animación de sprites':'Sprite animation'),spriteMotion,
     h('label', {class:'check'}, lessMotion, 'Reduce animations'),
     h('label', { class: 'check', for: 'st-scan' }, scan, 'Scanline effect'),
     h('label', { for: 'st-week' }, 'Calendar week starts on'),

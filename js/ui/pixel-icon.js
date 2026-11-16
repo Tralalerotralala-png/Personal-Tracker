@@ -79,7 +79,7 @@ export function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
       else if (!filled(y + 1, x)) parts.push(`<rect x="${x + 1}" y="${y + 1}" width="1" height="1" fill="#000" opacity=".3"/>`);
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dim} ${dim}" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${parts.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dim} ${dim}" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${stackSprite(parts.join(''))}</svg>`;
 }
 
 // ---- navigation glyphs (drawn in currentColor) ------------------------------
@@ -340,20 +340,25 @@ export function glyphNames() { return Object.keys(GLYPHS); }
 
 export function glyphRows(name) { return GLYPHS[name] ?? null; }
 
+// Separate offset silhouette slices give the existing pixel artwork thickness.
+// Preserve original face, palette and viewBox; CSS controls depth on hover.
+function stackSprite(face){
+  return '<g class="sprite-stack-back" aria-hidden="true">'+face+'</g><g class="sprite-stack-mid" aria-hidden="true">'+face+'</g><g class="sprite-stack-face">'+face+'</g>';
+}
 export function glyphSvg(name) {
   const compactCodes={sun:0,partly:2,cloud:3,fog:45,rain:61,snow:71,storm:95};
   if(Object.prototype.hasOwnProperty.call(compactCodes,name))return compactWeatherSvg(compactCodes[name]);
   if(name==='expenses'){
     const rows=["........................","........AAAAAAAA........","......AABBBAACCCAA......",".....AABBBBAACCCCAA.....","....ABBBBBBAACCCCCCA....","...ABBBBBBBAACCCCCCCA...","...ABBBBBBBAACCCDDDCA...","..ABBBBBBBBAACDDDDDDCA..","..ABBBBBBBBAADDDDDDDCA..","..ABBBBBBBEAADDDDDDDCA..",".ABBBBBBEEEEDDDDDDDDDCA.",".AFBBEEEEEEEDDDDDDDDDGA.",".AFEEEEEAAAHIAADDDDDDGA.",".AAFEEAAAHHAAIIAAADDGAA.",".AAFAAHHHHHAAIIIIAAAGAA.","..AAHHHHHHHAAIIIIIIAAA..","..AAJHHHHHHAAIIIIIIKAA..","..AAJJHHHHHAAIIIIIKKAA..","...AAJJHHHHAAIIIIKKAA...","...AAAAJJHHAAIIKKAAAA...","....AAAAJJJAAKKKAAAA....",".....AAAAAAAAAAAAAA.....",".......AAAAAAAAAA.......",".........AAAAAA........."],palette=["#26354d","#b1f1cb","#fff0a5","#f0b959","#70cbb3","#3f917c","#b87530","#e98299","#a48ae5","#a74662","#6953ab"];
     const rects=rows.flatMap((row,y)=>[...row].flatMap((c,x)=>c==='.'?[]:[`<rect x="${x}" y="${y}" width="1" height="1" fill="${palette[c.charCodeAt(0)-65]}"/>`])).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${rects}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${stackSprite(rects)}</svg>`;
   }
   if (name === 'pack') {
     // Monochrome navigation art inherits the active/idle theme color.
     const rows = ["....................",".......hhhhhh.......","......ssssssss......","......ss....ss......",".....ssssssssss.....","....sshhhhhhhhss....","...ssmmmmmmmmmmss...","...sshhhhhhhhhhss...","...sshhhhhhhhhhss...",".ssssddddddddddssss.",".smmsmmddmmddmmsmms.",".smmsmmddmmddmmsmms.",".smmsmddddddddmsmms.",".smmsmdhhhhhhdmsmms.",".smmsmdmmbbmmdmsmms.",".ssssmdmmmmmmdmssss.","...sssddddddddsss...","....sdddddddddds....",".....ssssssssss.....","...................."];
     const shades = {s:.4,m:.77,h:1,d:.23,b:1};
     const out=rows.flatMap((row,y)=>[...row].flatMap((c,x)=>shades[c]?[`<rect x="${x}" y="${y}" width="1" height="1" opacity="${shades[c]}"/>`]:[])).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${out}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${stackSprite(out)}</svg>`;
   }
   const rows = GLYPHS[name];
   if (!rows) return '';
@@ -363,7 +368,7 @@ export function glyphSvg(name) {
       if (c === '#') rects.push(`<rect x="${x}" y="${y}" width="1" height="1"/>`);
     });
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${rects.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${stackSprite(rects.join(''))}</svg>`;
 }
 
 // Shared multicolor, pixel-aligned weather art for the dashboard and Weather tab.
@@ -465,7 +470,7 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
       }
     }
   }
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>';
+  return '<svg class="sprite-weather-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>';
 }
 
 /** Compact monochrome weather art shares the detailed weather silhouettes.
@@ -473,7 +478,7 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
 export function compactWeatherSvg(code,options={}) {
   const svg=weatherIconSvg(code,options);
   const kind=weatherGlyph(code).glyph;
-  return svg.replace(/^<svg /,'<svg class="wx-compact wx-compact-'+kind+'" ')
+  return svg.replace(/^<svg(?: class="[^"]*")? /,'<svg class="sprite-weather-depth wx-compact wx-compact-'+kind+'" ')
      .replace(/fill="#([0-9a-fA-F]{6})"/g,(_,hex)=>{
       const rgb=hex.match(/../g).map(v=>parseInt(v,16));
       const light=(rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722)/255;

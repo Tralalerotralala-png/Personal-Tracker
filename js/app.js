@@ -64,6 +64,7 @@ async function applyDisplay() {
   ]) document.documentElement.style.setProperty(cssName, valid(ui?.[key]) ? ui[key] : fallback);
   document.documentElement.style.setProperty('--panel-opacity', `${Math.max(.65,Math.min(1,Number(ui?.panel_opacity) || 1))}`);
   document.documentElement.classList.toggle('reduce-animations', Boolean(ui?.reduce_animations));
+  document.documentElement.dataset.spriteMotion=['static','subtle','lively'].includes(ui?.sprite_motion)?ui.sprite_motion:'subtle';
 }
 applyDisplay();
 window.addEventListener('tracker-theme-refresh', applyDisplay);

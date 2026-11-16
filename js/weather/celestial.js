@@ -86,3 +86,56 @@ export function bodyAltitudeSeries(A,place,date,object){
   });
  }catch{return [];}
 }
+
+// The tropical zodiac is a conventional 12-sector coordinate system, not
+// the unequal IAU constellation boundaries. No horoscope service is needed.
+export const ZODIAC_SIGNS=[
+ ['Aries','Aries','♈'],['Taurus','Tauro','♉'],['Gemini','Géminis','♊'],
+ ['Cancer','Cáncer','♋'],['Leo','Leo','♌'],['Virgo','Virgo','♍'],
+ ['Libra','Libra','♎'],['Scorpio','Escorpio','♏'],['Sagittarius','Sagitario','♐'],
+ ['Capricorn','Capricornio','♑'],['Aquarius','Acuario','♒'],['Pisces','Piscis','♓']
+];
+export const ORBIT_BODIES=['Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
+export function normalizeLongitude(value){return ((value%360)+360)%360;}
+export function zodiacSector(longitude){
+ if(!Number.isFinite(longitude))return null;
+ const value=normalizeLongitude(longitude),index=Math.floor(value/30);
+ return {index,longitude:value,degree:value-index*30};
+}
+function geoLongitude(A,name,date){
+ const coord=name==='Sun'?A.SunPosition(date):A.Ecliptic(A.GeoVector(name,date,true));
+ if(!Number.isFinite(coord?.elon))throw Error('Invalid ecliptic longitude');
+ return normalizeLongitude(coord.elon);
+}
+// Central difference over one day, wrap-safe even at 0 degrees Aries.
+export function zodiacPositions(A,date){
+ return SOLAR_BODIES.flatMap(name=>{
+   try{
+    const longitude=geoLongitude(A,name,date),a=geoLongitude(A,name,new Date(date.getTime()-43200000)),b=geoLongitude(A,name,new Date(date.getTime()+43200000));
+    const speed=normalizeLongitude(b-a+180)-180;
+    return [{name,...zodiacSector(longitude),speed,retrograde:name!=='Sun'&&name!=='Moon'&&speed<0}];
+   }catch{return [];}
+ });
+}
+export function nextMoonSign(A,date){
+ try{
+  const initial=zodiacSector(geoLongitude(A,'Moon',date)).index;
+  let lo=date.getTime(),hi=lo;
+  for(let i=0;i<96;i++){hi+=3600000;if(zodiacSector(geoLongitude(A,'Moon',new Date(hi))).index!==initial)break;lo=hi;}
+  if(hi===lo)return null;
+  while(hi-lo>60000){const mid=(hi+lo)/2;if(zodiacSector(geoLongitude(A,'Moon',new Date(mid))).index===initial)lo=mid;else hi=mid;}
+  const at=new Date(hi);return {at:at.toISOString(),index:zodiacSector(geoLongitude(A,'Moon',at)).index};
+ }catch{return null;}
+}
+// Heliocentric view deliberately uses a compressed, non-scale radial axis.
+export function solarSystemPositions(A,date){
+ return ORBIT_BODIES.flatMap((name,i)=>{try{
+   const v=A.HelioVector(name,date),e=A.Ecliptic(v),distance=Math.hypot(v.x,v.y,v.z);
+   if(!Number.isFinite(distance)||!Number.isFinite(e.elon))return [];
+   return [{name,distance,longitude:normalizeLongitude(e.elon),index:i}];
+ }catch{return [];}});
+}
+export function orbitPoint(longitude,distance,{cx=200,cy=200}={}){
+ const r=22+150*Math.log1p(Math.max(0,distance)/.35)/Math.log1p(50/.35),a=longitude*Math.PI/180;
+ return {x:cx+r*Math.sin(a),y:cy-r*Math.cos(a),radius:r};
+}

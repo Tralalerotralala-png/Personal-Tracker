@@ -10,6 +10,7 @@ const palette={
  Uranus:['#315a6d','#649faa','#a0dcd5','#d9fff2'],
  Neptune:['#263a7b','#4768ba','#789fe4','#c7dfff'],
  Pluto:['#534a5e','#827589','#c0a3a0','#eed9cc'],
+ Earth:['#18345d','#28629a','#4f9bca','#a5e5ef'],
  Moon:['#3c3e55','#77768a','#bcb9bc','#eee7d8']
 };
 const cache=new Map();
@@ -27,6 +28,15 @@ function disk(name,phase){
   const z=Math.sqrt(Math.max(0,1-(r/12.8)**2));
   const light=.52*z-.035*x-.048*y;
   let texture=0;
+  if(name==='Earth'){
+    // Stylized continents and polar ice over a shaded ocean sphere.
+    const f=(cx,cy,rx,ry)=>((x-cx)/rx)**2+((y-cy)/ry)**2;
+    const land=Math.min(f(-5,-5,5,4),f(-3,-1,2.5,3.5),f(-1,5,3,5),f(7,-4,5,3),f(5,1,3,4),f(9,7,2.5,2))+.15*noise(x,y)<1;
+    if(r>11.9)return '#2d679a';
+    if(Math.abs(y)>10.2)return light>.15?'#e1f5ee':'#8dbacb';
+    if(land)return light<.16?'#275951':light<.43?'#4d9369':'#a0ce80';
+    return p[light<.08?0:light<.34?1:light<.60?2:3];
+  }
   if(name==='Jupiter'||name==='Saturn'||name==='Neptune'||name==='Uranus'){
     texture=.14*Math.sin(y*(name==='Jupiter'?1.45:1.05)+.17*Math.sin(x*.6));
     if(name==='Jupiter'&&((x-5)/4)**2+((y-5)/2.2)**2<1)return light>.23?'#bb654e':'#8b4f48';
@@ -55,12 +65,14 @@ function ring(front){
 export function celestialSprite(name,{kind='body',phase=null}={}){
  if(kind==='star')return '<g class="celestial-star-art" transform="translate(16 16)"><path d="M-2 -8H2V-2H8V2H2V8H-2V2H-8V-2H-2Z" fill="#a4b7e8" opacity=".55"/><path d="M-1 -5H1V-1H5V1H1V5H-1V1H-5V-1H-1Z" fill="#e1e9ff"/><rect x="-1" y="-1" width="2" height="2" fill="#fff"/></g>';
  const k=name+':'+(name==='Moon'&&phase!=null?Math.round(phase*100):'static');if(cache.has(k))return cache.get(k);
- const rings=name==='Saturn',sun=name==='Sun';
+ const rings=name==='Saturn',sun=name==='Sun',earth=name==='Earth';
  const glow=sun?'<g class="celestial-corona"><path d="M16 0V3M16 29V32M0 16H3M29 16H32M4 4L6 6M26 26L28 28M4 28L6 26M26 6L28 4" stroke="#ffc967" stroke-width="2"/><circle cx="16" cy="16" r="14" fill="#ffbe62" opacity=".17"/></g>':'';
  // Rear ring, stacked depth silhouette, lit raster surface, and front ring.
- const art=glow+(rings?'<g class="celestial-ring-back">'+ring(false)+'</g>':'')+
+ const atmosphere=earth?'<g class="celestial-atmosphere">'+raster((x,y)=>{const r=Math.hypot(x,y);return r>12.5&&r<14.1?'#598dc2':null;})+'</g>':'';
+ const clouds=earth?'<g class="celestial-earth-clouds" opacity=".62">'+raster((x,y)=>Math.hypot(x,y)<11.8&&Math.sin(y*.8+x*.19+Math.sin(x*.4))>.92&&Math.sin(x*.54-y*.17)>.18?'#d8eff0':null)+'</g>':'';
+ const art=glow+atmosphere+(rings?'<g class="celestial-ring-back">'+ring(false)+'</g>':'')+
  '<g class="celestial-depth" transform="translate(0 1)" opacity=".8">'+raster((x,y)=>Math.hypot(x,y)<=12.8?(palette[name]||palette.Moon)[0]:null)+'</g>'+
- '<g class="celestial-surface">'+disk(name,phase)+'</g>'+
+ '<g class="celestial-surface">'+disk(name,phase)+'</g>'+clouds+
  (rings?'<g class="celestial-ring-front">'+ring(true)+'</g>':'');
  if(cache.size>160)cache.clear();cache.set(k,art);return art;
 }

@@ -1830,3 +1830,66 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .celestial-altitude-section{display:grid;gap:6px;}
 .celestial-altitude-chart{background:var(--panel-2);border:1px solid var(--edge);padding:8px;}
 .celestial-altitude-chart svg{display:block;width:100%;height:auto;color:var(--ink-dim);}
+
+/* Global pixel-depth treatment: silhouette slices on generated glyphs, alpha
+   extrusion on existing raster/custom sprites. No image bytes are altered. */
+.sprite-stack-back{transform:translate(.8px,1.15px);filter:brightness(.30);opacity:.86;}
+.sprite-stack-mid{transform:translate(.4px,.57px);filter:brightness(.55);opacity:.92;}
+.sprite-stack-face{transition:transform .22s steps(4,end);}
+.slot:hover .sprite-stack-face,.tile:hover .sprite-stack-face,.btn:hover .sprite-stack-face{transform:translate(-.35px,-.4px);}
+.sprite-weather-depth .wx-cloud-layer,.sprite-weather-depth .wx-sun-art,.sprite-weather-depth .wx-fog-layer{filter:drop-shadow(.7px .9px 0 #10152d88) drop-shadow(1px 1px 0 #10152d44);}
+.sprite-weather-depth .wx-rain-drop,.sprite-weather-depth .wx-snow-flake,.sprite-weather-depth .wx-lightning{filter:drop-shadow(.7px .8px 0 #141c3d77);}
+.sprite-weather-depth:not(.wx-compact) .wx-sun-art{animation:ptDepthSun 5s steps(5,end) infinite alternate;}
+.sprite-weather-depth:not(.wx-compact) .wx-snow-flake{animation:compactSnow 3.8s steps(4,end) infinite;}
+.sprite-weather-depth:not(.wx-compact) .wx-lightning{animation:compactFlash 7s steps(1,end) infinite;}
+@keyframes ptDepthSun{from{opacity:.82}to{opacity:1}}
+/* UI art retains its original content, adding pixel-like layered shadow edges.
+   Photographs/covers use lift and tilt only during interaction. */
+.art>svg:not(:has(.sprite-stack-face)),.art>img,.slot-icon>svg:not(:has(.sprite-stack-face)):not(.sprite-weather-depth),.brand-glyph>svg:not(:has(.sprite-stack-face)),.gear-icon>svg:not(:has(.sprite-stack-face)),.w-weather-moon>svg,.private-moon>svg,.dream-night-icon>svg:not(.sprite-weather-depth),.wx-event-symbol>svg,.w-sky-symbol>svg,.celestial-sprite{
+ filter:drop-shadow(1px 1px 0 #0006) drop-shadow(1px 2px 0 #0004);
+}
+.tile .art,.row-art .art,.loot-art .art{transform-style:preserve-3d;perspective:450px;}
+.tile .art>svg,.tile .art>img,.row-art .art>svg,.row-art .art>img,.loot-art .art>svg,.loot-art .art>img,.slot-icon>svg,.brand-glyph>svg,.gear-icon>svg{transition:transform .25s cubic-bezier(.2,.7,.3,1),filter .25s;transform-origin:50% 60%;}
+@media(hover:hover) and (pointer:fine){
+ .tile:hover .art>svg,.tile:hover .art>img,.row-item:hover .row-art .art>svg,.row-item:hover .row-art .art>img,.loot:hover .loot-art .art>svg,.loot:hover .loot-art .art>img{transform:perspective(360px) translateY(-2px) scale(1.055) rotateX(7deg) rotateY(-9deg);filter:drop-shadow(2px 3px 0 #0006) drop-shadow(2px 2px 0 #0003);}
+ .slot:hover .slot-icon>svg,.brand:hover .brand-glyph>svg,.gear:hover .gear-icon>svg{transform:perspective(180px) translateY(-1px) rotateY(-10deg) scale(1.07);}
+ .game-book:hover>img:not(.library-cover-art),.game-book:hover>.game-placeholder:not(.library-cover-art){transform:perspective(480px) translateY(-4px) rotateY(-8deg) scale(1.04);}
+}
+.tile:active .art>svg,.tile:active .art>img,.slot:active .slot-icon>svg{transform:scale(.96);}
+.game-book>img:not(.library-cover-art),.game-book>.game-placeholder:not(.library-cover-art){transition:transform .22s,box-shadow .22s;}
+.journal-art,.photo-preview img,.game-detail img,.media-detail img{box-shadow:2px 2px 0 #0004,4px 4px 0 #0003;}
+/* Keep data charts and text stable; breathing on the icon, not its container. */
+.w-weather-moon>svg,.private-moon>svg,.dream-night-icon>svg[role=img]{animation:ptMoonRelief 7s ease-in-out infinite alternate;}
+@keyframes ptMoonRelief{from{filter:drop-shadow(1px 1px 0 #0006)}to{filter:drop-shadow(1px 2px 0 #0006) drop-shadow(0 0 2px #c7c0ed44)}}
+:root[data-sprite-motion="lively"] .tile .art>svg,:root[data-sprite-motion="lively"] .slot-icon>svg:not(.sprite-weather-depth){animation:ptSpriteIdle 6s steps(6,end) infinite alternate;}
+:root[data-sprite-motion="lively"] .tile:nth-child(3n) .art>svg,:root[data-sprite-motion="lively"] .slot:nth-child(3n) .slot-icon>svg{animation-delay:-2s;}
+@keyframes ptSpriteIdle{0%,25%{transform:translateY(0)}75%,100%{transform:translateY(-1px)}}
+:root[data-sprite-motion="static"] .sprite-stack-face,:root[data-sprite-motion="static"] .art>svg,:root[data-sprite-motion="static"] .art>img,:root[data-sprite-motion="static"] .slot-icon>svg,:root[data-sprite-motion="static"] .brand-glyph>svg,:root[data-sprite-motion="static"] .gear-icon>svg,:root[data-sprite-motion="static"] .sprite-weather-depth g,:root[data-sprite-motion="static"] .w-weather-moon>svg,:root[data-sprite-motion="static"] .private-moon>svg,:root[data-sprite-motion="static"] .dream-night-icon>svg{animation:none!important;transition:none!important;}
+:root[data-sprite-motion="static"] .tile .art>svg,:root[data-sprite-motion="static"] .tile .art>img,:root[data-sprite-motion="static"] .row-art .art>svg,:root[data-sprite-motion="static"] .row-art .art>img,:root[data-sprite-motion="static"] .slot-icon>svg,:root[data-sprite-motion="static"] .sprite-stack-face{transform:none!important;}
+.reduce-animations .sprite-stack-face,.reduce-animations .art>svg,.reduce-animations .art>img,.reduce-animations .slot-icon>svg,.reduce-animations .brand-glyph>svg,.reduce-animations .gear-icon>svg,.reduce-animations .sprite-weather-depth g,.reduce-animations .private-moon>svg,.reduce-animations .w-weather-moon>svg,.reduce-animations .dream-night-icon>svg,.reduce-animations .celestial-earth-clouds{animation:none!important;transition:none!important;}
+.reduce-animations .tile .art>svg,.reduce-animations .tile .art>img,.reduce-animations .row-art .art>svg,.reduce-animations .row-art .art>img,.reduce-animations .slot-icon>svg,.reduce-animations .sprite-stack-face{transform:none!important;}
+@media(prefers-reduced-motion:reduce){.sprite-stack-face,.art>svg,.art>img,.slot-icon>svg,.brand-glyph>svg,.gear-icon>svg,.sprite-weather-depth g,.private-moon>svg,.w-weather-moon>svg,.dream-night-icon>svg,.celestial-earth-clouds{animation:none!important;transition:none!important;}.tile .art>svg,.tile .art>img,.row-art .art>svg,.row-art .art>img,.slot-icon>svg,.sprite-stack-face{transform:none!important;}}
+/* Earth and the zodiac: two different astronomical reference frames. */
+.celestial-extra{border:1px solid var(--edge);padding:9px;background:var(--panel-2);min-width:0;}
+.celestial-extra>summary{cursor:pointer;color:var(--accent);font-weight:600;}
+.celestial-extra[open]>summary{margin-bottom:12px;}
+.celestial-solar-home{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.celestial-solar-home>div{flex:1;min-width:120px;}
+.solar-system-map{max-width:540px;margin:12px auto;}
+.solar-system-map svg,.zodiac-wheel svg{display:block;width:100%;height:auto;}
+.celestial-orbit-guide{fill:none;stroke:#63769a;stroke-width:.7;stroke-dasharray:3 5;opacity:.55;}
+.celestial-orbit-buttons{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0;}
+.zodiac-panel{display:grid;gap:12px;}
+.zodiac-feature{display:grid;grid-template-columns:minmax(115px,1fr) minmax(130px,1fr);align-items:center;gap:12px;}
+.zodiac-wheel{max-width:290px;}
+.zodiac-summary{display:grid;gap:12px;}
+.zodiac-summary>div{display:grid;gap:4px;}
+.zodiac-summary>div small{color:var(--ink-dim);}
+.zodiac-summary>div strong{color:var(--accent);font-size:1.15rem;}
+.zodiac-planet-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:5px;}
+.zodiac-position{display:flex;align-items:center;gap:6px;text-align:left;font-size:.78rem;}
+.zodiac-position>span:nth-child(2){flex:1;min-width:0;}
+.zodiac-position strong{white-space:nowrap;font-size:.75rem;}
+.celestial-earth-clouds{animation:earthCloudLight 9s steps(7,end) infinite alternate;}
+@keyframes earthCloudLight{from{opacity:.4}to{opacity:.78}}
+@media(max-width:420px){.zodiac-feature{grid-template-columns:1fr;}.zodiac-wheel{margin:auto;}}
