@@ -27,24 +27,30 @@ function wrap(error, status) {
   });
 }
 
-export function createSupabaseRemote(client) {
+export function createSupabaseRemote(client, expectedUserId=null) {
   async function currentUserId() {
     const { data } = await client.auth.getSession();
     if (!data?.session) throw Object.assign(new Error('Not signed in'), { code: 'AUTH' });
-    return data.session.user.id;
+    const uid=data.session.user.id;
+    if(expectedUserId&&uid!==expectedUserId)throw Object.assign(new Error('Account changed'),{code:'AUTH'});
+    return uid;
   }
 
   return {
     async pull(table, since, limit) {
+      const uid=await currentUserId();
       let q = client
         .from(table)
         .select('*')
+        .eq('user_id',uid)
         .order('synced_at', { ascending: true })
         .order(TABLES[table].pk, { ascending: true })
         .limit(limit);
       if (since) q = q.gte('synced_at', since);
       const { data, error, status } = await q;
       if (error) throw wrap(error, status);
+      await currentUserId();
+      if(data.some(r=>r.user_id!==uid))throw Object.assign(new Error('Unexpected row owner'),{code:'AUTH'});
       return data;
     },
 
@@ -55,6 +61,7 @@ export function createSupabaseRemote(client) {
         .from(table)
         .upsert(payload, { onConflict: TABLES[table].onConflict });
       if (error) throw wrap(error, status);
+      await currentUserId();
     },
 
     classifyError: classifySupabaseError,

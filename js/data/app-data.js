@@ -51,24 +51,21 @@ export async function initData() {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
   const auth = createAuth(client, { allowNewUser: cfg.ALLOW_NEW_USER !== false });
-  const store = createStore({
-    adapter: await openAdapter('personal-tracker-cloud'),
-    remote: createSupabaseRemote(client),
-  });
-
-  let started = false;
-  async function startCloud() {
-    if (started) return;
-    started = true;
-    store.sync.start(); // begins periodic sync and kicks off the first one
-    const status = await store.sync.syncNow(); // joins the sync already running
-    if (status.state === 'synced') { await ensureDefaults(store); await upgradeLayouts(store); }
+  const initial=await auth.getSession();
+  const uid=initial?.user?.id||null;
+  // No account cache is opened until the server confirms the owner.
+  if(!uid)return {mode:'cloud',store:null,auth,client,config:cfg};
+  const {data:allowed,error}=await client.rpc('tracker_account_allowed');
+  if(error||allowed!==true){
+    if(!error)await auth.signOut();
+    return {mode:'cloud',store:null,auth,client,config:cfg,accessError:error?'Unable to verify account. Reconnect and reload.':'This account is not authorized.'};
   }
-
-  if (await auth.getSession()) startCloud();
-  auth.onAuthChange((_event, session) => {
-    if (session) startCloud();
-  });
-
-  return { mode: 'cloud', store, auth, client, config: cfg };
+  const adapter=await openAdapter('personal-tracker-cloud:'+uid);
+  // The old cache has no trustworthy owner stamp. Preserve it untouched;
+  // download authoritative cloud rows instead of importing ambiguous data.
+  const store=createStore({adapter,remote:createSupabaseRemote(client,uid)});
+  store.accountId=uid;
+  store.sync.start();
+  store.sync.syncNow().then(async status=>{if(status.state==='synced'){await ensureDefaults(store);await upgradeLayouts(store);}}).catch(console.warn);
+  return {mode:'cloud',store,auth,client,config:cfg,accountId:uid};
 }

@@ -37,6 +37,13 @@ try {
   throw err;
 }
 const { mode, store, auth, client } = ctx;
+// Signed-out shell never constructs private views, reminders or global shortcuts.
+if(mode==='cloud'&&!store){
+  const login=createLogin({auth});root.replaceChildren(login.el);
+  if(ctx.accessError)login.el.append(h('p',{class:'hint'},ctx.accessError));
+  auth.onAuthChange((event,session)=>{if(event!=='INITIAL_SESSION'&&session)location.reload();});
+  if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}else{
 const photos = createPhotos({ store, client });
 const gameBackups = client ? createGameBackupService({store,client}) : null;
 const weather = createWeatherService({ store });
@@ -408,14 +415,11 @@ window.addEventListener('online', () => { weather.refresh(); feed.refresh(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { weather.refresh(); feed.refresh(); } });
 setInterval(() => { if (document.visibilityState === 'visible') { weather.refresh(); feed.refresh(); } }, 5 * 60_000);
 
-// ---- sign-in gate ------------------------------------------------------------------------
-if (mode === 'cloud') {
-  const login = createLogin({ auth });
-  const gate = (signedIn) => {
-    if (signedIn) login.el.remove(); else { audioPlayer.pause(); if (!login.el.isConnected) document.body.append(login.el); }
-  };
-  gate(Boolean(await auth.getSession()));
-  auth.onAuthChange((_event, session) => gate(Boolean(session)));
+// Account changes destroy all in-memory views by reloading the document.
+if(mode==='cloud'){
+ const seal=()=>{store.sync.stop();audioPlayer.pause();document.querySelectorAll('dialog').forEach(d=>d.remove());root.replaceChildren(h('p',{},'Session changed. Reloading…'));location.reload();};
+ auth.onAuthChange((_event,session)=>{if(session?.user?.id!==ctx.accountId)seal();});
+ window.addEventListener('pageshow',e=>{if(e.persisted)auth.getSession().then(s=>{if(s?.user?.id!==ctx.accountId)seal();});});
 }
 
 // ---- service worker (offline + installable) -------------------------------------------------
@@ -435,3 +439,5 @@ if ('serviceWorker' in navigator) {
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{
   if(e.data?.type==='open-reminder-tab' && ['#calendar','#hub'].includes(e.data.target))location.hash=e.data.target;
 });
+
+}

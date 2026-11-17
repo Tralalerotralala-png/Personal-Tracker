@@ -8,7 +8,7 @@ import { loadLayout, saveLayout, boundsFor } from '../widgets/store.js';
 import { addItem, removeItem } from '../widgets/layout.js';
 const tr=(en,es)=>language()==='es'?es:en;
 const KEY='tracker-audio-preferences-v1';
-const readPrefs=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch{return {};}};
+const readPrefs=key=>{try{return JSON.parse(localStorage.getItem(key)||'{}')||{};}catch{return {};}};
 export const secureStream=value=>{try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password?url.href:null;}catch{return null;}};
 export async function findRadioStations({country='',region='',name=''},{fetchImpl=globalThis.fetch}={}){
  const p=new URLSearchParams({hidebroken:'true',limit:'45',order:'votes',reverse:'true',is_https:'true'});
@@ -19,18 +19,20 @@ export async function findRadioStations({country='',region='',name=''},{fetchImp
  const data=await response.json();
  return (Array.isArray(data)?data:[]).filter(s=>secureStream(s.url_resolved||s.url)).map(s=>({id:'radio:'+s.stationuuid,name:String(s.name||'Radio').trim().slice(0,150),url:secureStream(s.url_resolved||s.url),region:String(s.state||s.country||'').slice(0,100),uuid:s.stationuuid}));
 }
-function openTracks(){
- return new Promise((resolve,reject)=>{const req=indexedDB.open('personal-tracker-local-music',1);req.onupgradeneeded=()=>req.result.createObjectStore('tracks',{keyPath:'id'});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+function openTracks(name){
+ return new Promise((resolve,reject)=>{const req=indexedDB.open(name,1);req.onupgradeneeded=()=>req.result.createObjectStore('tracks',{keyPath:'id'});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
 }
-async function dbOp(mode,fn){
- const db=await openTracks();
+async function accountDbOp(name,mode,fn){
+ const db=await openTracks(name);
  try{return await new Promise((resolve,reject)=>{const tx=db.transaction('tracks',mode),r=fn(tx.objectStore('tracks'));let result;r.onsuccess=()=>result=r.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}finally{db.close();}
 }
 const time=s=>Number.isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'LIVE';
 export function createAudioPlayer({store}){
- let prefs=readPrefs(),tracks=[],favorites=Array.isArray(prefs.favorites)?prefs.favorites.filter(s=>secureStream(s.url)):[],results=[],active=null,objectUrl=null,dockHost=null,mode='music',requestId=0,ready=false,profileChanged=false;
+ const key=KEY+':'+(store.accountId||'local'),dbName='personal-tracker-local-music:'+(store.accountId||'local');
+ const dbOp=(mode,fn)=>accountDbOp(dbName,mode,fn);
+ let prefs=readPrefs(key),tracks=[],favorites=Array.isArray(prefs.favorites)?prefs.favorites.filter(s=>secureStream(s.url)):[],results=[],active=null,objectUrl=null,dockHost=null,mode='music',requestId=0,ready=false,profileChanged=false;
  const audio=document.createElement('audio');audio.preload='metadata';audio.volume=Number.isFinite(prefs.volume)?Math.max(0,Math.min(1,prefs.volume)):.65;
- const savePrefs=()=>{try{localStorage.setItem(KEY,JSON.stringify({...prefs,favorites,volume:audio.volume}));}catch{}};
+ const savePrefs=()=>{try{localStorage.setItem(key,JSON.stringify({...prefs,favorites,volume:audio.volume}));}catch{}};
  const floating=h('aside',{class:'floating-audio','aria-label':tr('Music and radio','Música y radio')});
  const launcher=h('button',{class:'btn audio-launcher',type:'button',title:tr('Open music & radio','Abrir música y radio')},h('span',{class:'audio-cassette','aria-hidden':'true'},'♫'),tr('Audio','Audio'));
  const panel=h('section',{class:'audio-player'});
