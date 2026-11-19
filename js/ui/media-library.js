@@ -51,13 +51,11 @@ export function createMediaLibraryView({store,backups=null}) {
    return h('div',{},form,saveButton);
  }
  function render(){
-   const tabs=h('div',{class:'hub-tabs'},['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),onclick:()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;dirty=false;page=null;active=k;render();}},L()[k])));
+   const tabs=h('div',{class:'hub-tabs'},['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),onclick:()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;dirty=false;page=null;query='';statusFilter='all';active=k;render();}},L()[k])));
    const top=h('div',{class:'panel-head'},h('h2',{},L().library),tabs);
    if(active==='games'){games.el.hidden=false;replace(el,top,games.el);return;}
    games.el.hidden=true;
    if(page){replace(el,top,h('div',{class:'game-page-head'},h('button',{class:'btn small',onclick:back},L().cancel),h('h2',{},page.entry?.title||`${L().add} ${L()[active]}`)),h('div',{class:'game-page-body'},page.editing?renderEditor(page.entry):renderDetail(page.entry)));return;}
-   const rows=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
-   const shelves=[...new Set(rows.map(x=>x.shelf||'Collection'))];
    const header=h('div',{class:'inline-actions'},h('button',{class:'btn small',onclick:()=>{shelfMode=!shelfMode;render();}},L().view),h('button',{class:'btn primary',onclick:()=>show(null,true)},`${L().add} ${L()[active]}`));
    const results=h('div',{class:'media-filter-results'});
    function updateResults(){
@@ -70,5 +68,24 @@ export function createMediaLibraryView({store,backups=null}) {
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
- return {el,mount:load,show:render,hide:()=>{}};
+ return {
+  el, mount: load, show: render, hide: () => {},
+  openRecord(record) {
+   if (dirty && !confirm(language() === 'es' ? '¿Descartar cambios sin guardar?' : 'Discard unsaved changes?')) return true;
+   if (record.kind === 'games') {
+    if (!games.openRecord(record)) return false;
+    active = 'games';
+    dirty = false;
+    page = null;
+    render();
+    return true;
+   }
+   const row = list(record.kind).find(item => item.id === record.id);
+   if (!row) return false;
+   active = record.kind;
+   dirty = false;
+   show(row);
+   return true;
+  },
+ };
 }

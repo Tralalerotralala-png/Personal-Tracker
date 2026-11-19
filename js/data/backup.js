@@ -1,6 +1,6 @@
 // Backup / restore as one JSON file. Photos are not included (they live in
 // Supabase Storage; the rows only hold their paths).
-import { TABLE_NAMES, TABLES } from './schema.js';
+import { TABLE_NAMES, TABLES, normalizeRow } from './schema.js';
 
 export const BACKUP_APP = 'personal-tracker';
 export const BACKUP_VERSION = 1;
@@ -16,36 +16,54 @@ export async function exportAll(store) {
   return { app: BACKUP_APP, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), tables };
 }
 
-// mode 'merge'   : add rows that are missing, restore deleted ones, update rows
-//                  that are older than the backup; never touch newer local rows.
-// mode 'replace' : make the data match the backup exactly (rows not in the
-//                  backup are deleted).
-export async function importAll(store, data, { mode = 'merge' } = {}) {
-  if (!data || data.app !== BACKUP_APP || typeof data.tables !== 'object') {
+// Validate the file before touching local records. Merge can recover valid
+// rows from a damaged file, but replace must reject incomplete or bad tables.
+export function inspectBackup(data) {
+  if (!data || data.app !== BACKUP_APP || !data.tables || typeof data.tables !== 'object' || Array.isArray(data.tables)) {
     throw new Error('This file is not a Personal Tracker backup.');
   }
-  if (data.version !== BACKUP_VERSION) {
-    throw new Error(`Unsupported backup version: ${data.version}`);
-  }
-  if (!['merge', 'replace'].includes(mode)) throw new Error(`Unknown import mode: ${mode}`);
-
-  const summary = { added: 0, updated: 0, skipped: 0, removed: 0, errors: [] };
-
+  if (data.version !== BACKUP_VERSION) throw new Error(`Unsupported backup version: ${data.version}`);
+  const tables = {};
+  const errors = [];
   for (const table of TABLE_NAMES) {
-    const rows = data.tables[table];
-    if (!Array.isArray(rows)) continue;
-    const pk = TABLES[table].pk;
-
-    if (mode === 'replace') {
-      const incoming = new Set(rows.map((r) => r[pk]));
-      for (const local of await store.list(table)) {
-        if (!incoming.has(local[pk])) {
-          await store.remove(table, local[pk]);
-          summary.removed += 1;
-        }
-      }
+    const input = data.tables[table];
+    if (input === undefined) continue;
+    if (!Array.isArray(input)) {
+      errors.push(`${table}: expected an array of records`);
+      continue;
     }
+    const pk = TABLES[table].pk;
+    const ids = new Set();
+    tables[table] = input.flatMap((row, index) => {
+      try {
+        const id = row?.[pk];
+        if (typeof id !== 'string' || !id.trim()) throw new Error(`${pk} is required`);
+        if (ids.has(id)) throw new Error('duplicate record');
+        const clean = normalizeRow(table, row);
+        if (['name', 'title'].some(key => key in clean && typeof clean[key] !== 'string')) throw new Error('name/title must be text');
+        if (table === 'events' && !Number.isFinite(Date.parse(clean.starts_at))) throw new Error('invalid event start');
+        if (table === 'widget_layout' && !Array.isArray(clean.layout)) throw new Error('invalid widget layout');
+        ids.add(id);
+        return [clean];
+      } catch (error) {
+        errors.push(`${table} #${index + 1}: ${error.message}`);
+        return [];
+      }
+    });
+  }
+  if (!Object.keys(tables).length) throw new Error('The backup does not contain any readable tables.');
+  return { tables, errors, count: Object.values(tables).reduce((sum, rows) => sum + rows.length, 0) };
+}
 
+export async function importAll(store, data, { mode = 'merge' } = {}) {
+  if (!['merge', 'replace'].includes(mode)) throw new Error(`Unknown import mode: ${mode}`);
+  const { tables, errors } = inspectBackup(data);
+  if (mode === 'replace' && (errors.length || TABLE_NAMES.some(table => !tables[table]))) {
+    throw new Error('Replacing data requires a complete backup without invalid records.');
+  }
+  const summary = { added: 0, updated: 0, skipped: 0, removed: 0, errors };
+  for (const [table, rows] of Object.entries(tables)) {
+    const pk = TABLES[table].pk;
     for (const row of rows) {
       try {
         const existing = await store.get(table, row[pk], { includeDeleted: true });
@@ -56,8 +74,18 @@ export async function importAll(store, data, { mode = 'merge' } = {}) {
         }
         await store.importRow(table, row, { touch: true });
         if (live) summary.updated += 1; else summary.added += 1;
-      } catch (err) {
-        summary.errors.push(`${table}/${row?.[pk]}: ${err.message}`);
+      } catch (error) {
+        summary.errors.push(`${table}/${row[pk]}: ${error.message}`);
+      }
+    }
+  }
+  // Even valid JSON can fail to write (for example, quota exceeded).
+  if (mode === 'replace' && !summary.errors.length) {
+    for (const [table, rows] of Object.entries(tables)) {
+      const pk = TABLES[table].pk;
+      const incoming = new Set(rows.map(row => row[pk]));
+      for (const local of await store.list(table)) {
+        if (!incoming.has(local[pk]) && await store.remove(table, local[pk])) summary.removed += 1;
       }
     }
   }

@@ -38,9 +38,14 @@ export function createStore({
     return def;
   };
 
-  async function markDirty(table, id) {
-    if (!sync) return;
-    await adapter.put('outbox', { key: `${table}:${id}`, table, id, queuedAt: clock() });
+  // A failed outbox write must never leave a locally saved row stranded.
+  async function write(table, row) {
+    if (!sync) { await adapter.put(table, row); return; }
+    const id = row[TABLES[table].pk];
+    await adapter.putBatch([
+      [table, row],
+      ['outbox', { key: `${table}:${id}`, table, id, queuedAt: clock() }],
+    ]);
     sync.noteLocalWrite();
   }
 
@@ -80,8 +85,7 @@ export function createStore({
       deleted_at: input.deleted_at ?? null,
     });
 
-    await adapter.put(table, row);
-    await markDirty(table, id);
+    await write(table, row);
     emit({ type: 'change', tables: [table], ids: [id], source: 'local' });
     return row;
   }
@@ -93,8 +97,7 @@ export function createStore({
     const existing = await adapter.get(table, id);
     if (!existing || existing.deleted_at) return false;
     const now = nextTimestamp(clock, existing.updated_at);
-    await adapter.put(table, { ...existing, deleted_at: now, updated_at: now });
-    await markDirty(table, id);
+    await write(table, { ...existing, deleted_at: now, updated_at: now });
     emit({ type: 'change', tables: [table], ids: [id], source: 'local' });
     return true;
   }
@@ -150,8 +153,7 @@ export function createStore({
       deleted_at: row.deleted_at ?? null,
     });
     delete clean.synced_at;
-    await adapter.put(table, clean);
-    await markDirty(table, clean[def.pk]);
+    await write(table, clean);
     emit({ type: 'change', tables: [table], ids: [clean[def.pk]], source: 'local' });
     return clean;
   }

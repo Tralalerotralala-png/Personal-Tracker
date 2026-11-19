@@ -1367,6 +1367,14 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Search and go to','Buscar e ir a'], ['Section','Sección'], ['Sections','Secciones'],
+ ['Search results','Resultados de búsqueda'], ['Searching saved records…','Buscando en tus registros…'],
+ ['Could not load saved records.','No se pudieron cargar tus registros.'],
+ ['This record is no longer available.','Este registro ya no está disponible.'],
+ ['Could not open this section. Try again.','No se pudo abrir esta sección. Inténtalo de nuevo.'],
+ ['Skip to content','Saltar al contenido'], ['Add widgets with Edit layout.','Agrega widgets desde Editar diseño.'],
+ ['Temporary session','Sesión temporal'], ['Local','Local'], ['Game','Juego'], ['Book','Libro'], ['Film','Película'], ['Album','Álbum'],
+
  ['Customize backpack','Personalizar mochila'],
  ['Audio player','Reproductor de audio'],['Music and radio player · available in the Tracker app.','Reproductor de música y radio · disponible en la app Tracker.'],
  ['Boxes','Cajas'],['Box','Caja'],['Add another box','Agregar otra caja'],['Each box has its own quantity and capacity. Your pack shows their combined total.','Cada caja tiene su propia cantidad y capacidad. Tu mochila muestra el total de todas.'],['Each box needs a valid current and maximum quantity.','Cada caja debe tener una cantidad actual y máxima válidas.'],['Remove box?','¿Quitar caja?'],['This removes its quantity from the total when you save.','Su cantidad se restará del total cuando guardes.'],['Quantity is too large.','La cantidad es demasiado grande.'],
@@ -3446,6 +3454,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
   let state = { status: 'idle', place: null, rows: [], summary: null, fetchedAt: null, error: null, soilAvailable: false, current: null, hourly: [], history: [], forecastReview:null };
   const listeners = new Set();
   let running = null;
+  let placeVersion = 0;
 
   const emit = () => { for (const fn of [...listeners]) { try { fn({ ...state }); } catch (e) { console.error(e); } } };
   const set = (patch) => { state = { ...state, ...patch }; emit(); };
@@ -3468,13 +3477,17 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
 
   async function refresh({ force = false } = {}) {
     if (running) return running;
+    const version = placeVersion;
     running = (async () => {
       const place = await loadPlace();
+      if (version !== placeVersion) return state;
       if (!place) { set({ status: 'no-location', place: null, rows: [], history: [], hourly: [], summary: null, current: null, error: null }); return state; }
 
       const interval = ((await store.getSetting('refresh_minutes'))?.weather ?? 60) * 60_000;
       const cached = (await store.meta.get(CACHE_KEY)) ?? null;
       const sameplace = cached && cached.key === placeKey(place);
+      const sameDisplay = state.place && placeKey(state.place) === placeKey(place);
+      if (!sameDisplay) set({ hourly: [], forecastReview: null });
       // A previous app version did not fetch sunrise, sunset, or cloud cover.
       // Display its cached forecast immediately, but refresh the new fields.
       const needsLightingData = sameplace && !cached.raw.skyRefreshChecked && (!cached.raw.days?.some(d => d.sunrise && d.sunset)
@@ -3485,6 +3498,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       // Show what we have straight away.
       if (sameplace) {
         const c = await compute(cached.raw);
+        if (version !== placeVersion) return state;
         if (c.todayFound) set({ place, ...c, fetchedAt: cached.raw.fetchedAt, soilAvailable: cached.raw.soilAvailable, current: cached.raw.current ?? null, hourly: cached.raw.hourly?.length ? cached.raw.hourly : state.hourly, status: age < interval ? 'ok' : 'stale', error: null });
       } else set({ place, rows: [], history: [], hourly: [], summary: null, current: null, status: 'loading', error: null });
 
@@ -3493,6 +3507,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       try {
         if (!state.rows.length) set({ status: 'loading' });
         const raw = await fetchWeather(place, { fetchImpl });
+        if (version !== placeVersion) return state;
         raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         const archive=await store.meta.get(FORECAST_ARCHIVE_KEY) || {};
@@ -3516,29 +3531,45 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
         await store.meta.set(FORECAST_ARCHIVE_KEY,{place:placeKey(place),forecasts});
         await store.meta.set(CACHE_KEY, { key: placeKey(place), raw });
         const c = await compute(raw);
+        if (version !== placeVersion) return state;
         set({ place, ...c, fetchedAt: raw.fetchedAt, soilAvailable: raw.soilAvailable, current: raw.current ?? null, hourly: raw.hourly?.length ? raw.hourly : state.hourly, status: c.todayFound ? 'ok' : 'error', forecastReview:review, error: c.todayFound ? null : 'The weather data did not include today.' });
       } catch (err) {
-        set({ place, status: state.rows.length ? 'stale' : 'error', error: err.message });
+        if (version === placeVersion) set({ place, status: state.rows.length ? 'stale' : 'error', error: err.message });
       }
       return state;
     })();
     const p = running;
-    p.finally(() => { if (running === p) running = null; });
+    const clear = () => { if (running === p) running = null; };
+    p.then(clear, clear);
     return p;
   }
 
   // Re-score from the cached data (after retuning, or when the date rolls over).
   // Load short-term rain separately so existing daily/soil refresh remains reliable.
-  let hourlyAt = 0;
+  let hourlyCache = null;
+  let hourlyPending = null;
   async function loadHourly({ force = false } = {}) {
+    const version = placeVersion;
     const place = await loadPlace();
-    if (!place) return [];
-    if (!force && state.hourly.length && Date.now() - hourlyAt < 20 * 60_000) return state.hourly;
-    try {
-      const hourly = await fetchRainHours(place, { fetchImpl });
-      hourlyAt = Date.now(); set({ hourly });
-      return hourly;
-    } catch { return state.hourly; }
+    if (!place || version !== placeVersion) return [];
+    const key = placeKey(place);
+    if (!force && hourlyCache?.key === key && now().getTime() - hourlyCache.at < 20 * 60_000) return hourlyCache.rows;
+    if (hourlyPending?.key === key && hourlyPending.version === version) return hourlyPending.promise;
+    const promise = (async () => {
+      try {
+        const rows = await fetchRainHours(place, { fetchImpl });
+        const selected = await loadPlace();
+        if (version !== placeVersion || !selected || placeKey(selected) !== key) return [];
+        hourlyCache = { key, rows, at: now().getTime() };
+        set({ hourly: rows });
+        return rows;
+      } catch {
+        return hourlyCache?.key === key ? hourlyCache.rows : [];
+      }
+    })();
+    hourlyPending = { key, version, promise };
+    try { return await promise; }
+    finally { if (hourlyPending?.promise === promise) hourlyPending = null; }
   }
   async function recompute() {
     const place = await loadPlace();
@@ -3559,17 +3590,20 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
   }
 
   async function setPlace(place) {
+    const version = ++placeVersion;
     await store.setSetting('location', {
       name: place.name, label: place.label ?? place.name, lat: place.lat, lon: place.lon,
       elevation_m: place.elevation_m ?? null, timezone: place.timezone ?? null,
     });
-    return refresh({ force: true });
+    if (running) await running.catch(() => {});
+    return version === placeVersion ? refresh({ force: true }) : state;
   }
 
   // Retuning or changing the place in settings takes effect immediately.
   store.subscribe((e) => {
     if (e.type !== 'change' || !e.tables?.includes('settings')) return;
-    if (e.source === 'local' || e.source === 'sync') { recompute().then(() => {}); }
+    if (e.ids && !e.ids.some(key => ['location', 'mud_params', 'mud_weights'].includes(key))) return;
+    if (e.source === 'local' || e.source === 'sync') recompute().catch(console.warn);
   });
 
   return {

@@ -1,6 +1,7 @@
 // The Overview tab: all your widgets on one screen, arranged by the layout you
 // chose. On a phone widgets stack in one column using the phone layout.
 import { h, replace } from './dom.js';
+import { locale, t } from './language.js';
 import { createWidgetCard } from '../widgets/registry.js';
 import { loadLayout } from '../widgets/store.js';
 import { readingOrder } from '../widgets/layout.js';
@@ -12,14 +13,17 @@ export function createOverviewView({ store, ctx }) {
   const wide = typeof matchMedia === 'function' ? matchMedia('(min-width: 900px)') : { matches: true, addEventListener() {} };
   let cards = [];
   let lastDay = '';
+  let renderVersion = 0;
 
   const profile = () => (wide.matches ? 'desktop' : 'mobile');
 
   function clear() { cards.forEach((c) => c.destroy()); cards = []; }
 
   async function render() {
+    const version = ++renderVersion;
     const p = profile();
     const layout = await loadLayout(store, p);
+    if (version !== renderVersion || el.hidden) return;
     clear();
     const grid = h('div', { class: 'ov-grid', role: 'list' });
     const today = new Date();
@@ -35,10 +39,12 @@ export function createOverviewView({ store, ctx }) {
       cards.push(card);
     }
     replace(el,
-      h('div', { class: 'panel-head' },
-        h('h2', {}, 'Overview'),
-        h('button', { class: 'btn small', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, 'Edit layout')),
-      grid);
+      h('div', { class: 'overview-heading' },
+        h('div', {},
+          h('time', { datetime: lastDay }, new Intl.DateTimeFormat(locale(), { weekday: 'long', month: 'long', day: 'numeric' }).format(today)),
+          h('h1', {}, t('Overview'))),
+        h('button', { class: 'btn', type: 'button', onclick: () => openLayoutEditor({ store, ctx, profile: p }) }, t('Edit layout'))),
+      layout.length ? grid : h('p', { class: 'empty' }, t('Add widgets with Edit layout.')));
   }
 
   let queued = false;
@@ -63,6 +69,6 @@ export function createOverviewView({ store, ctx }) {
     el,
     async mount() { await render(); },
     async show() { await render(); },
-    hide() { clear(); },
+    hide() { renderVersion++; clear(); el.replaceChildren(); },
   };
 }

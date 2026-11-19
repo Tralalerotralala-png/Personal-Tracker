@@ -2,6 +2,14 @@
 export const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 export const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Search and go to','Buscar e ir a'], ['Section','Sección'], ['Sections','Secciones'],
+ ['Search results','Resultados de búsqueda'], ['Searching saved records…','Buscando en tus registros…'],
+ ['Could not load saved records.','No se pudieron cargar tus registros.'],
+ ['This record is no longer available.','Este registro ya no está disponible.'],
+ ['Could not open this section. Try again.','No se pudo abrir esta sección. Inténtalo de nuevo.'],
+ ['Skip to content','Saltar al contenido'], ['Add widgets with Edit layout.','Agrega widgets desde Editar diseño.'],
+ ['Temporary session','Sesión temporal'], ['Local','Local'], ['Game','Juego'], ['Book','Libro'], ['Film','Película'], ['Album','Álbum'],
+
  ['Customize backpack','Personalizar mochila'],
  ['Audio player','Reproductor de audio'],['Music and radio player · available in the Tracker app.','Reproductor de música y radio · disponible en la app Tracker.'],
  ['Boxes','Cajas'],['Box','Caja'],['Add another box','Agregar otra caja'],['Each box has its own quantity and capacity. Your pack shows their combined total.','Cada caja tiene su propia cantidad y capacidad. Tu mochila muestra el total de todas.'],['Each box needs a valid current and maximum quantity.','Cada caja debe tener una cantidad actual y máxima válidas.'],['Remove box?','¿Quitar caja?'],['This removes its quantity from the total when you save.','Su cantidad se restará del total cuando guardes.'],['Quantity is too large.','La cantidad es demasiado grande.'],

@@ -3,7 +3,7 @@
 //  - Fonts and the Supabase script (CDN) are cached the same way.
 //  - Requests to Supabase itself are never touched (sync handles those).
 // Bump VERSION whenever you deploy, so installed copies notice the update.
-const VERSION = 'v81';
+const VERSION = 'v82';
 const SHELL = `tracker-shell-${VERSION}`;
 const RUNTIME = `tracker-runtime-${VERSION}`;
 
@@ -18,6 +18,7 @@ const PRECACHE = [
   './icons/icon-maskable-512.png',
   './js/app.js',
   './js/ui/quick-capture.js',
+  './js/ui/search.js',
   './js/ui/audio-player.js',
   './js/ui/celestial-map.js',
   './js/ui/celestial-sprites.js',
@@ -106,7 +107,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     for (const key of await caches.keys()) {
-      if (key !== SHELL && key !== RUNTIME) await caches.delete(key);
+      if (/^tracker-(shell|runtime)-v\d+$/.test(key) && key !== SHELL && key !== RUNTIME) await caches.delete(key);
     }
     await self.clients.claim();
   })());
@@ -117,6 +118,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || req.headers.has('Authorization')) return;
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
+  if (sameOrigin && !url.href.startsWith(self.registration.scope)) return;
   if (!sameOrigin && !CDN_HOSTS.has(url.hostname)) return; // Supabase and everything else: untouched
   const critical = sameOrigin && (req.mode === 'navigate' || /\.(?:m?js|css|html)$/.test(url.pathname));
   event.respondWith(critical ? networkFirst(event, req) : staleWhileRevalidate(event, req, sameOrigin));
@@ -128,7 +130,9 @@ async function staleWhileRevalidate(event, req, sameOrigin) {
 
   const refresh = fetch(req, sameOrigin ? { cache: 'no-cache' } : undefined)
     .then((res) => {
-      if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+      if (res && (res.ok || res.type === 'opaque')) {
+        return cache.put(req, res.clone()).catch(() => {}).then(() => res);
+      }
       return res;
     })
     .catch(() => null);
@@ -152,7 +156,15 @@ async function networkFirst(event, req) {
   const cache=await caches.open(SHELL);
   try {
     const response=await fetch(req,{cache:'no-cache'});
-    if(response?.ok){event.waitUntil(cache.put(req,response.clone()));return response;}
+    if (response.ok) {
+      event.waitUntil(cache.put(req, response.clone()).catch(() => {}));
+      return response;
+    }
+    // An explicit removal (for example config.js) is authoritative.
+    if (response.status === 404 || response.status === 410) {
+      event.waitUntil(cache.delete(req, { ignoreSearch: true }).catch(() => {}));
+      return response;
+    }
   } catch {}
   const cached=await cache.match(req,{ignoreSearch:true});
   if(cached)return cached;

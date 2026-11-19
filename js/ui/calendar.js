@@ -378,6 +378,12 @@ export function createCalendarView({ store, weather }) {
 
   return {
     el,
+    openRecord({ id }) {
+      const event = state.events.find(row => row.id === id);
+      if (!event) return false;
+      handleOverviewSelection({ detail: { dateKey: startParts(event).key, eventId: id } });
+      return true;
+    },
     async mount() { await load(); render(); processOverviewSelection(); },
     async show() { await load(); render(); processOverviewSelection(); },
   };

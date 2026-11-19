@@ -251,15 +251,32 @@ function buildPersonalHub({store, host}) {
       h('p',{class:'hint'},es?'El resumen usa registros existentes. No rastrea el tiempo de juego real ni convierte monedas.':'This uses existing records. It does not measure actual playtime or convert currencies.')];
   }
   function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():active==='timeline'?drawTimeline():active==='review'?drawWeeklyReview():drawEntries(active)));}
-  reload().catch(error=>replace(panel,h('p',{class:'form-error'},error.message)));
-  return {refresh:reload};
+  return {
+    refresh: reload,
+    openRecord({ id, kind }) {
+      const row = hub?.[kind]?.find(item => item.id === id);
+      if (!row) return false;
+      active = kind + 's';
+      draw();
+      editor(kind, row);
+      return true;
+    },
+  };
 }
 
 // Standalone full-window hub. The former side drawer now redirects here.
 export function createPersonalHubView({store}) {
   const el=h('section',{class:'view hub-view'});
   let controller=null;
-  return {el,async mount(){if(!controller) controller=buildPersonalHub({store,host:el});},async show(){await controller?.refresh();}};
+  return {
+    el,
+    async mount() {
+      controller ??= buildPersonalHub({ store, host: el });
+      await controller.refresh();
+    },
+    show: () => controller?.refresh(),
+    openRecord: record => controller?.openRecord(record),
+  };
 }
 export function openPersonalHub() { location.hash='#hub'; }
 

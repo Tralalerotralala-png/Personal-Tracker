@@ -40,13 +40,23 @@ export function normalizeTransaction(entry) {
     due: String(entry.due || ''), repeat: entry.repeat || 'none', account: String(entry.account || '') };
 }
 export function summarizeTransactions(entries, month, currency) {
-  const rows = entries.map(normalizeTransaction).filter(x=>monthOf(x.due)===month && x.currency===currency);
-  const expenses = rows.filter(x=>x.type==='expense');
-  const income = rows.filter(x=>x.type==='income');
-  const spent = expenses.reduce((s,x)=>s+x.amount,0);
-  const received = income.reduce((s,x)=>s+x.amount,0);
-  const categories = [...new Set(expenses.map(x=>x.category))].map(name=>({name,amount:expenses.filter(x=>x.category===name).reduce((s,x)=>s+x.amount,0)})).sort((a,b)=>b.amount-a.amount);
-  return {rows,spent,received,balance:received-spent,categories,transactions:rows.length};
+  const rows = [];
+  const totals = new Map();
+  let spent = 0;
+  let received = 0;
+  for (const entry of entries) {
+    if (monthOf(entry.due) !== month) continue;
+    const row = normalizeTransaction(entry);
+    if (row.currency !== currency) continue;
+    rows.push(row);
+    if (row.type === 'income') received += row.amount;
+    else {
+      spent += row.amount;
+      totals.set(row.category, (totals.get(row.category) ?? 0) + row.amount);
+    }
+  }
+  const categories = [...totals].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+  return { rows, spent, received, balance: received - spent, categories, transactions: rows.length };
 }
 export function calculateBill({subtotal=0,taxPercent=0,tipPercent=0,people=1}={}) {
   const price = Number(subtotal), tax = Number(taxPercent), tip = Number(tipPercent), parties = Number(people);
@@ -83,7 +93,8 @@ export function importTransactionsCsv(text) {
   return rows.map((cols,i)=>{
     const obj=Object.fromEntries(header.map((key,index)=>[key,cols[index]||'']));
     const amount=Number(obj.amount);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(obj.date)||!obj.title.trim()||!Number.isFinite(amount)||amount<0||!CURRENCIES.includes(obj.currency.toUpperCase()))throw new Error(`Invalid row ${i+2}`);
+    const date = new Date(obj.date + 'T00:00:00Z');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(obj.date)||!Number.isFinite(+date)||date.toISOString().slice(0,10)!==obj.date||!obj.title.trim()||!obj.amount.trim()||!Number.isFinite(amount)||amount<0||!CURRENCIES.includes(obj.currency.toUpperCase()))throw new Error(`Invalid row ${i+2}`);
     return normalizeTransaction({due:obj.date,title:obj.title,amount,currency:obj.currency.toUpperCase(),type:obj.type,category:obj.category,account:obj.account,body:obj.notes,repeat:obj.repeat});
   });
 }
@@ -132,8 +143,19 @@ export function createExpensesView({store}) {
     const upload=h('input',{type:'file',accept:'.csv,text/csv',hidden:true,onchange:async e=>{
       const file=e.target.files?.[0];if(!file)return;
       try{const imported=importTransactionsCsv(await file.text());if(!imported.length){toast(label('Nothing to import','Nada que importar'));return;}
-        const existing=new Set(entries.map(x=>[x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
-        const unique=imported.filter(x=>!existing.has([x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
+        const identity = row => JSON.stringify([row.due, row.type, row.title, row.amount, row.currency, row.category, row.account, row.body || '', row.repeat]);
+        const existing = new Map();
+        for (const row of entries) {
+          const key = identity(row);
+          existing.set(key, (existing.get(key) ?? 0) + 1);
+        }
+        const unique = imported.filter(row => {
+          const key = identity(row);
+          const remaining = existing.get(key) ?? 0;
+          if (!remaining) return true;
+          existing.set(key, remaining - 1);
+          return false;
+        });
         if(!unique.length){toast(label('All records are already present','Los registros ya existen'));return;}
         if(!await confirmDialog({title:label('Import transactions?','¿Importar movimientos?'),message:`${unique.length} ${label('new rows will be saved. Review your CSV before importing.','se guardarán nuevos registros. Revisa tu CSV antes de importar.')}`,confirmLabel:label('Import','Importar')}))return;
         for(const row of unique)await store.setSetting(`hub_expense:${uuid()}`,row);
@@ -159,16 +181,28 @@ export function createExpensesView({store}) {
     const repeat=select([['none',label('No repeat','Sin repetición')],['weekly',label('Weekly','Semanal')],['monthly',label('Monthly','Mensual')],['yearly',label('Yearly','Anual')]],current.repeat);
     const notes=h('textarea',{rows:4,placeholder:label('Optional notes','Notas opcionales')},current.body||'');
     const error=h('p',{class:'form-error',role:'alert'});
+    let saving = false;
     const save=async()=>{
+      if (saving) return;
       const val=Number(amount.value);
       if(!title.value.trim()||amount.value.trim()===''||!Number.isFinite(val)||val<0||!/^\d{4}-\d{2}-\d{2}$/.test(date.value)){error.textContent=label('Enter a title, valid date and nonnegative amount.','Escribe un título, una fecha válida y un importe mayor o igual a cero.');return;}
-      await store.setSetting(`hub_expense:${original?.id||uuid()}`,{...current,title:title.value.trim(),due:date.value,amount:val,type:type.value,currency:currencyPick.value,category:cat.value.trim()||'Other',account:account.value.trim(),repeat:repeat.value,body:notes.value.trim()});
-      editing=null;await load();toast(label('Saved','Guardado'));
+      saving = true;
+      saveButton.disabled = true;
+      try {
+        await store.setSetting(`hub_expense:${original?.id||uuid()}`,{...current,title:title.value.trim(),due:date.value,amount:val,type:type.value,currency:currencyPick.value,category:cat.value.trim()||'Other',account:account.value.trim(),repeat:repeat.value,body:notes.value.trim()});
+        editing=null;await load();toast(label('Saved','Guardado'));
+      } catch (failure) {
+        error.textContent = failure.message;
+      } finally {
+        saving = false;
+        saveButton.disabled = false;
+      }
     };
     const remove=async()=>{if(!original||!await confirmDialog({title:label('Delete transaction?','¿Eliminar movimiento?'),message:label('This cannot be undone.','Esta acción no se puede deshacer.'),danger:true,confirmLabel:label('Delete','Eliminar')}))return;await store.remove('settings',`hub_expense:${original.id}`);editing=null;await load();};
+    const saveButton = h('button', { class: 'btn primary', type: 'submit' }, label('Save transaction','Guardar movimiento'));
     replace(el,h('div',{class:'panel-head'},h('h2',{},original?label('Edit transaction','Editar movimiento'):label('New transaction','Nuevo movimiento')),btn(label('Back','Volver'),()=>{editing=null;render();})),
-      h('div',{class:'expense-editor'},h('div',{class:'expense-form-grid'},field(label('Description','Descripción'),title),field(label('Date','Fecha'),date),field(label('Amount','Importe'),amount),field(label('Type','Tipo'),type),field(label('Currency','Moneda'),currencyPick),field(label('Category','Categoría'),cat),categories,field(label('Payment method / account','Método de pago / cuenta'),account),field(label('Repeat (planning only)','Repetición (solo planificación)'),repeat)),field(label('Notes','Notas'),notes),error,
-        h('div',{class:'expense-actions'},original?btn(label('Delete','Eliminar'),remove,'danger'):null,btn(label('Cancel','Cancelar'),()=>{editing=null;render();}),btn(label('Save transaction','Guardar movimiento'),()=>save().catch(e=>{error.textContent=e.message;}),'primary'))));
+      h('form',{class:'expense-editor', onsubmit: event => { event.preventDefault(); void save(); }},h('div',{class:'expense-form-grid'},field(label('Description','Descripción'),title),field(label('Date','Fecha'),date),field(label('Amount','Importe'),amount),field(label('Type','Tipo'),type),field(label('Currency','Moneda'),currencyPick),field(label('Category','Categoría'),cat),categories,field(label('Payment method / account','Método de pago / cuenta'),account),field(label('Repeat (planning only)','Repetición (solo planificación)'),repeat)),field(label('Notes','Notas'),notes),error,
+        h('div',{class:'expense-actions'},original?btn(label('Delete','Eliminar'),remove,'danger'):null,btn(label('Cancel','Cancelar'),()=>{editing=null;render();}),saveButton)));
     title.focus();
   }
   function renderBudgets(){
@@ -224,5 +258,16 @@ export function createExpensesView({store}) {
       h('div',{class:'expense-form-grid'},field(label('Subtotal','Subtotal'),subtotal),field(label('Tax %','Impuesto %'),tax),field(label('Tip %','Propina %'),tip),field(label('People','Personas'),people)),result);
     calc();return content;
   }
-  return {el,async mount(){if(!ready)await load();},async show(){if(ready&&editing===null)await load();}};
+  return {
+    el,
+    async mount() { if (!ready) await load(); },
+    async show() { if (ready && editing === null) await load(); },
+    openRecord({ id }) {
+      const row = entries.find(item => item.id === id);
+      if (!row) return false;
+      editing = row;
+      render();
+      return true;
+    },
+  };
 }

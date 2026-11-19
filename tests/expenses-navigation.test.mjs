@@ -30,6 +30,8 @@ test('CSV escaping, export and import for old and new transactions',()=>{
   const restored=importTransactionsCsv(csv);
   assert.equal(restored[0].title,'Food, dinner');assert.equal(restored[0].body,'Line one\nLine two');
   assert.throws(()=>importTransactionsCsv('date,title,amount,currency\n2026-11-04,A,notanumber,USD'));
+  assert.throws(()=>importTransactionsCsv('date,title,amount,currency\n2026-11-04,A,,USD'), /Invalid row/);
+  assert.throws(()=>importTransactionsCsv('date,title,amount,currency\n2026-02-30,A,1,USD'), /Invalid row/);
   assert.match(exportTransactionsCsv([{...rows[0],title:'=1+1'}]),/"'=1\+1"/);
 });
 test('weather renderer uses the shared 40 pixel canvas',()=>{

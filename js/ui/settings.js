@@ -5,7 +5,7 @@ import { TRACK_FIELDS, TRACK_LABELS, categoryFields } from '../data/tracking.js'
 import { openPersonalHub } from './personal-hub.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
-import { exportAll, importAll, downloadBackup } from '../data/backup.js';
+import { exportAll, importAll, inspectBackup, downloadBackup } from '../data/backup.js';
 import { openPlaceSearchSheet } from './place-search.js';
 import { openMudSettings } from './mud-settings.js';
 import { openSourcesSheet } from './feed.js';
@@ -350,23 +350,63 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const navigation = h('section', { class: 'set-block' }, h('h3', {}, 'Navigation order'),
     h('p', { class: 'hint' }, 'Drag tabs on desktop, or use these buttons on desktop or phone. Saved on this device.'), navOrder);
 
-  // -- backup
-  const file = h('input', { type: 'file', accept: 'application/json', 'aria-label': 'Backup file' });
-  const out = h('p', { class: 'prose' });
+  // Read and report the backup before the user commits to a merge.
+  const backupText = (en, es) => language() === 'es' ? es : en;
+  const file = h('input', { type: 'file', accept: '.json,application/json', 'aria-label': backupText('Backup file', 'Archivo de respaldo') });
+  const out = h('div', { class: 'backup-status prose', role: 'status' });
+  let pendingBackup = null;
+  let readVersion = 0;
+  const restore = h('button', { class: 'btn small', type: 'button', disabled: true }, backupText('Restore (merge)', 'Restaurar y combinar'));
+  const download = h('button', { class: 'btn small', type: 'button' }, backupText('Download backup', 'Descargar respaldo'));
+  download.addEventListener('click', async () => {
+    download.disabled = true;
+    try { downloadBackup(await exportAll(store)); }
+    catch (error) { out.textContent = error.message; }
+    finally { download.disabled = false; }
+  });
+  file.addEventListener('change', async () => {
+    const version = ++readVersion;
+    const selected = file.files?.[0];
+    pendingBackup = null;
+    restore.disabled = true;
+    out.textContent = selected ? backupText('Checking backup…', 'Revisando respaldo…') : '';
+    if (!selected) return;
+    try {
+      const json = JSON.parse(await selected.text());
+      const result = inspectBackup(json);
+      if (version !== readVersion) return;
+      pendingBackup = json;
+      restore.disabled = !result.count;
+      replace(out,
+        h('p', {}, backupText(`${result.count} records ready to merge. ${result.errors.length} invalid records will be skipped.`,
+          `${result.count} registros listos para combinar. Se omitirán ${result.errors.length} registros inválidos.`)),
+        result.errors.length ? h('ul', {}, result.errors.slice(0, 4).map(error => h('li', {}, error))) : null);
+    } catch (error) {
+      if (version === readVersion) out.textContent = error.message;
+    }
+  });
+  restore.addEventListener('click', async () => {
+    if (!pendingBackup || restore.disabled) return;
+    restore.disabled = file.disabled = true;
+    try {
+      const result = await importAll(store, pendingBackup);
+      pendingBackup = null;
+      file.value = '';
+      out.textContent = backupText(
+        `${result.added} added, ${result.updated} updated, ${result.skipped} unchanged, ${result.errors.length} skipped due to errors.`,
+        `${result.added} agregados, ${result.updated} actualizados, ${result.skipped} sin cambios, ${result.errors.length} omitidos por errores.`);
+    } catch (error) {
+      out.textContent = error.message;
+      restore.disabled = false;
+    } finally { file.disabled = false; }
+  });
   const backup = h('section', { class: 'set-block' },
-    h('h3', {}, 'Backup'),
-    h('p', { class: 'hint' }, 'One JSON file with all items, places, events and settings. Photos are not included.'),
-    h('div', { class: 'inline-actions' },
-      h('button', { class: 'btn small', type: 'button', onclick: async () => downloadBackup(await exportAll(store)) }, 'Download backup')),
-    h('div', { class: 'inline-actions' }, file,
-      h('button', { class: 'btn small', type: 'button', onclick: async () => {
-        const f = file.files?.[0];
-        if (!f) { out.textContent = 'Choose a backup file first.'; return; }
-        try {
-          const s = await importAll(store, JSON.parse(await f.text()), { mode: 'merge' });
-          out.textContent = `Imported: ${s.added} added, ${s.updated} updated, ${s.skipped} unchanged${s.errors.length ? `, ${s.errors.length} could not be read` : ''}.`;
-        } catch (err) { out.textContent = err.message; }
-      } }, 'Restore (merge)')),
+    h('h3', {}, backupText('Backup', 'Respaldo')),
+    h('p', { class: 'hint' }, backupText(
+      'Export your records and settings as JSON. Stored photos and game save files are excluded. When you merge, newer local records stay in place.',
+      'Exporta tus registros y ajustes en JSON. El respaldo excluye fotos almacenadas y partidas guardadas. Al combinar, se conservan los registros locales más recientes.')),
+    h('div', { class: 'inline-actions' }, download),
+    h('div', { class: 'inline-actions' }, file, restore),
     out);
 
   // -- install help

@@ -19,11 +19,12 @@ import { moonPhaseSvg } from './weather/moon-phase.js';
 import { skyLighting } from './weather/environment.js';
 import { skyEventIconSvg } from './weather/sky-events.js';
 import { createGameBackupService } from './game-backups.js';
-import { loadHub, openPersonalHub, createPersonalHubView, startBrowserReminders } from './ui/personal-hub.js';
+import { loadHub, createPersonalHubView, startBrowserReminders } from './ui/personal-hub.js';
 import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings, createAnalogClockSettings } from './ui/settings.js';
 import { openQuickCapture } from './ui/quick-capture.js';
+import { rankSearch } from './ui/search.js';
 
 const root = document.getElementById('app');
 let ctx;
@@ -93,13 +94,31 @@ function syncStatus() {
 
 const pill = h('button', { class: 'pill', type: 'button', onclick: showSyncInfo });
 function renderPill(s) {
+  if (store.adapter.kind === 'memory') {
+    pill.className = 'pill s-error';
+    pill.textContent = t('Temporary session');
+    return;
+  }
   const state = mode === 'local' ? 'local' : s.state;
   pill.className = `pill s-${state}`;
-  pill.textContent = SYNC_TEXT[state] ?? state;
+  pill.textContent = t(SYNC_TEXT[state] ?? state);
   if (mode === 'cloud' && s.pending && state !== 'synced') pill.textContent += ` (${s.pending})`;
 }
 function showSyncInfo() {
-  if (mode === 'local') { toast('Data is stored on this device only'); return; }
+  if (store.adapter.kind === 'memory') {
+    const es = locale() === 'es-MX';
+    openSheet({
+      title: t('Temporary session'), size: 'small',
+      body: h('p', { class: 'prose' }, es
+        ? 'El navegador no pudo abrir el almacenamiento de Tracker. Exporta una copia desde Configuración antes de cerrar o recargar.'
+        : 'The browser could not open Tracker storage. Export a backup from Settings before closing or reloading.'),
+    });
+    return;
+  }
+  if (mode === 'local') {
+    openSheet({ title: t('Local'), size: 'small', body: h('p', { class: 'prose' }, t('Data is stored on this device only.')) });
+    return;
+  }
   const s = store.sync.getStatus();
   const body = [h('p', { class: 'prose' }, syncStatus())];
   if (s.error) body.push(h('p', { class: 'prose' }, `Details: ${s.error}`));
@@ -149,7 +168,7 @@ const NAV = [
   ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'board'], ['expenses', 'Expenses', 'expenses'],
 ];
 
-const main = h('main', { id: 'main' });
+const main = h('main', { id: 'main', tabindex: '-1' });
 for (const [key, view] of Object.entries(VIEWS)) { view.el.hidden = true; view.el.dataset.view = key; main.append(view.el); }
 
 // Navigation preferences are device-local so they work even before sign-in.
@@ -169,7 +188,7 @@ function applyTypography() {
 applyTypography();
 window.addEventListener('tracker-display-change', applyTypography);
 const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href: `#${key}`, 'data-route': key },
-  h('span', { class: 'slot-icon', html: navGlyphSvg(key==='hub'?'hub':glyph) }), h('span', { class: 'slot-label' }, label)));
+  h('span', { class: 'slot-icon', 'aria-hidden': 'true', html: navGlyphSvg(key==='hub'?'hub':glyph) }), h('span', { class: 'slot-label' }, label)));
 const packNav=navButtons.find(n=>n.dataset.route==='inventory');
 const packIcon=packNav?.querySelector('.slot-icon');
 const PACK_KEY='tracker-pack-appearance-v1';
@@ -229,12 +248,12 @@ setInterval(()=>{if(document.visibilityState!=='hidden')refreshEnvironmentalLigh
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshEnvironmentalLight();});
 window.addEventListener('tracker-theme-refresh',refreshEnvironmentalLight);
 
-const nav = h('nav', { class: 'hotbar', 'aria-label': 'Main' }, navButtons);
+const nav = h('nav', { class: 'hotbar', 'aria-label': t('Sections') }, navButtons);
 // Touch/keyboard alternative is on the Pack view itself.
 const packCustomize=h('button',{class:'btn small pack-customize-button',type:'button',onclick:customizePack},'Customize backpack');inventory.el.prepend(packCustomize);
 // Desktop-only draggable sidebar edge. Width is device-local and never synced.
 const sidebarWidthKey = 'tracker-sidebar-width';
-const sidebarMin = 92, sidebarMax = 310, sidebarDefault = 104;
+const sidebarMin = 92, sidebarMax = 310, sidebarDefault = 148;
 const applySidebarWidth = value => {
   const width = Math.max(sidebarMin, Math.min(sidebarMax, Number(value) || sidebarDefault));
   document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
@@ -282,7 +301,7 @@ sidebarGrip.addEventListener('keydown', e => {
   const next = applySidebarWidth(e.key === 'Home' ? sidebarDefault : current + (e.key === 'ArrowRight' ? 12 : -12));
   try { localStorage.setItem(sidebarWidthKey, String(next)); } catch {}
 });
-function saveNavOrder() { localStorage.setItem(NAV_KEY, JSON.stringify([...nav.children].map(n => n.dataset.route))); }
+function saveNavOrder() { localStorage.setItem(NAV_KEY, JSON.stringify([...nav.querySelectorAll('[data-route]')].map(n => n.dataset.route))); }
 function moveNav(from, to) {
   const items = [...nav.children];
   const source = items.find(n => n.dataset.route === from);
@@ -301,61 +320,84 @@ navButtons.forEach((a) => {
 });
 window.addEventListener('tracker-nav-change', e => { moveNav(e.detail.from, e.detail.to); });
 
-const globalSearchInput = h('input', { type: 'search', class: 'global-search-input', placeholder: t('Search everything'), 'aria-label': t('Search everything'), autocomplete: 'off' });
-const searchResults = h('div', { class: 'global-search-results', hidden: true, role: 'listbox', 'aria-label': t('Search') });
-const searchToggle = h('button', { class: 'pixel-search-toggle', type: 'button', 'aria-label': t('Search'), title: 'Search (Ctrl+K)', 'aria-expanded': 'false', html: '<svg viewBox="0 0 16 16" width="24" height="24" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M4 1h6v2H4zM2 3h2v7H2zM10 3h2v7h-2zM4 10h6v2H4zM10 11h2v2h-2zM12 13h2v2h-2z"/></svg>' });
-const searchWrap = h('div', { class: 'global-search-wrap', 'data-open': 'false' }, searchToggle, globalSearchInput, searchResults);
-const openSearch = () => { searchWrap.dataset.open = 'true'; searchToggle.setAttribute('aria-expanded','true'); globalSearchInput.focus(); };
-const closeSearch = () => { searchWrap.dataset.open = 'false'; searchToggle.setAttribute('aria-expanded','false'); searchResults.hidden = true; globalSearchInput.value = ''; };
-searchToggle.addEventListener('click', () => searchWrap.dataset.open === 'true' ? closeSearch() : openSearch());
-document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); } else if (e.key === 'Escape' && searchWrap.dataset.open === 'true') closeSearch(); });
-let searchSeq = 0;
-async function renderGlobalSearch() {
-  const seq = ++searchSeq;
-  const query = globalSearchInput.value.trim().toLocaleLowerCase();
-  if (!query) { searchResults.hidden = true; searchResults.replaceChildren(); return; }
-  const [items, events, places, hub, gameLibrary, otherMedia] = await Promise.all([
-    store.list('items'),store.list('events'),store.list('places'),loadHub(store),
-    store.getSetting('game_library_v1'),store.getSetting('other_media_library_v1')
-  ]);
-  if (seq !== searchSeq) return;
-  const languageLabel=(en,es)=>locale().startsWith('es')?es:en;
-  const entries = [
-    ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory' })),
-    ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar' })),
-    ...places.map(x => ({ type: t('Places'), title: x.name, detail: x.notes || '', target: 'inventory' })),
-    ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', hub: true })),
-    ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', hub: true })),
-    ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', target: 'expenses' })),
-    ...(Array.isArray(gameLibrary?.games)?gameLibrary.games:[]).map(x=>({
-      type:languageLabel('Game','Juego'),title:x.title,detail:[x.platform,x.notes,x.status].filter(Boolean).join(' '),target:'games'
-    })),
-    ...['books','films','albums'].flatMap(kind=>(Array.isArray(otherMedia?.[kind])?otherMedia[kind]:[]).map(x=>({
-      type:languageLabel(kind==='books'?'Book':kind==='films'?'Film':'Album',kind==='books'?'Libro':kind==='films'?'Película':'Álbum'),
-      title:x.title,detail:[x.creator,x.notes,x.status].filter(Boolean).join(' '),target:'games'
-    }))),
-  ];
-  const found = entries.filter(x => `${x.title || ''} ${x.detail} ${x.type}`.toLocaleLowerCase().includes(query)).slice(0, 12);
-  searchResults.replaceChildren(...(found.length ? found.map(entry => h('button', { class: 'global-search-result', type: 'button', role: 'option', onclick: () => {
-    closeSearch();
-    if (entry.hub) openPersonalHub({ store }); else location.hash = `#${entry.target}`;
-  } }, h('span', {}, entry.title || entry.type), h('small', {}, entry.type))) : [h('p', { class: 'hint' }, t('No matching results.'))]));
-  searchResults.hidden = false;
+const searchToggle = h('button', {
+  class: 'pixel-search-toggle', type: 'button', 'aria-label': t('Search and go to'), 'aria-haspopup': 'dialog',
+  title: t('Search and go to'),
+}, h('span', { html: '<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15 15 5 5" stroke="currentColor" stroke-width="2"/></svg>' }),
+h('span', { class: 'search-trigger-label' }, t('Search and go to')), h('kbd', {}, '⌘ / Ctrl K'));
+
+function searchSections() {
+  return [...nav.querySelectorAll('[data-route]')].map(link => ({
+    target: link.dataset.route, title: link.querySelector('.slot-label').textContent, type: t('Section'),
+  }));
 }
-globalSearchInput.addEventListener('input', () => { renderGlobalSearch().catch(() => { searchResults.hidden = true; }); });
-globalSearchInput.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeSearch(); globalSearchInput.blur(); }
-  if (e.key === 'Enter' && !searchResults.hidden) { e.preventDefault(); searchResults.querySelector('button')?.click(); }
-  if (e.key === 'ArrowDown' && !searchResults.hidden) { e.preventDefault(); searchResults.querySelector('button')?.focus(); }
-});
-searchResults.addEventListener('keydown', e=>{
-  if(!['ArrowUp','ArrowDown'].includes(e.key))return;
-  e.preventDefault();
-  const buttons=[...searchResults.querySelectorAll('button')];
-  const index=buttons.indexOf(document.activeElement);
-  const next=e.key==='ArrowDown'?index+1:index-1;
-  if(next<0){globalSearchInput.focus();return;}
-  buttons[Math.min(next,buttons.length-1)]?.focus();
+
+async function loadSearchEntries() {
+  const [items, events, places, hub, gameLibrary, otherMedia] = await Promise.all([
+    store.list('items'), store.list('events'), store.list('locations'), loadHub(store),
+    store.getSetting('game_library_v1'), store.getSetting('other_media_library_v1'),
+  ]);
+  const records = list => Array.isArray(list) ? list.filter(row => row?.id) : [];
+  const entry = (row, target, kind, type, title, detail) => ({ id: row.id, target, kind, type: t(type), title, detail });
+  return [
+    ...records(items).map(x => entry(x, 'inventory', 'item', 'Pack', x.name, x.notes)),
+    ...records(places).map(x => entry(x, 'inventory', 'location', 'Places', x.name, x.notes)),
+    ...records(events).map(x => entry(x, 'calendar', 'event', 'Calendar', x.title, x.notes)),
+    ...records(hub.task).map(x => entry(x, 'hub', 'task', 'Task', x.title, x.body)),
+    ...records(hub.note).map(x => entry(x, 'hub', 'note', 'Note', x.title, x.body)),
+    ...records(hub.expense).map(x => entry(x, 'expenses', 'expense', 'Expense', x.title, [x.category, x.account, x.body].join(' '))),
+    ...records(gameLibrary?.games).map(x => entry(x, 'games', 'games', 'Game', x.title, [x.platform, x.notes, x.status].join(' '))),
+    ...[['books', 'Book'], ['films', 'Film'], ['albums', 'Album']].flatMap(([kind, label]) =>
+      records(otherMedia?.[kind]).map(x => entry(x, 'games', kind, label, x.title, [x.creator, x.notes, x.status].join(' ')))),
+  ];
+}
+
+function openSearch() {
+  if (document.querySelector('dialog[open]')) return;
+  const input = h('input', { type: 'search', placeholder: t('Search everything'), 'aria-label': t('Search everything'), autocomplete: 'off' });
+  const status = h('p', { class: 'search-status hint', role: 'status' });
+  const searchResults = h('div', { class: 'command-results' });
+  const sections = searchSections();
+  let records = null;
+  let loadFailed = false;
+  const sheet = openSheet({ title: t('Search and go to'), size: 'search-sheet', body: [input, status, searchResults] });
+  function draw() {
+    if (!sheet.el.open) return;
+    const query = input.value.trim();
+    const found = query ? rankSearch([...sections, ...(records ?? [])], query) : sections;
+    status.textContent = loadFailed ? t('Could not load saved records.') : query && !records ? t('Searching saved records…')
+      : found.length ? (query ? t('Search results') : t('Sections')) : t('No matching results.');
+    searchResults.replaceChildren(...found.map(entry => h('button', {
+      class: 'global-search-result', type: 'button',
+      onclick: () => {
+        sheet.close();
+        navigate(entry.target, entry.id ? entry : null);
+      },
+    }, h('span', { 'data-user-content': entry.id ? '' : null }, entry.title || entry.type), h('small', {}, entry.type))));
+  }
+  input.addEventListener('input', draw);
+  sheet.el.addEventListener('keydown', event => {
+    const buttons = [...searchResults.querySelectorAll('button')];
+    if (event.target === input && event.key === 'Enter') {
+      event.preventDefault();
+      searchResults.querySelector('button')?.click();
+    } else if (['ArrowDown', 'ArrowUp'].includes(event.key) && (event.target === input || buttons.includes(event.target))) {
+      event.preventDefault();
+      const index = buttons.indexOf(event.target);
+      const next = event.key === 'ArrowDown' ? Math.min(index + 1, buttons.length - 1) : index - 1;
+      (buttons[next] ?? input).focus();
+    }
+  });
+  draw();
+  input.focus();
+  loadSearchEntries().then(data => { records = data; draw(); }).catch(() => { loadFailed = true; draw(); });
+}
+searchToggle.addEventListener('click', openSearch);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
+    e.preventDefault();
+    openSearch();
+  }
 });
 document.addEventListener('keydown', e=>{
   if(e.defaultPrevented||e.ctrlKey||e.metaKey)return;
@@ -363,7 +405,7 @@ document.addEventListener('keydown', e=>{
   if(target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
   if(document.querySelector('dialog[open]'))return;
   if(e.altKey&&/^[1-9]$/.test(e.key)){
-    const page=NAV[Number(e.key)-1]?.[0];
+    const page=[...nav.querySelectorAll('[data-route]')][Number(e.key)-1]?.dataset.route;
     if(page){e.preventDefault();location.hash='#'+page;}
   }else if(!e.altKey&&e.key==='?'){
     e.preventDefault();
@@ -373,36 +415,81 @@ document.addEventListener('keydown', e=>{
       h('p',{},'Esc: ',locale().startsWith('es')?'Cerrar búsqueda':'Close search'))});
   }
 });
-document.addEventListener('pointerdown', e => { if (!searchWrap.contains(e.target)) closeSearch(); });
 
 const captureButton = h('button',{class:'btn small ghost quick-capture-trigger',type:'button',
   title:'Quick Capture (Ctrl+Shift+K)','aria-label':locale().startsWith('es')?'Captura rápida':'Quick Capture',
-  onclick:()=>openQuickCapture({store})},'+');
+  onclick:()=>openQuickCapture({store})},h('span', { 'aria-hidden': 'true' }, '+'), h('span', { class: 'capture-trigger-label' }, t('Quick Capture')));
 document.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='k'){
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='k'&&!document.querySelector('dialog[open]')){
     e.preventDefault();openQuickCapture({store});
   }
 });
 try { localStorage.removeItem('tracker-privacy-display-v1'); } catch {}
 const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
-  searchWrap, captureButton, h('span', { class: 'spacer' }), skyBadge, pill,
-  h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
+  searchToggle, h('span', { class: 'spacer' }), captureButton, skyBadge, pill,
+  h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': t('Settings'), title: t('Settings'),
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-root.replaceChildren(header, main, nav, audioPlayer.el);
+root.replaceChildren(h('a', { class: 'skip-link', href: '#main', onclick: event => { event.preventDefault(); main.focus(); } }, t('Skip to content')), header, main, nav, audioPlayer.el);
 startTranslations(document.body);
 
-const mounted = new Set();
+const mounted = new Map();
+let routeVersion = 0;
+let activeRoute = null;
+let pendingRecord = null;
+function navigate(target, record) {
+  pendingRecord = record;
+  if (location.hash === `#${target}`) void route();
+  else location.hash = `#${target}`;
+}
 async function route() {
+  const version = ++routeVersion;
   const wanted = location.hash.replace(/^#\/?/, '');
-  const key = VIEWS[wanted] ? wanted : 'overview'; // unknown hashes (e.g. sign-in tokens) are ignored, not rewritten
-  for (const [k, view] of Object.entries(VIEWS)) view.el.hidden = k !== key;
-  navButtons.forEach((a) => { const on = a.dataset.route === key; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-  if (!mounted.has(key)) { mounted.add(key); await VIEWS[key].mount(); }
-  for (const [k, view] of Object.entries(VIEWS)) if (k !== key) view.hide?.();
-  VIEWS[key].show?.();
-  document.title = `${t(NAV.find((n) => n[0] === key)[1])} - Personal Tracker`;
+  const key = Object.hasOwn(VIEWS, wanted) ? wanted : 'overview';
+  const view = VIEWS[key];
+  const previous = activeRoute;
+  activeRoute = key;
+  const record = pendingRecord?.target === key ? pendingRecord : null;
+  pendingRecord = null;
+  if (previous && previous !== key) VIEWS[previous].hide?.();
+  for (const [k, item] of Object.entries(VIEWS)) item.el.hidden = k !== key;
+  navButtons.forEach(a => {
+    const on = a.dataset.route === key;
+    a.classList.toggle('on', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  const selected = navButtons.find(a => a.dataset.route === key);
+  if (selected && matchMedia('(max-width: 899px)').matches) {
+    const bounds = nav.getBoundingClientRect();
+    const position = selected.getBoundingClientRect();
+    if (position.left < bounds.left) nav.scrollLeft += position.left - bounds.left - 6;
+    else if (position.right > bounds.right) nav.scrollLeft += position.right - bounds.right + 6;
+  }
+  document.title = `${t(NAV.find(n => n[0] === key)[1])} - Personal Tracker`;
+  if (previous && previous !== key) {
+    main.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+  }
+  try {
+    const initialized = mounted.get(key);
+    if (initialized) await initialized;
+    else {
+      const promise = Promise.resolve().then(() => view.mount());
+      mounted.set(key, promise);
+      try { await promise; } catch (error) { mounted.delete(key); throw error; }
+    }
+    if (version !== routeVersion) return;
+    if (initialized) await view.show?.();
+    if (version !== routeVersion) return;
+    if (record) {
+      const opened = await view.openRecord?.(record);
+      if (opened === false && version === routeVersion) toast(t('This record is no longer available.'));
+    }
+  } catch (error) {
+    console.error('Could not open tracker section:', key, error);
+    if (version === routeVersion) toast(t('Could not open this section. Try again.'));
+  }
 }
 window.addEventListener('hashchange', route);
 await route();

@@ -386,6 +386,43 @@ test('service: changing the place fetches again', async () => {
   assert.equal(fetchImpl.calls.length, n + 2);
 });
 
+test('service: choosing a second location while the first loads shows the new forecast', async () => {
+  const fetchWeatherFixture = routedFetch();
+  let begin, release;
+  const started = new Promise(resolve => { begin = resolve; });
+  const delayed = new Promise(resolve => { release = resolve; });
+  const { svc } = serviceFixture({
+    fetchImpl: async url => {
+      if (new URL(url).searchParams.get('latitude') === '52.52') { begin(); await delayed; }
+      return fetchWeatherFixture(url);
+    },
+  });
+  const first = svc.setPlace(berlin);
+  await started;
+  const second = svc.setPlace({ ...berlin, name: 'Hamburg', lat: 53.55, lon: 9.99 });
+  release();
+  await Promise.all([first, second]);
+  assert.equal(svc.getState().place.name, 'Hamburg');
+  assert.ok(svc.getState().rows.length);
+  assert.equal(fetchWeatherFixture.calls.filter(url => url.includes('latitude=53.55')).length, 2);
+});
+
+test('service: simultaneous hourly requests share one fetch for a location', async () => {
+  let hourly = 0;
+  const fallback = routedFetch();
+  const { svc } = serviceFixture({fetchImpl: async url => {
+    if (!new URL(url).searchParams.get('hourly')?.startsWith('precipitation_probability')) return fallback(url);
+    hourly += 1;
+    return { ok: true, json: async () => ({ hourly: { time: [`${TODAY}T10:00`], precipitation_probability: [70], precipitation: [2], weather_code: [61] } }) };
+  }});
+  await svc.setPlace(berlin);
+  const [one, two] = await Promise.all([svc.loadHourly(), svc.loadHourly()]);
+  assert.equal(one.length, 1);
+  assert.deepEqual(one, two);
+  await svc.loadHourly();
+  assert.equal(hourly, 1);
+});
+
 test('moon icons: rounded disk, correct illumination and detailed opposing crescents', () => {
   const ref = Date.UTC(2000, 0, 6, 18, 14);
   const synodic = 29.530588853 * 86400000;

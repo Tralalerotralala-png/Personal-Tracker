@@ -26,6 +26,10 @@ export function createMemoryAdapter() {
     },
     async put(name, value) { s(name).set(keyOf(name, value), clone(value)); },
     async putMany(name, values) { for (const v of values) s(name).set(keyOf(name, v), clone(v)); },
+    async putBatch(entries) {
+      const values = entries.map(([name, value]) => [name, keyOf(name, value), clone(value)]);
+      for (const [name, key, value] of values) s(name).set(key, value);
+    },
     async del(name, key) { s(name).delete(key); },
     async clear(name) { s(name).clear(); },
   };
@@ -51,7 +55,9 @@ export async function openIdbAdapter(dbName) {
   // Run one operation in its own transaction; resolve with the request result.
   const run = (store, mode, fn) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, mode);
-    const result = fn(tx.objectStore(store));
+    let result;
+    try { result = fn(tx.objectStore(store)); }
+    catch (error) { tx.abort(); reject(error); return; }
     tx.oncomplete = () => resolve(result && 'result' in result ? result.result : undefined);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
@@ -63,6 +69,18 @@ export async function openIdbAdapter(dbName) {
     get: (name, key) => run(name, 'readonly', (s) => s.get(key)),
     put: (name, value) => run(name, 'readwrite', (s) => s.put(value)),
     putMany: (name, values) => run(name, 'readwrite', (s) => { for (const v of values) s.put(v); }),
+    putBatch: entries => new Promise((resolve, reject) => {
+      if (!entries.length) { resolve(); return; }
+      const tx = db.transaction([...new Set(entries.map(([name]) => name))], 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error || new Error('The storage transaction was aborted.'));
+      try {
+        for (const [name, value] of entries) tx.objectStore(name).put(value);
+      } catch (error) {
+        tx.abort();
+        reject(error);
+      }
+    }),
     del: (name, key) => run(name, 'readwrite', (s) => s.delete(key)),
     clear: (name) => run(name, 'readwrite', (s) => s.clear()),
   };

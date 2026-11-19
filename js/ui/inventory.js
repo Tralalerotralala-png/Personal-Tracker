@@ -719,6 +719,22 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     mount: show,
     show,
     destroy(){clearInterval(dayTimer);window.removeEventListener('focus',checkDay);document.removeEventListener('visibilitychange',checkDay);},
+    openRecord({ id, kind }) {
+      if (kind === 'location') {
+        if (!data.locations.some(place => place.id === id)) return false;
+        state.placeId = id;
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input'));
+        state.pane = 'items';
+        renderPane();
+        renderAll();
+      } else {
+        const item = data.items.find(row => row.id === id);
+        if (!item) return false;
+        openItemSheet(item);
+      }
+      return true;
+    },
     focusSearch: () => searchInput.focus(),
   };
 }

@@ -238,5 +238,6 @@ export function createDreamDiaryView({store}) {
  window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});
  window.addEventListener('tracker-private-capture',e=>{const type=e.detail?.type;if(!['dreams','sleep','moods','habits','vault'].includes(type))return;pendingCapture=type;if(session&&openCaptureEditor){pendingCapture=null;openCaptureEditor(type);}else if(!el.hidden)openLocked();});
  landing();
- return {el,mount:async()=>{if(!session&&!pendingCapture)landing();},show:()=>{if(!session){if(pendingCapture)openLocked();else landing();}},hide:()=>{}};
+ function show() { if (!session) { if (pendingCapture) openLocked(); else landing(); } }
+ return { el, mount: show, show, hide:()=>{} };
 }
