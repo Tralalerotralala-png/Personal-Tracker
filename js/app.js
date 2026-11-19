@@ -4,7 +4,9 @@ import { startTranslations, t, locale } from './ui/language.js';
 document.documentElement.lang = locale();
 import { createPhotos } from './photos.js';
 import { h, toast, openSheet } from './ui/dom.js';
-import { glyphSvg, weatherGlyph, weatherIconSvg, navGlyphSvg, packAppearance, PACK_SHAPES, PACK_COLORS } from './ui/pixel-icon.js';
+import { weatherGlyph } from './ui/pixel-icon.js';
+import { navGlyphSvg } from './ui/nav-sprites.js';
+import { openNavAppearance, readNavAppearance } from './ui/nav-appearance.js';
 import { createInventoryView } from './ui/inventory.js';
 import { createMudView } from './ui/mud.js';
 import { createCalendarView } from './ui/calendar.js';
@@ -15,7 +17,7 @@ import { createOverviewView } from './ui/overview.js';
 import { createAudioPlayer } from './ui/audio-player.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createMediaLibraryView } from './ui/media-library.js';
-import { moonPhaseSvg } from './weather/moon-phase.js';
+import { moonPhase } from './weather/moon-phase.js';
 import { skyLighting } from './weather/environment.js';
 import { skyEventIconSvg } from './weather/sky-events.js';
 import { createGameBackupService } from './game-backups.js';
@@ -165,7 +167,7 @@ const VIEWS = {
   expenses: expensesView,
 };
 const NAV = [
-  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'board'], ['expenses', 'Expenses', 'expenses'],
+  ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'hub'], ['expenses', 'Expenses', 'expenses'],
 ];
 
 const main = h('main', { id: 'main', tabindex: '-1' });
@@ -187,40 +189,63 @@ function applyTypography() {
 }
 applyTypography();
 window.addEventListener('tracker-display-change', applyTypography);
+let navAppearance = readNavAppearance();
+let navIconSheet = null;
+const skySprites = new Map();
 const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href: `#${key}`, 'data-route': key },
-  h('span', { class: 'slot-icon', 'aria-hidden': 'true', html: navGlyphSvg(key==='hub'?'hub':glyph) }), h('span', { class: 'slot-label' }, label)));
-const packNav=navButtons.find(n=>n.dataset.route==='inventory');
-const packIcon=packNav?.querySelector('.slot-icon');
-const PACK_KEY='tracker-pack-appearance-v1';
-const readPack=()=>{try{return packAppearance(JSON.parse(localStorage.getItem(PACK_KEY)||'{}'));}catch{return packAppearance();}};
-let packSheet=null;
-function refreshPackIcon(){if(packIcon)packIcon.innerHTML=navGlyphSvg('pack',readPack());}
-function customizePack(){
- if(packSheet)return;
- let draft=readPack();const es=document.documentElement.lang.startsWith('es'),tr=(a,b)=>es?b:a;
- const preview=h('div',{class:'pack-icon-preview'}),choices=h('div',{class:'pack-icon-choices'}),colors=h('div',{class:'pack-color-choices'});
- const picker=h('input',{type:'color',value:draft.color,'aria-label':tr('Custom backpack color','Color personalizado de mochila')});
- const names=[['Classic','Clásica'],['Rucksack','Excursionismo'],['Satchel','Bolso'],['Tactical','Táctica']];
- function draw(){preview.innerHTML=navGlyphSvg('pack',draft);picker.value=draft.color;choices.replaceChildren(...PACK_SHAPES.map((shape,i)=>h('button',{class:'btn pack-shape-choice'+(draft.shape===shape?' primary':''),type:'button','aria-pressed':String(draft.shape===shape),onclick:()=>{draft={...draft,shape};draw();}},h('span',{html:navGlyphSvg('pack',{...draft,shape})}),tr(...names[i]))));colors.replaceChildren(...PACK_COLORS.map(color=>{const b=h('button',{class:'pack-swatch',type:'button','aria-label':color,'aria-pressed':String(color===draft.color),onclick:()=>{draft={...draft,color};draw();}});b.style.backgroundColor=color;return b;}));}
- picker.oninput=()=>{draft={...draft,color:picker.value};draw();};draw();
- packSheet=openSheet({title:tr('Customize backpack','Personalizar mochila'),body:[preview,choices,h('label',{},tr('Color','Color')),colors,picker],footer:[h('button',{class:'btn',type:'button',onclick:()=>{draft=packAppearance();draw();}},tr('Reset','Restablecer')),h('button',{class:'btn primary',type:'button',onclick:()=>{try{localStorage.setItem(PACK_KEY,JSON.stringify(packAppearance(draft)));refreshPackIcon();packSheet?.close();}catch{toast(tr('Could not save appearance','No se pudo guardar la apariencia'));}}},tr('Save','Guardar'))],onClose:()=>{packSheet=null;}});
+  h('span', { class: 'slot-icon', 'aria-hidden': 'true', html: navGlyphSvg(glyph, key === 'inventory'
+    ? navAppearance.pack : { variant: navAppearance.variants[glyph] }) }), h('span', { class: 'slot-label' }, label)));
+const packNav = navButtons.find(button => button.dataset.route === 'inventory');
+const navIcon = key => navButtons.find(button => button.dataset.route === key)?.querySelector('.slot-icon');
+function customizeIcons(initial) {
+  if (navIconSheet?.el.open) return;
+  navIconSheet = openNavAppearance({
+    sections: NAV, initial,
+    onSave: next => {
+      navAppearance = next;
+      for (const [key, , glyph] of NAV) {
+        if (key === 'mud' || key === 'diary') continue;
+        navIcon(key).innerHTML = navGlyphSvg(glyph, key === 'inventory' ? next.pack : { variant: next.variants[glyph] });
+      }
+      refreshMoonNav();
+      refreshWeatherNav();
+    },
+    onClose: () => { navIconSheet = null; },
+  });
 }
-refreshPackIcon();
-if(packNav){packNav.title='Double-click or right-click to customize backpack';packNav.addEventListener('dblclick',e=>{e.preventDefault();customizePack();});packNav.addEventListener('contextmenu',e=>{e.preventDefault();customizePack();});packNav.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.shiftKey){e.preventDefault();customizePack();}});}
-window.addEventListener('tracker-customize-pack',customizePack);
-const moonNavIcon = navButtons.find(n => n.dataset.route === 'diary')?.querySelector('.slot-icon');
-function refreshMoonNav(){ if(moonNavIcon) moonNavIcon.innerHTML=moonPhaseSvg(); }
-refreshMoonNav(); setInterval(refreshMoonNav, 60*60*1000);
-const weatherNavIcon=navButtons.find(n=>n.dataset.route==='mud')?.querySelector('.slot-icon');
+function customizePack() { customizeIcons('inventory'); }
+packNav.addEventListener('dblclick', event => { event.preventDefault(); customizePack(); });
+packNav.addEventListener('contextmenu', event => { event.preventDefault(); customizePack(); });
+packNav.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); customizePack(); }
+});
+window.addEventListener('tracker-customize-pack', customizePack);
+window.addEventListener('tracker-customize-nav', () => customizeIcons('overview'));
+
+function paintSkySprite(key, glyph, options, stamp) {
+  if (skySprites.get(key) === stamp) return;
+  skySprites.set(key, stamp);
+  navIcon(key).innerHTML = navGlyphSvg(glyph, options);
+}
+function refreshMoonNav() {
+  const date = new Date();
+  const variant = navAppearance.variants.moon;
+  const phase = variant === 'default' ? Math.round(moonPhase(date).fraction * 96) % 96 : null;
+  paintSkySprite('diary', 'moon', { variant, date }, `${variant}:${phase}`);
+}
+refreshMoonNav();
+setInterval(refreshMoonNav, 60 * 60 * 1000);
 let currentUi = {};
-function refreshWeatherNav(){
-  const state=weather.getState();
-  const current=state.current;
-  if(!weatherNavIcon || !current)return;
-  const code=Number(current.weather_code);
-  const sky=skyLighting(state, currentUi, new Date());
-  weatherNavIcon.innerHTML=weatherIconSvg(code,{night:sky.night});
-  weatherNavIcon.title=sky.event ? `${sky.event.en} — local visibility unverified` : '';
+function refreshWeatherNav() {
+  const state = weather.getState();
+  const date = new Date();
+  const code = state.current?.weather_code;
+  const sky = skyLighting(state, currentUi, date);
+  const night = code != null && sky.night;
+  const variant = navAppearance.variants.weather;
+  const phase = night ? Math.round(moonPhase(date).fraction * 96) % 96 : null;
+  const stamp = variant === 'default' ? `${weatherGlyph(code).glyph}:${night}:${phase}` : variant;
+  paintSkySprite('mud', 'weather', { variant, code, date, night }, stamp);
 }
 const skyBadge=h('button',{class:'sky-today-badge',type:'button',hidden:true,'aria-label':'Sky event calendar',title:'Astronomical event (visibility varies)',onclick:()=>{location.hash='#mud';}});
 async function refreshEnvironmentalLight(){
@@ -239,6 +264,7 @@ async function refreshEnvironmentalLight(){
     if(sky.event){skyBadge.hidden=false;skyBadge.innerHTML=skyEventIconSvg(sky.event.kind);skyBadge.title=`${sky.event.en}: global event; local visibility not verified`;
       skyBadge.setAttribute('aria-label',skyBadge.title);
     } else {skyBadge.hidden=true;skyBadge.replaceChildren();}
+    refreshMoonNav();
     refreshWeatherNav();
   }catch(error){console.warn('Environmental lighting unavailable:',error);}
 }
@@ -313,7 +339,7 @@ function moveNav(from, to) {
 }
 navButtons.forEach((a) => {
   a.draggable = true;
-  a.title = 'Drag to rearrange navigation';
+  a.title = a === packNav ? t('Drag to reorder; double-click to customize backpack') : t('Drag to rearrange navigation');
   a.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', a.dataset.route); e.dataTransfer.effectAllowed = 'move'; });
   a.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
   a.addEventListener('drop', e => { e.preventDefault(); moveNav(e.dataTransfer.getData('text/plain'), a.dataset.route); });
@@ -426,10 +452,10 @@ document.addEventListener('keydown',e=>{
 });
 try { localStorage.removeItem('tracker-privacy-display-v1'); } catch {}
 const header = h('header', { class: 'top' },
-  h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
+  h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: navGlyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
   searchToggle, h('span', { class: 'spacer' }), captureButton, skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': t('Settings'), title: t('Settings'),
-    onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
+    onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: navGlyphSvg('gear') })));
 
 root.replaceChildren(h('a', { class: 'skip-link', href: '#main', onclick: event => { event.preventDefault(); main.focus(); } }, t('Skip to content')), header, main, nav, audioPlayer.el);
 startTranslations(document.body);

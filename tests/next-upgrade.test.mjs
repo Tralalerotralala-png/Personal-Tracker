@@ -21,5 +21,5 @@ test('Adaptive layout and editable theme presets exist',()=>{
  assert.match(file('css/app.css'),/data-layout-width="wide"/);
 });
 test('Moon phase is the Dreams navigation icon',()=>{
- assert.match(file('js/app.js'),/moonNavIcon\.innerHTML=moonPhaseSvg\(\)/);
+ assert.match(file('js/app.js'),/paintSkySprite\('diary', 'moon', \{ variant, date \}/);
 });

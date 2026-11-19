@@ -2,6 +2,9 @@
 export const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 export const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Customize navigation icons','Personalizar iconos de navegación'],
+ ['Drag to reorder; double-click to customize backpack','Arrastra para reordenar; haz doble clic para personalizar la mochila'],
+
  ['Search and go to','Buscar e ir a'], ['Section','Sección'], ['Sections','Secciones'],
  ['Search results','Resultados de búsqueda'], ['Searching saved records…','Buscando en tus registros…'],
  ['Could not load saved records.','No se pudieron cargar tus registros.'],

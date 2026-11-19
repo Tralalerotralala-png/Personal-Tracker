@@ -1367,6 +1367,9 @@ __define("js/ui/language.js", function (__require, __exports) {
 const language = () => localStorage.getItem('tracker-language') === 'es' ? 'es' : 'en';
 const locale = () => language() === 'es' ? 'es-MX' : 'en-US';
 const pairs = [
+ ['Customize navigation icons','Personalizar iconos de navegación'],
+ ['Drag to reorder; double-click to customize backpack','Arrastra para reordenar; haz doble clic para personalizar la mochila'],
+
  ['Search and go to','Buscar e ir a'], ['Section','Sección'], ['Sections','Secciones'],
  ['Search results','Resultados de búsqueda'], ['Searching saved records…','Buscando en tus registros…'],
  ['Could not load saved records.','No se pudieron cargar tus registros.'],
@@ -2172,65 +2175,7 @@ function compactWeatherSvg(code,options={}) {
       return 'fill="currentColor" fill-opacity="'+(.36+.64*light).toFixed(2)+'"';
     });
 }
-
-// Dedicated 32px navigation art; old compact glyph APIs remain stable for
-// inline weather/status indicators. All icons share outline, depth and light.
-const PACK_SHAPES=['classic','rucksack','satchel','tactical'];
-const PACK_COLORS=['#d84d54','#d39b4e','#509e85','#5c8fd1','#9d79c8','#9a9ba5'];
-function packAppearance(value={}){
- return {shape:PACK_SHAPES.includes(value?.shape)?value.shape:'classic',color:/^#[0-9a-f]{6}$/i.test(value?.color||'')?value.color.toLowerCase():PACK_COLORS[0]};
-}
-function tone(color,mix){
- const values=color.slice(1).match(/../g).map(n=>parseInt(n,16));
- return '#'+values.map(v=>Math.round(mix<0?v*(1+mix):v+(255-v)*mix).toString(16).padStart(2,'0')).join('');
-}
-function navGlyphSvg(name,appearance={}){
- if(name==='expenses'){
-  // Existing detailed pie art, normalized to the shared 32px canvas.
-  const src=glyphSvg(name),face=src.slice(src.indexOf('>')+1,-6);
-  return '<svg class="nav-pixel-sprite" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-hidden="true"><g transform="translate(3 3)">'+face+'</g></svg>';
- }
- const cells=Array.from({length:32},()=>Array(32).fill(null));
- const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)if(i>=0&&i<32&&j>=0&&j<32)cells[j][i]=c;};
- const shape=(x,y,w,h,c)=>{rect(x+2,y,w-4,h,c);rect(x,y+2,w,h-4,c);};
- const pack=packAppearance(appearance),pal=({board:'#d6ad70',weather:'#e5b75f',calendar:'#9cabd9',feed:'#b4c3a0',moon:'#b1a0db',games:'#70bab9',hub:'#cf9ecb',gear:'#a8b0c4'})[name]||pack.color;
- const dark='#202338',edge=tone(pal,-.44),mid=pal,light=tone(pal,.38),highlight=tone(pal,.68),shade=tone(pal,-.22),metal='#d9cba8';
- if(name==='pack'){
-  // straps behind fabric; distinct silhouettes and pockets for each style.
-  if(pack.shape==='satchel'){
-   shape(5,10,23,18,dark);shape(7,11,19,15,mid);rect(5,5,4,11,edge);rect(8,4,16,3,light);rect(24,5,3,12,edge);rect(7,13,19,7,light);rect(7,20,19,2,edge);rect(14,18,5,5,metal);rect(15,19,3,3,edge);rect(9,24,15,1,shade);
-  }else{
-   const wide=pack.shape==='tactical',tall=pack.shape==='rucksack',x=wide?5:7,w=wide?23:19,y=tall?4:7,h=tall?24:21;
-   shape(x-3,y+5,5,h-7,edge);shape(x+w-1,y+5,5,h-7,edge);
-   shape(11,2,11,7,dark);rect(13,4,7,3,light);rect(14,5,5,2,null);
-   shape(x,y,w,h,dark);shape(x+2,y+2,w-4,h-4,mid);rect(x+3,y+3,w-6,2,light);rect(x+2,y+4,2,h-8,light);rect(x+w-4,y+5,2,h-9,shade);
-   if(tall){shape(x+2,y+2,w-4,7,shade);rect(x+3,y+3,w-6,2,light);rect(x+3,y+10,w-6,2,edge);}
-   shape(x+3,y+12,w-6,7,edge);shape(x+4,y+13,w-8,5,mid);rect(x+5,y+13,w-10,1,light);
-   rect(x+5,y+15,w-10,1,shade);rect(x+5,y+16,2,2,metal);
-   if(wide){for(const off of [4,8]){rect(x+3,y+off,w-6,2,edge);rect(x+4,y+off,w-8,1,shade);}rect(x+8,y+5,5,3,metal);}
-   else{rect(x+4,y+8,2,4,edge);rect(x+w-6,y+8,2,4,edge);rect(x+4,y+10,2,2,metal);rect(x+w-6,y+10,2,2,metal);}
-  }
- }else if(name==='board'||name==='hub'){
-  shape(3,4,26,24,dark);shape(5,6,22,20,mid);rect(6,7,20,2,light);rect(7,11,8,12,edge);rect(17,11,8,5,edge);rect(17,18,8,5,edge);rect(8,12,6,3,'#e7d4b0');rect(18,12,6,2,'#9ad3c0');rect(18,19,6,2,'#b4b9e3');rect(8,18,5,1,highlight);rect(8,20,4,1,highlight);
-  if(name==='hub'){shape(11,10,10,12,dark);rect(14,12,4,8,light);rect(12,14,8,4,light);}
- }else if(name==='calendar'){
-  shape(4,6,24,23,dark);shape(6,8,20,19,'#dfd9cd');rect(6,8,20,6,mid);rect(6,8,20,2,light);rect(9,3,4,8,edge);rect(21,3,4,8,edge);rect(10,4,2,5,highlight);rect(22,4,2,5,highlight);for(let i=0;i<3;i++)for(let j=0;j<3;j++)rect(9+i*6,16+j*3,3,2,i===1&&j===1?'#cb6869':shade);
- }else if(name==='feed'){
-  shape(4,5,25,23,dark);shape(6,7,21,19,'#d9d7bf');rect(7,8,18,4,edge);rect(8,9,10,2,light);rect(7,14,8,7,mid);rect(17,14,8,2,shade);rect(17,17,8,1,edge);rect(17,20,8,1,edge);rect(7,23,18,1,edge);rect(26,10,3,14,shade);
- }else if(name==='games'){
-  shape(3,10,26,15,dark);shape(5,11,22,12,mid);rect(7,11,18,2,light);rect(6,20,20,2,edge);rect(10,13,3,10,edge);rect(7,16,9,3,edge);rect(10,14,2,8,highlight);rect(8,17,7,1,highlight);rect(21,13,3,3,'#eaad72');rect(24,16,3,3,'#d889a4');rect(18,16,3,3,'#a5d09e');rect(21,19,3,3,'#a5b7dc');
- }else if(name==='moon'||name==='weather'){
-  for(let y=4;y<27;y++)for(let x=4;x<27;x++){const r=Math.hypot(x-15,y-15);if(r<11.8&&(name==='weather'||Math.hypot(x-21,y-11)>9))cells[y][x]=r>10.6?edge:(x+y<27?highlight:light);}
-  if(name==='weather'){for(const [a,b] of [[14,1],[14,27],[1,14],[27,14],[5,5],[25,25],[5,25],[25,5]])rect(a,b,3,3,mid);shape(11,17,18,11,'#49617d');shape(13,15,9,10,'#c5d3e7');shape(11,19,18,8,'#a0b4cf');rect(14,18,8,2,'#e0e6ee');}
-  else{rect(9,17,3,3,shade);rect(11,22,4,2,shade);rect(22,5,2,5,highlight);rect(20,7,6,1,highlight);}
- }else{
-  const rows=GLYPHS[name]||GLYPHS.gear;rows.forEach((r,y)=>[...r].forEach((c,x)=>{if(c==='#')rect(4+x*2,4+y*2,2,2,mid);}));
- }
- let face='',silhouette='';
- for(let y=0;y<32;y++)for(let x=0;x<32;){const c=cells[y][x];let end=x+1;while(end<32&&cells[y][end]===c)end++;if(c){face+='<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+c+'"/>';silhouette+='<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="#303044"/>';}x=end;}
- return '<svg class="nav-pixel-sprite" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(face,silhouette)+'</svg>';
-}
-Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, stackSprite, glyphSvg, weatherIconSvg, compactWeatherSvg, PACK_SHAPES, PACK_COLORS, packAppearance, navGlyphSvg });
+Object.assign(__exports, { hash32, spriteGrid, pixelIconSvg, weatherGlyph, glyphNames, glyphRows, stackSprite, glyphSvg, weatherIconSvg, compactWeatherSvg });
 });
 __define("js/wallpaper/config.js", function (__require, __exports) {
 "use strict";
