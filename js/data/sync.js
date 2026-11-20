@@ -68,21 +68,36 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
     }
 
     let pushed = 0;
+    async function pushAndPreserve(table,group){
+      const response=await remote.push(table,group.map(g=>g.row));
+      const conflicts=new Set(response?.conflicts||[]);
+      if(conflicts.size){
+        // Preserve losing edits on this device before acknowledging the outbox.
+        // This is a recovery copy, not an automatic merger or a cloud record.
+        for(const g of group){
+          if(!conflicts.has(String(g.entry.id)))continue;
+          const savedAt=new Date().toISOString();
+          const key='sync-conflict:'+table+':'+g.entry.id+':'+Date.now()+':'+Math.random().toString(36).slice(2);
+          await adapter.put('meta',{key,value:{table,id:g.entry.id,local:g.row,savedAt,reason:'Server kept a newer version'}});
+        }
+        // Re-read this table even if its previous cursor is ahead of the
+        // version that rejected the edit.
+        await adapter.del('meta','cursor:'+table);
+      }
+      await settle(group);
+      return group.length-conflicts.size;
+    }
     for (const [table, items] of byTable) {
       for (const group of chunks(items, PUSH_CHUNK)) {
         try {
-          await remote.push(table, group.map((g) => g.row));
-          await settle(group);
-          pushed += group.length;
+          pushed += await pushAndPreserve(table,group);
         } catch (err) {
           if (remote.classifyError(err) !== 'rejected') throw err;
           // One bad row spoils the whole batch on the server. Retry singly to
           // find it, and park only the guilty row.
           for (const g of group) {
             try {
-              await remote.push(table, [g.row]);
-              await settle([g]);
-              pushed += 1;
+              pushed += await pushAndPreserve(table,[g]);
             } catch (err2) {
               if (remote.classifyError(err2) !== 'rejected') throw err2;
               await adapter.put('outbox', {

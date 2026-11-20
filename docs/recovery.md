@@ -7,3 +7,5 @@
 - Restore performs complete preflight validation and one atomic local database transaction, but cannot roll back writes already accepted by a remote server. Restore only while your account is stable and the sync queue is healthy.
 - The app downloads a safety checkpoint of current structured records before a manual merge restore. Protect that JSON as a sensitive document; it may include private settings and encrypted journal ciphertext.
 - Never use a four-digit journal PIN for highly sensitive information. The app supports 12–128 character passphrases; lost secrets cannot be recovered.
+
+A cloud write rejected by last-write-wins can produce an account-scoped, device-only conflict copy in IndexedDB meta. Export these from Settings > General > Export conflicting edits. This is a safety net, not a full multi-device conflict resolver; compare versions manually. If the browser data is deleted, these copies disappear too.

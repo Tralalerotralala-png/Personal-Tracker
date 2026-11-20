@@ -57,11 +57,20 @@ export function createSupabaseRemote(client, expectedUserId=null) {
     async push(table, rows) {
       const userId = await currentUserId();
       const payload = rows.map((r) => ({ ...pickColumns(table, r), user_id: userId }));
-      const { error, status } = await client
+      // Postgres's last-write-wins trigger may silently decline an older edit.
+      // Request the persisted values to detect and preserve the losing copy.
+      const { data, error, status } = await client
         .from(table)
-        .upsert(payload, { onConflict: TABLES[table].onConflict });
+        .upsert(payload, { onConflict: TABLES[table].onConflict })
+        .select(TABLES[table].pk+',updated_at');
       if (error) throw wrap(error, status);
       await currentUserId();
+      const server=new Map((data||[]).map(r=>[String(r[TABLES[table].pk]),r]));
+      const conflicts=rows.filter(row=>{
+        const returned=server.get(String(row[TABLES[table].pk]));
+        return !returned || Date.parse(returned.updated_at)>Date.parse(row.updated_at)+1;
+      }).map(row=>String(row[TABLES[table].pk]));
+      return {conflicts};
     },
 
     classifyError: classifySupabaseError,

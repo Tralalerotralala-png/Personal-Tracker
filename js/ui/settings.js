@@ -7,6 +7,7 @@ import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 import { exportAll, importAll, inspectBackup, downloadBackup } from '../data/backup.js';
 import {legacyCacheExists,exportUnverifiedLegacyCache} from '../data/legacy-recovery.js';
+import {getSyncConflicts,exportSyncConflicts} from '../data/conflicts.js';
 import { openPlaceSearchSheet } from './place-search.js';
 import { openMudSettings } from './mud-settings.js';
 import { openSourcesSheet } from './feed.js';
@@ -60,6 +61,14 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
        if(ok)downloadBackup(await exportUnverifiedLegacyCache(),'personal-tracker-LEGACY-UNVERIFIED-'+new Date().toISOString().slice(0,10)+'.json');
      }catch(e){toast(e.message);}
    }},'Export old browser data'),
+   h('button',{class:'btn small',type:'button',onclick:async()=>{
+     try{
+       const conflicts=await getSyncConflicts(store);
+       if(!conflicts.length){toast('No losing sync revisions saved on this device.');return;}
+       const ok=await confirmDialog({title:'Export sync conflict copies?',message:conflicts.length+' local versions were preserved when a newer server edit won. These copies may contain private data. Review before restoring.',confirmLabel:'Export conflict copies'});
+       if(ok)downloadBackup(await exportSyncConflicts(store),'personal-tracker-sync-conflicts-'+new Date().toISOString().slice(0,10)+'.json');
+     }catch(e){toast(e.message);}
+   }},'Export conflicting edits'),
    mode==='cloud'?h('button',{class:'btn small danger',type:'button',onclick:async()=>{
       const s=store.sync.getStatus();if(s.pending||s.failed){toast('Unsynced changes exist. Export and sync before erasing this device.');return;}
       const ok=await confirmDialog({title:'Erase account cache?',message:'This permanently erases this account’s local database on this device. Verify your cloud backup first.',confirmLabel:'Erase local cache and sign out',danger:true});
