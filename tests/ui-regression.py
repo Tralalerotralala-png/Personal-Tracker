@@ -29,7 +29,7 @@ for width,height in [(390,844),(1280,900)]:
         first_result.click()
         assert page.evaluate("window.location.hash")=="#inventory","Search result failed to navigate"
         page.locator("dialog.sheet[open]").wait_for(state="visible",timeout=10000)
-        assert "Headlamp" in page.locator("dialog.sheet[open]").inner_text(),"Search did not open the actual item"
+        assert page.locator("dialog.sheet[open] #it-name").input_value()=="Headlamp","Search did not open the actual item"
         page.keyboard.press("Escape")
         page.locator("dialog.sheet[open]").wait_for(state="detached",timeout=5000)
         page.evaluate("location.hash='#overview'")
