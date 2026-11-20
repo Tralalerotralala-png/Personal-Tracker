@@ -95,8 +95,15 @@ export function importTransactionsCsv(text) {
   return rows.map((cols,i)=>{
     const obj=Object.fromEntries(header.map((key,index)=>[key,cols[index]||'']));
     const amount=Number(obj.amount);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(obj.date)||!obj.title.trim()||!Number.isFinite(amount)||amount<0||!CURRENCIES.includes(obj.currency.toUpperCase()))throw new Error(`Invalid row ${i+2}`);
-    return normalizeTransaction({due:obj.date,title:obj.title,amount,currency:obj.currency.toUpperCase(),type:obj.type,category:obj.category,account:obj.account,body:obj.notes,repeat:obj.repeat});
+    const rawType=String(obj.type||'').trim().toLowerCase();
+    if(rawType && !['expense','income'].includes(rawType)) throw new Error(`Invalid row ${i+2}: unknown transaction type`);
+    // A blank amount is not the same as an intentional zero. Date.parse can
+    // normalize an impossible date (February 30) into March, so compare the
+    // parsed UTC day against the original civil date before importing.
+    const date=/^\d{4}-\d{2}-\d{2}$/.test(obj.date) ? new Date(obj.date+'T00:00:00Z') : null;
+    const validDay=date && Number.isFinite(+date) && date.toISOString().slice(0,10)===obj.date;
+    if(!validDay||!obj.title.trim()||!obj.amount.trim()||!Number.isFinite(amount)||amount<0||!CURRENCIES.includes(obj.currency.toUpperCase()))throw new Error(`Invalid row ${i+2}`);
+    return normalizeTransaction({due:obj.date,title:obj.title,amount,currency:obj.currency.toUpperCase(),type:rawType,category:obj.category,account:obj.account,body:obj.notes,repeat:obj.repeat});
   });
 }
 
