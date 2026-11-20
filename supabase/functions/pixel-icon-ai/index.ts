@@ -12,9 +12,11 @@ Deno.serve(async request=>{
  if(request.method!=='POST')return reply(405,'POST required');
  const jwt=(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,'');
  if(!jwt)return reply(401,'Sign in to generate icons.');
- const supabase=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!);
+ const supabase=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:'Bearer '+jwt}}});
  const {data,error}=await supabase.auth.getUser(jwt);
  if(error||!data.user)return reply(401,'Invalid session.');
+ const access=await supabase.rpc('tracker_account_allowed');
+ if(access.error||access.data!==true)return reply(403,'Owner authorization required.');
  const key=Deno.env.get('OPENAI_API_KEY');if(!key)return reply(503,'OPENAI_API_KEY is not configured on the server.');
  let description='';try{const body=await request.json();description=String(body?.description||'').trim().slice(0,300);}catch{}
  if(description.length<2)return reply(400,'Provide a description.');

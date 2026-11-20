@@ -11,3 +11,11 @@ The code is public, but my personal data isn't part of the repository. If you wa
 The full instructions are in [SETUP.md](SETUP.md). Start with `config.example.js` if you're connecting your own Supabase project, run `supabase/schema.sql` for the database, and run `supabase/game-backups.sql` if you want private file backups. Check that Row Level Security and Storage access policies are enabled before putting personal information online. Never publish a Supabase secret or service-role key, private backup, or password. The journal's four-digit PIN isn't strong enough to protect highly sensitive secrets against someone who gets a copy of its encrypted data.
 
 The app uses plain HTML, CSS, and JavaScript modules. No build step is needed to serve the website. For local testing, run `python -m http.server 8080` from the repository folder and open `http://localhost:8080`. Run `node --test` to check the JavaScript tests. The separate Wallpaper Engine files can be rebuilt with `node scripts/build-wallpaper.mjs`.
+
+## Stabilization and security
+
+The hosted instance is a private, single-owner deployment. It uses owner-restricted Supabase RLS; a fork should use its *own* Supabase project and security policies. Its local IndexedDB cache is account-specific but **not encrypted at rest**. A known account can reopen its cache offline if it was verified while online. Never use this deployment as shared-device private storage without clearing device caches.
+
+The private journal supports existing four-digit PINs for compatibility and stronger passphrases of 12–128 characters. There is no forgotten-passphrase recovery. Structured-data JSON exports do **not** include photos, game backup files or audio files, and may contain readable personal information. Back up those files separately. A legacy browser database can be exported for manual review from Settings; it is never silently assigned to a user.
+
+New CI includes basic mobile/desktop browser smoke tests in addition to Node tests. Browser security headers beyond meta CSP (especially framing restrictions) require an appropriate host; GitHub Pages does not let this repository set arbitrary HTTP response headers. The feed-proxy and pixel-icon-ai edge function *sources* enforce owner authorization but are optional and must be configured, security-reviewed and deployed separately.
