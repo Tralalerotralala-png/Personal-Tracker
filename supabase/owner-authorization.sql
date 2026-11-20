@@ -82,8 +82,8 @@ BEGIN
         AND tablename = table_name AND policyname = 'tracker_private_owner';
     IF FOUND THEN
       IF existing.permissive <> 'RESTRICTIVE' OR existing.cmd <> 'ALL'
-        OR existing.qual NOT LIKE '%tracker_account_allowed%'
-        OR existing.with_check NOT LIKE '%tracker_account_allowed%' THEN
+        OR COALESCE(existing.qual, '') NOT LIKE '%tracker_account_allowed%'
+        OR COALESCE(existing.with_check, '') NOT LIKE '%tracker_account_allowed%' THEN
         RAISE EXCEPTION 'Existing policy on %.% must be reviewed, not overwritten',
           'public', table_name;
       END IF;
@@ -109,10 +109,10 @@ BEGIN
     AND policyname='tracker_private_owner';
   IF FOUND THEN
     IF existing.permissive <> 'RESTRICTIVE' OR existing.cmd <> 'ALL'
-      OR existing.qual NOT LIKE '%tracker_account_allowed%'
-      OR existing.with_check NOT LIKE '%tracker_account_allowed%'
-      OR existing.qual NOT LIKE '%item-photos%'
-      OR existing.qual NOT LIKE '%game-backups%' THEN
+      OR COALESCE(existing.qual, '') NOT LIKE '%tracker_account_allowed%'
+      OR COALESCE(existing.with_check, '') NOT LIKE '%tracker_account_allowed%'
+      OR COALESCE(existing.qual, '') NOT LIKE '%item-photos%'
+      OR COALESCE(existing.qual, '') NOT LIKE '%game-backups%' THEN
       RAISE EXCEPTION 'Existing Storage owner policy must be reviewed, not overwritten';
     END IF;
   ELSE
