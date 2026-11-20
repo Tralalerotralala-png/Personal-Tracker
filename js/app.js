@@ -3,7 +3,7 @@ import { initData } from './data/app-data.js';
 import { startTranslations, t, locale } from './ui/language.js';
 document.documentElement.lang = locale();
 import { createPhotos } from './photos.js';
-import { h, toast, openSheet } from './ui/dom.js';
+import { h, toast, openSheet, replace } from './ui/dom.js';
 import { glyphSvg, weatherGlyph, weatherIconSvg, navGlyphSvg, packAppearance, PACK_SHAPES, PACK_COLORS } from './ui/pixel-icon.js';
 import { createInventoryView } from './ui/inventory.js';
 import { createMudView } from './ui/mud.js';
@@ -397,7 +397,7 @@ const header = h('header', { class: 'top' },
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-root.replaceChildren(header,
+replace(root, header,
   store.adapter.kind==='memory'?h('div',{class:'temporary-storage-banner',role:'alert'},'Temporary device storage: changes may disappear after a refresh. Export a backup before leaving this page.'):null,
   ctx.offlineAuthorized?h('div',{class:'verified-offline-banner',role:'status'},'Offline device mode: previously verified account data is available. Uploads resume when you reconnect.'):null,
   main,nav,audioPlayer.el);
