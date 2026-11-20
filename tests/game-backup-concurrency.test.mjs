@@ -57,3 +57,30 @@ test('legacy array backups remain visible and deletable without rewriting newer 
   assert.deepEqual(await store.getSetting('game_backup_index_v1'),[]);
   assert.equal((await store.get('settings','game_backup_entry_v2:'+fresh.id)).value.path,fresh.path);
 });
+
+test('separate offline device caches converge after syncing independent backup rows', async () => {
+  const {client} = fixture();
+  const adapterA=createMemoryAdapter(),adapterB=createMemoryAdapter();
+  const storeA=createStore({adapter:adapterA});
+  const storeB=createStore({adapter:adapterB});
+  const a=createGameBackupService({client,store:storeA});
+  const b=createGameBackupService({client,store:storeB});
+  const [first,second]=await Promise.all([
+    a.upload(GAME,new File(['device A'],'a.sav')),
+    b.upload(GAME,new File(['device B'],'b.sav')),
+  ]);
+  assert.deepEqual((await a.listAll()).map(x=>x.id),[first.id]);
+  assert.deepEqual((await b.listAll()).map(x=>x.id),[second.id]);
+
+  // Model the effect of pulling both independently keyed rows from the server.
+  // This is a deterministic merge test, not a live Supabase sync integration test.
+  const remoteRows=[...await storeA.list('settings'),...await storeB.list('settings')];
+  assert.equal(new Set(remoteRows.map(x=>x.key)).size,2);
+  for (const row of remoteRows) {
+    await adapterA.put('settings',row);
+    await adapterB.put('settings',row);
+  }
+  const expected=new Set([first.id,second.id]);
+  assert.deepEqual(new Set((await a.listAll()).map(x=>x.id)),expected);
+  assert.deepEqual(new Set((await b.listAll()).map(x=>x.id)),expected);
+});
