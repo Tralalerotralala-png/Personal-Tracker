@@ -5,6 +5,8 @@ import { skyLighting, dateKeyAt, clockFromIsoLocal } from '../js/weather/environ
 import { skyEventOnDate, skyEventIconSvg } from '../js/weather/sky-events.js';
 import { buildForecastUrl, parseDaily } from '../js/weather/open-meteo.js';
 import { backupPath,validateBackupFile,createGameBackupService,GAME_BACKUP_BUCKET } from '../js/game-backups.js';
+import { createMemoryAdapter } from '../js/data/adapters.js';
+import { createStore } from '../js/data/store.js';
 
 const row = {date:'2026-11-11',raw:{sunrise:'2026-11-11T06:15',sunset:'2026-11-11T18:05'}};
 const state={place:{timezone:'UTC'},rows:[row],current:{is_day:1,weather_code:0,cloud_cover:0}};
@@ -52,8 +54,8 @@ test('upload validates size, extension, path traversal and protects identity',()
 test('backup service versions uploads, verifies downloads, and deletes objects',async()=>{
  const user='11111111-1111-4111-8111-111111111111';
  const game='22222222-2222-4222-8222-222222222222';
- const blobs=new Map();let rows=[];
- const store={getSetting:async()=>rows,setSetting:async(_key,value)=>{rows=value;}};
+ const blobs=new Map();
+ const store=createStore({adapter:createMemoryAdapter()});
  const fileApi={
   list:async()=>({data:[],error:null}),upload:async(p,f)=>{blobs.set(p,f);return {error:null}},
   download:async(p)=>({data:blobs.get(p),error:blobs.has(p)?null:{message:'Missing'}}),
