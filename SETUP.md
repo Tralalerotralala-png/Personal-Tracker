@@ -144,6 +144,11 @@ screen. (If you see a plain "404", wait another minute. If it stays 404, check t
    The account gate and optional Edge Functions now share the same owner check.
    Before entering personal data, run the three verification queries at the bottom
    of `supabase/owner-authorization.sql`; they should show **1**, **false**, **true**.
+   This same script also creates **restrictive owner-only policies** on all seven
+   Tracker record tables and both private Storage buckets. It guards wallpaper
+   key changes made through privileged database functions. Verify the eight
+   `tracker_private_owner` policies and wallpaper trigger using the read-only
+   queries in `supabase/owner-policy-hardening.sql`.
 
 **You will know it worked when...** you see the **Pack** screen. It starts empty (the sample
 data only appears when you run without a database). The small label at the top changes to
@@ -155,6 +160,15 @@ few emails an hour on the free plan. Wait a bit rather than pressing the button 
 ---
 
 ## Part 7. Lock it down (3 minutes)
+
+**Existing installations with an owner check but missing database owner policies:**
+Review `supabase/owner-policy-hardening.sql`, back up your Supabase database,
+then apply it in SQL Editor only after confirming the existing
+`tracker_account_allowed()` function grants access exclusively to the correct
+owner. It is idempotent and refuses to silently replace conflicting policies.
+Your existing hosted project may already have these restrictions; do not
+assume new SQL changes are needed without inspecting its active policies.
+These scripts are not deployed automatically by GitHub Pages.
 
 **Existing installations:** If your app already authenticates successfully,
 do not run the owner bootstrap or replace its existing owner function. The
