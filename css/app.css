@@ -2099,3 +2099,23 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
  .widget .w-sky-scroll{max-height:115px;}
  .widget .w-feed-scroll{max-height:145px;}
 }
+
+/* Keyboard: skip repeated navigation and go straight to the active view.
+   Fixed positioning keeps this accessibility link out of the app's CSS grid. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 120;
+  padding: 10px 14px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 2px solid var(--accent);
+  transform: translateY(calc(-100% - 20px));
+}
+.skip-link:focus-visible, .skip-link:focus {
+  transform: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+#main:focus { outline: none; }
