@@ -52,11 +52,11 @@ const safeText=(value,max=10000)=>String(value||'').slice(0,max);
 export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
  let session=null, timeout=null, sheet=null, failures=0, blockedUntil=0;
- let activeDraftTimer=null, editorDirty=false, pendingCapture=null, openCaptureEditor=null;
+ let activeDraftTimer=null, activeDraftFlush=null, editorDirty=false, pendingCapture=null, openCaptureEditor=null;
  let writeChain=Promise.resolve();
  const dialogs=new Set();
  const L=()=>labels[language()];
- const clear=()=>{session=null;clearTimeout(timeout);clearTimeout(activeDraftTimer);timeout=null;activeDraftTimer=null;editorDirty=false;};
+ const clear=()=>{session=null;clearTimeout(timeout);clearTimeout(activeDraftTimer);timeout=null;activeDraftTimer=null;activeDraftFlush=null;editorDirty=false;};
  function closeDialogs(){
   for(const dlg of [...dialogs]){if(dlg.el?.open)dlg.close();}
   dialogs.clear();
@@ -64,13 +64,24 @@ export function createDreamDiaryView({store}) {
  }
  function landing(){replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing'},h('div',{class:'private-moon','aria-hidden':'true',html:moonPhaseSvg()}),h('p',{},L().intro),h('p',{class:'hint'},L().locked),h('button',{class:'btn primary',onclick:openLocked},L().open)));}
  function lock(){
+  // A journal editor autosaves after a short debounce. Capture and queue its
+  // encrypted draft before clearing sensitive session state on navigation or
+  // when the app goes into the background.
+  if(session&&editorDirty&&activeDraftFlush){
+   clearTimeout(activeDraftTimer);activeDraftTimer=null;
+   void activeDraftFlush().catch(()=>toast(L().saveFailed));
+  }
   closeDialogs();clear();landing();
  }
  const touch=()=>{if(!session)return;clearTimeout(timeout);timeout=setTimeout(()=>{lock();toast(L().lock);},DURATION);};
  // Editing happens in dialogs appended outside the view: activity there must also keep it unlocked.
  document.addEventListener('pointerdown',()=>{if(session)touch();});
  document.addEventListener('keydown',()=>{if(session)touch();});
- // The 40-minute idle timer also runs while the app is in the background.
+ // A hidden or backgrounded tab must not keep decrypted journal data unlocked.
+ document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&session)lock();
+ });
+ // The 40-minute idle timer still protects long idle foreground sessions.
  function trackDialog(dialog){dialogs.add(dialog);dialog.el.addEventListener('close',()=>dialogs.delete(dialog),{once:true});return dialog;}
  async function openLocked(){
   if(sheet) sheet.close();clear();
@@ -159,13 +170,14 @@ export function createDreamDiaryView({store}) {
     type==='dreams'?[h('label',{},L().illustration),file,entry?.art?h('img',{src:entry.art,alt:L().night,class:'journal-art'}):null]:null,error);
    const captureDraft=()=>({title:title.value,date:date.value,body:description.value,dreamType:dreamType.value,vivid:Number(vivid.value),
       tags:tags.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,...(type==='dreams'&&night?.date===date.value?{nightSky:night}:{})});
-   const persistDraft=async()=>{if(!session)return;session.data.drafts ||= {};session.data.drafts[draftKey]=captureDraft();await persist();};
+   const persistDraft=async()=>{if(session!==editorSession)return;session.data.drafts ||= {};session.data.drafts[draftKey]=captureDraft();await persist();};
+   activeDraftFlush=persistDraft;
    form.addEventListener('input',()=>{editorDirty=true;clearTimeout(activeDraftTimer);activeDraftTimer=setTimeout(()=>persistDraft().catch(()=>{}),1800);});
    const closeEditor=async()=>{
      if(editorDirty&&!confirm(language()==='es'?'¿Salir del editor? Se conservará un borrador cifrado.':'Leave the editor? An encrypted draft will be kept.'))return;
      clearTimeout(activeDraftTimer);activeDraftTimer=null;
      if(editorDirty)try{await persistDraft();}catch{toast(L().saveFailed);return;}
-     editorDirty=false;replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();
+     editorDirty=false;activeDraftFlush=null;replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();
    };
    const editor={close:closeEditor};
    const actions=[
@@ -185,7 +197,7 @@ export function createDreamDiaryView({store}) {
        if(session!==editorSession||!form.isConnected||(date.value||today())!==saveDate)return;
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
        delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;editorDirty=false;
-       await persist();editor.close();draw();
+       await persist();activeDraftFlush=null;editor.close();draw();
       }catch(err){error.textContent=L().saveFailed;}
       finally{saving=false;saveButton.disabled=false;}
     }},L().save)];
@@ -238,5 +250,5 @@ export function createDreamDiaryView({store}) {
  window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});
  window.addEventListener('tracker-private-capture',e=>{const type=e.detail?.type;if(!['dreams','sleep','moods','habits','vault'].includes(type))return;pendingCapture=type;if(session&&openCaptureEditor){pendingCapture=null;openCaptureEditor(type);}else if(!el.hidden)openLocked();});
  landing();
- return {el,mount:async()=>{if(!session&&!pendingCapture)landing();},show:()=>{if(!session){if(pendingCapture)openLocked();else landing();}},hide:()=>{}};
+ return {el,mount:async()=>{if(!session&&!pendingCapture)landing();},show:()=>{if(!session){if(pendingCapture)openLocked();else landing();}},hide:()=>{if(session)lock();}};
 }
