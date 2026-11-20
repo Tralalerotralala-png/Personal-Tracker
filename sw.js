@@ -3,7 +3,7 @@
 //  - Fonts and the Supabase script (CDN) are cached the same way.
 //  - Requests to Supabase itself are never touched (sync handles those).
 // Bump VERSION whenever you deploy, so installed copies notice the update.
-const VERSION = 'v95';
+const VERSION = 'v96';
 const SHELL = `tracker-shell-${VERSION}`;
 const RUNTIME = `tracker-runtime-${VERSION}`;
 const OWNED_CACHE_PREFIXES = ['tracker-shell-', 'tracker-runtime-'];
@@ -161,6 +161,12 @@ async function networkFirst(event, req) {
   try {
     const response=await fetch(req,{cache:'no-cache'});
     if(response?.ok){event.waitUntil(cache.put(req,response.clone()));return response;}
+    // A real 404/410 is an intentional removal, not an offline failure.
+    // Do not resurrect a deleted config.js or obsolete script from the cache.
+    if (response && (response.status === 404 || response.status === 410)) {
+      event.waitUntil(cache.delete(req, { ignoreSearch: true }).catch(() => {}));
+      return response;
+    }
   } catch {}
   const cached=await cache.match(req,{ignoreSearch:true});
   if(cached)return cached;
