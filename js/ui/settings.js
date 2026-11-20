@@ -5,7 +5,7 @@ import { TRACK_FIELDS, TRACK_LABELS, categoryFields } from '../data/tracking.js'
 import { openPersonalHub } from './personal-hub.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
-import { exportAll, importAll, downloadBackup } from '../data/backup.js';
+import { exportAll, importAll, inspectBackup, downloadBackup } from '../data/backup.js';
 import {legacyCacheExists,exportUnverifiedLegacyCache} from '../data/legacy-recovery.js';
 import { openPlaceSearchSheet } from './place-search.js';
 import { openMudSettings } from './mud-settings.js';
@@ -371,7 +371,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const out = h('p', { class: 'prose' });
   const backup = h('section', { class: 'set-block' },
     h('h3', {}, 'Backup'),
-    h('p', { class: 'hint' }, 'One JSON file with all items, places, events and settings. Photos are not included.'),
+    h('p', { class: 'hint' }, 'Exports include records and settings, but NOT photos, game backup file contents, or imported local music. The JSON is readable and may contain sensitive data. Protect it and back up media separately.'),
     h('div', { class: 'inline-actions' },
       h('button', { class: 'btn small', type: 'button', onclick: async () => downloadBackup(await exportAll(store)) }, 'Download backup')),
     h('div', { class: 'inline-actions' }, file,
@@ -379,9 +379,20 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
         const f = file.files?.[0];
         if (!f) { out.textContent = 'Choose a backup file first.'; return; }
         try {
-          const s = await importAll(store, JSON.parse(await f.text()), { mode: 'merge' });
-          out.textContent = `Imported: ${s.added} added, ${s.updated} updated, ${s.skipped} unchanged${s.errors.length ? `, ${s.errors.length} could not be read` : ''}.`;
-        } catch (err) { out.textContent = err.message; }
+          if(f.size>50*1024*1024)throw Error('Backup is too large to inspect safely (50 MB limit).');
+          const backupData=JSON.parse(await f.text()),inspection=inspectBackup(backupData,{mode:'merge'});
+          const count=Object.values(inspection.counts).reduce((total,n)=>total+n,0);
+          const ok=await confirmDialog({title:'Review backup restore',
+            message:'This file contains '+count+' records across '+Object.keys(inspection.counts).length+' tables. '+
+              (inspection.errors.length?inspection.errors.length+' invalid entries will be SKIPPED. ':'')+
+              'Merge keeps newer records. A readable safety checkpoint of your current records will be downloaded before applying. Photos and audio are NOT included in the checkpoint.',
+            confirmLabel:'Download safety copy and restore'});
+          if(!ok){out.textContent='Restore canceled. No records changed.';return;}
+          // Never start a restore if creating its safety checkpoint fails.
+          downloadBackup(await exportAll(store),'personal-tracker-before-restore-'+new Date().toISOString().slice(0,10)+'.json');
+          const s=await importAll(store,backupData,{mode:'merge'});
+          out.textContent=`Imported: ${s.added} added, ${s.updated} updated, ${s.skipped} unchanged${s.errors.length ? `, ${s.errors.length} could not be read` : ''}.`;
+        } catch (err) { out.textContent=err.message; }
       } }, 'Restore (merge)')),
     out);
 
@@ -399,6 +410,8 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       const sync=mode==='cloud'?store.sync.getStatus():null;
       const worker='serviceWorker' in navigator?(navigator.serviceWorker.controller?(es?'Activo':'Active'):(es?'Aún sin controlar esta página':'Not controlling this page yet')):(es?'No compatible':'Not supported');
       const cached=typeof caches==='undefined'?[]:await caches.keys();
+      const estimate=await navigator.storage?.estimate?.().catch(()=>null);
+      const storageSize=estimate?.usage!=null?Math.round(estimate.usage/1048576)+' MB'+(estimate.quota?' / '+Math.round(estimate.quota/1048576)+' MB quota':''):(es?'No disponible':'Unavailable');
       const shells=cached.filter(n=>n.startsWith('tracker-shell-')).sort();
       const weatherState=weather.getState();
       let storage=es?'Sin cuenta conectada':'Not connected';
@@ -413,7 +426,8 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       }
       const rows=[
         [es?'Conexión':'Connection',navigator.onLine===false?(es?'Sin conexión':'Offline'):(es?'En línea':'Online')],
-        [es?'Almacenamiento local':'Local storage',typeof indexedDB==='undefined'?(es?'No compatible':'Not supported'):(es?'Disponible':'Available')],
+        [es?'Almacenamiento local':'Local storage',store.adapter.kind==='memory'?(es?'Temporal: puede perderse':'Temporary: may be lost'):(es?'Persistente':'Persistent')],
+        [es?'Uso de almacenamiento':'Storage usage',storageSize],
         [es?'Sincronización':'Sync',sync?`${sync.state} · ${sync.pending||0} pending`:(es?'Solo local':'Local only')],
         [es?'Modo sin conexión':'Offline mode',worker],
         [es?'Caché guardada':'Stored cache',shells.at(-1)||(es?'Sin caché':'No stored shell cache')],
