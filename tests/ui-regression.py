@@ -20,6 +20,16 @@ for width,height in [(390,844),(1280,900)]:
             "(el) => [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim())"
         )
         assert not stray_text,"Unexpected text nodes in app grid: "+str(stray_text)
+        # Search must read the real locations table, not a missing "places" table.
+        page.locator(".pixel-search-toggle").click()
+        page.locator(".global-search-input").fill("Headlamp")
+        first_result=page.locator(".global-search-results .global-search-result").first
+        first_result.wait_for(state="visible",timeout=5000)
+        assert "Headlamp" in first_result.inner_text(),"Global search did not return a seeded inventory item"
+        first_result.click()
+        assert page.evaluate("window.location.hash")=="#inventory","Search result failed to navigate"
+        page.locator(".overview").evaluate("(el) => { location.hash='#overview'; }")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         page.locator(".top .gear").click()
         page.locator("dialog.sheet[open]").wait_for(timeout=5000)
         page.keyboard.press("Escape")

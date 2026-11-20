@@ -8,7 +8,9 @@ const source = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 function serviceWorker({ cacheAdd = async () => {} } = {}) {
   const handlers = new Map();
   const removed = [];
-  const known = ['tracker-shell-v90', 'tracker-runtime-v90', 'tracker-shell-v92', 'tracker-runtime-v92', 'unrelated-app-cache', 'workbox-precache-v5'];
+  const current = source.match(/const VERSION = '([^']+)'/)?.[1];
+  assert.ok(current, 'service worker cache version is defined');
+  const known = ['tracker-shell-v90', 'tracker-runtime-v90', `tracker-shell-${current}`, `tracker-runtime-${current}`, 'unrelated-app-cache', 'workbox-precache-v5'];
   let skipped = false;
   let claimed = false;
   const context = {
