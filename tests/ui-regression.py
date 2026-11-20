@@ -20,6 +20,11 @@ for width,height in [(390,844),(1280,900)]:
             "(el) => [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim())"
         )
         assert not stray_text,"Unexpected text nodes in app grid: "+str(stray_text)
+        skip=page.locator(".skip-link")
+        skip.focus()
+        assert skip.bounding_box()["y"]>=0,"Keyboard skip link did not appear on focus"
+        skip.press("Enter")
+        assert page.evaluate("document.activeElement.id")=="main","Skip link did not move keyboard focus to main content"
         # Search must read the real locations table, not a missing "places" table.
         page.locator(".pixel-search-toggle").click()
         page.locator(".global-search-input").fill("Headlamp")
