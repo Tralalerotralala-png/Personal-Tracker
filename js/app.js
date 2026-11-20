@@ -175,7 +175,7 @@ const NAV = [
   ['overview', 'Overview', 'board'], ['inventory', 'Pack', 'pack'], ['mud', 'Weather', 'weather'], ['calendar', 'Calendar', 'calendar'], ['feed', 'Feed', 'feed'], ['diary', 'Logs', 'moon'], ['games', 'Library', 'games'], ['hub', 'Personal Hub', 'board'], ['expenses', 'Expenses', 'expenses'],
 ];
 
-const main = h('main', { id: 'main' });
+const main = h('main', { id: 'main', tabindex: '-1' });
 for (const [key, view] of Object.entries(VIEWS)) { view.el.hidden = true; view.el.dataset.view = key; main.append(view.el); }
 
 // Navigation preferences are device-local so they work even before sign-in.
@@ -429,7 +429,7 @@ const header = h('header', { class: 'top' },
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-replace(root, header,
+replace(root, h('a', { class: 'skip-link', href: '#main', onclick: e => { e.preventDefault(); main.focus(); } }, t('Skip to content')), header,
   store.adapter.kind==='memory'?h('div',{class:'temporary-storage-banner',role:'alert'},'Temporary device storage: changes may disappear after a refresh. Export a backup before leaving this page.'):null,
   ctx.offlineAuthorized?h('div',{class:'verified-offline-banner',role:'status'},'Offline device mode: previously verified account data is available. Uploads resume when you reconnect.'):null,
   main,nav,audioPlayer.el);
