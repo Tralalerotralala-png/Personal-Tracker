@@ -5,7 +5,8 @@ import { uuid } from './data/util.js';
 
 export const GAME_BACKUP_BUCKET = 'game-backups';
 export const GAME_BACKUP_LIMIT = 25 * 1024 * 1024; // reliable simple uploads on phones
-const META_KEY = 'game_backup_index_v1';
+const META_KEY = 'game_backup_index_v1'; // Legacy index: read only for existing records.
+const ENTRY_PREFIX = 'game_backup_entry_v2:'; // One independently synced setting per backup.
 const cleanFilename = name => String(name ?? '').split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g,'').slice(0,160);
 export function validateBackupFile(file) {
   if (!file || !file.name || !Number.isFinite(file.size) || file.size <= 0) throw new Error('Choose a non-empty backup file.');
@@ -36,8 +37,26 @@ export function createGameBackupService({client, store}) {
     return data.session.user.id;
   }
   async function listAll() {
-    const rows = await store.getSetting(META_KEY, []);
-    return Array.isArray(rows) ? rows.filter(x => x && typeof x.id === 'string' && typeof x.path === 'string') : [];
+    // The legacy shared array is read for backwards compatibility, but all new
+    // uploads have their own setting key. Concurrent devices can then upload
+    // different records without overwriting each other's metadata index.
+    const [legacy, records] = await Promise.all([
+      store.getSetting(META_KEY, []),
+      store.list('settings', {where: row => row.key.startsWith(ENTRY_PREFIX)}),
+    ]);
+    const valid = record => record && typeof record.id === 'string'
+      && typeof record.path === 'string' && typeof record.gameId === 'string';
+    const byId = new Map();
+    for (const rec of Array.isArray(legacy) ? legacy : []) {
+      if (valid(rec)) byId.set(rec.id, rec);
+    }
+    for (const row of records) {
+      const rec = row.value;
+      // Require metadata to match its key; a malformed row cannot impersonate
+      // another backup or shadow its legacy entry.
+      if (valid(rec) && row.key === ENTRY_PREFIX + rec.id) byId.set(rec.id, rec);
+    }
+    return [...byId.values()];
   }
   async function list(gameId) {
     return (await listAll()).filter(x => x.gameId === gameId).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
@@ -63,7 +82,7 @@ export function createGameBackupService({client, store}) {
     if (error) throw new Error(`Backup upload failed: ${error.message}`);
     const rec = {id,gameId,path,name:cleanFilename(file.name),size:file.size,hash:checksum,
       createdAt:new Date().toISOString(),category:String(category).slice(0,40),notes:String(notes).slice(0,300)};
-    try {await store.setSetting(META_KEY,[...(await listAll()),rec]);}
+    try {await store.setSetting(ENTRY_PREFIX + id, rec);}
     catch (err) {
       // Avoid orphaned objects when a metadata write cannot be saved.
       await client.storage.from(GAME_BACKUP_BUCKET).remove([path]).catch(()=>{});
@@ -84,7 +103,14 @@ export function createGameBackupService({client, store}) {
     if (!entry?.path?.startsWith(`${uid}/`)) throw new Error('This backup is not owned by your account.');
     const {error}=await client.storage.from(GAME_BACKUP_BUCKET).remove([entry.path]);
     if(error)throw new Error(`Could not delete backup: ${error.message}`);
-    await store.setSetting(META_KEY,(await listAll()).filter(x=>x.id!==entry.id));
+    // New backups have independent metadata; deleting one cannot overwrite another.
+    await store.remove('settings', ENTRY_PREFIX + entry.id);
+    // Older backups still live inside the v1 shared index. Only touch that
+    // record when deleting one of those legacy entries.
+    const legacy = await store.getSetting(META_KEY, []);
+    if (Array.isArray(legacy) && legacy.some(x => x?.id === entry.id)) {
+      await store.setSetting(META_KEY, legacy.filter(x => x?.id !== entry.id));
+    }
   }
   return {userId,list,listAll,checkReady,upload,download,remove,storageUsed:async()=> (await listAll()).reduce((s,x)=>s+(Number(x.size)||0),0)};
 }
