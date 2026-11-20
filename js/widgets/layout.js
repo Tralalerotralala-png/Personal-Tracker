@@ -147,3 +147,23 @@ export function movePhoneWidget(layout,id,delta){
  [ordered[i],ordered[j]]=[ordered[j],ordered[i]];
  let y=0;return ordered.map(x=>{const next={...x,x:0,y,w:12};y+=x.h;return next;});
 }
+
+export function recoverLayout(raw,defs,bounds={cols:COLS,rows:null}){
+ const arranged=normalizeLayout(raw,defs,bounds),present=new Set(arranged.map(x=>x.id)),unplaced=[];
+ if(!Array.isArray(raw))return {layout:arranged,unplaced};
+ for(const r of raw){
+  if(!r||!defs[r.id]||present.has(r.id))continue;
+  present.add(r.id);
+  const def=defs[r.id],w=Math.min(bounds.cols,Math.max(def.minW??1,Number.isInteger(r.w)?r.w:def.defaultW??def.minW??1));
+  const maxH=bounds.rows??MAX_ROWS,h=Math.min(maxH,Math.max(def.minH??1,Number.isInteger(r.h)?r.h:def.defaultH??def.minH??1));
+  const preferred={x:Number.isInteger(r.x)?Math.max(0,Math.min(bounds.cols-w,r.x)):0,y:Number.isInteger(r.y)?Math.max(0,Math.min(maxH-h,r.y)):0};
+  let best=null,cost=Infinity;
+  for(let y=0;y+h<=maxH;y++)for(let x=0;x+w<=bounds.cols;x++){
+   const row={id:r.id,x,y,w,h};if(!canPlace(arranged,row,bounds))continue;
+   const distance=Math.abs(x-preferred.x)+2*Math.abs(y-preferred.y);
+   if(distance<cost){cost=distance;best=row;}
+  }
+  if(best)arranged.push(best);else unplaced.push(r.id);
+ }
+ return {layout:arranged,unplaced};
+}

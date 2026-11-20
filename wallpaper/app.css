@@ -2076,3 +2076,5 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 .uv-scale { display:inline-flex; gap:2px; align-items:center; }
 .uv-scale i { width:.65em; height:.4em; background:var(--ink-dim); opacity:.25; }
 .uv-scale i.selected { height:.65em; opacity:1; background:var(--accent); }
+
+.verified-offline-banner{font-size:.8rem;padding:6px 12px;background:var(--panel-2);border-bottom:1px solid var(--edge-hi);color:var(--accent);text-align:center;}

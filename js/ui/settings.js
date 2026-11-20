@@ -6,6 +6,7 @@ import { openPersonalHub } from './personal-hub.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 import { exportAll, importAll, downloadBackup } from '../data/backup.js';
+import {legacyCacheExists,exportUnverifiedLegacyCache} from '../data/legacy-recovery.js';
 import { openPlaceSearchSheet } from './place-search.js';
 import { openMudSettings } from './mud-settings.js';
 import { openSourcesSheet } from './feed.js';
@@ -50,6 +51,20 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
         store.sync.stop();await auth.signOut();location.reload();
       } }, 'Sign out')) : null);
 
+  const recovery=h('section',{class:'set-block'},h('h3',{},'Recovery and device privacy'),
+  h('p',{class:'hint'},'The pre-upgrade browser cache has no verifiable owner. Review it before manually restoring. Signing out preserves local data; it is not encrypted.'),
+  h('div',{class:'inline-actions'},
+   h('button',{class:'btn small',type:'button',onclick:async()=>{
+     try{if(!await legacyCacheExists()){toast('No pre-upgrade cache found.');return;}
+       const ok=await confirmDialog({title:'Export unverified cache?',message:'Old data could belong to another account. The downloaded JSON is readable: save it privately.',confirmLabel:'Export legacy data'});
+       if(ok)downloadBackup(await exportUnverifiedLegacyCache(),'personal-tracker-LEGACY-UNVERIFIED-'+new Date().toISOString().slice(0,10)+'.json');
+     }catch(e){toast(e.message);}
+   }},'Export old browser data'),
+   mode==='cloud'?h('button',{class:'btn small danger',type:'button',onclick:async()=>{
+      const s=store.sync.getStatus();if(s.pending||s.failed){toast('Unsynced changes exist. Export and sync before erasing this device.');return;}
+      const ok=await confirmDialog({title:'Erase account cache?',message:'This permanently erases this account’s local database on this device. Verify your cloud backup first.',confirmLabel:'Erase local cache and sign out',danger:true});
+      if(!ok)return;store.sync.stop();await store.resetCache();await auth.signOut();location.reload();
+   }},'Erase account cache from device'):null));
   // -- mud forecast
   const hasPlace = place && typeof place.lat === 'number';
   const mudBlock = h('section', { class: 'set-block' },
@@ -416,7 +431,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
 
   // Compact settings categories: only the selected section is visible.
   const groups = [
-    ['general', 'General', [languageBlock, account, install]],
+    ['general', 'General', [languageBlock, account, recovery, install]],
     ['overview', 'Overview & weather', [mudBlock, clockSettings, analogBlock, feedBlock, layoutBlock, wallpaperBlock]],
     ['pack', 'Pack', [cats, rarity]],
     ['appearance', 'Appearance', [display, typography, navigation]],

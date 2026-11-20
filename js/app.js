@@ -390,7 +390,7 @@ const header = h('header', { class: 'top' },
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-root.replaceChildren(header, main, nav, audioPlayer.el);
+root.replaceChildren(header,ctx.offlineAuthorized?h('div',{class:'verified-offline-banner',role:'status'},'Offline device mode: previously verified account data is available. Uploads resume when you reconnect.'):null,main,nav,audioPlayer.el);
 startTranslations(document.body);
 
 const mounted = new Set();

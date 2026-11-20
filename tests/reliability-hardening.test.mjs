@@ -16,7 +16,7 @@ test('record and queue are persisted together in a single adapter operation',asy
  assert.equal((await base.getAll('outbox')).length,1);
 });
 test('settlement cannot erase an edit made during a push',async()=>{
- const adapter=createMemoryAdapter(),s=createStore({adapter});
+ const adapter=createMemoryAdapter(),remote={pull:async()=>[],push:async()=>{},classifyError:()=> 'network'},s=createStore({adapter,remote,autoSync:false});
  await s.upsert('items',{id:'x',name:'First'});const a=await s.get('items','x');
  await s.upsert('items',{id:'x',name:'Second'});
  assert.equal(await adapter.settleIfUnchanged('items','x',a.updated_at,'items:x'),false);

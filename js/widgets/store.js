@@ -1,14 +1,16 @@
 // Reading and saving layouts. A saved layout that is empty or no longer valid
 // falls back to the default, so a screen is never left blank.
 import { WIDGET_DEFS, PROFILES } from './defs.js';
-import { normalizeLayout } from './layout.js';
+import { recoverLayout } from './layout.js';
 import { DEFAULT_LAYOUTS } from '../data/defaults.js';
 
 export const boundsFor = (profile) => ({ cols: PROFILES[profile].cols, rows: PROFILES[profile].rows });
 
 export function cleanLayout(raw, profile) {
   const input=profile==='wallpaper'&&Array.isArray(raw)?raw.filter(w=>!WIDGET_DEFS[w?.id]?.appOnly):raw;
-  return normalizeLayout(input, WIDGET_DEFS, boundsFor(profile));
+  const {layout,unplaced}=recoverLayout(input,WIDGET_DEFS,boundsFor(profile));
+  if(unplaced.length)console.warn('Some widgets could not fit; original saved layout remains unchanged:',unplaced.join(', '));
+  return layout;
 }
 
 export async function loadLayout(store, profile) {

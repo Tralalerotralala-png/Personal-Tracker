@@ -10,7 +10,7 @@ import { createAuth, createSupabaseRemote } from './supabase.js';
 import { ensureDefaults, upgradeLayouts } from './defaults.js';
 import { seedSample } from './sample-data.js';
 
-const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm';
 
 async function loadConfig() {
   try {

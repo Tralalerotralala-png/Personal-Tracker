@@ -56,7 +56,7 @@ const nextDate = (date, repeat) => {
   if (repeat === 'daily') day.setDate(day.getDate() + 1);
   if (repeat === 'weekly') day.setDate(day.getDate() + 7);
   if (repeat === 'biweekly') day.setDate(day.getDate() + 14);
-  if (repeat === 'monthly') day.setMonth(day.getMonth() + 1);
+  if(repeat==='monthly'){const originalDay=day.getDate();day.setDate(1);day.setMonth(day.getMonth()+1);const last=new Date(day.getFullYear(),day.getMonth()+1,0).getDate();day.setDate(Math.min(originalDay,last));}
   return `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
 };
 export async function loadHub(store) {
