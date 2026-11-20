@@ -25,6 +25,19 @@ const isRealConfig = (cfg) =>
   Boolean(cfg?.SUPABASE_URL && cfg?.SUPABASE_ANON_KEY) &&
   !/YOUR-/i.test(cfg.SUPABASE_URL + cfg.SUPABASE_ANON_KEY);
 
+// Remember that this specific installation was configured for the cloud.
+// Without this marker, intentionally local-only/demo installations still work.
+// A transient failed config.js import must not silently change an existing
+// cloud account into a different local database with sample records.
+const CLOUD_CONFIG_MARKER = 'tracker-cloud-configured:' + new URL('../../config.js', import.meta.url).pathname;
+export function resolveStorageMode({config, previouslyCloud = false}) {
+  if (isRealConfig(config)) return 'cloud';
+  if (previouslyCloud) {
+    throw new Error('Cloud configuration could not be loaded. Your account data was not switched to local storage. Reconnect and restore config.js, then reload.');
+  }
+  return 'local';
+}
+
 async function openAdapter(name) {
   try {
     return await openIdbAdapter(name);
@@ -36,9 +49,12 @@ async function openAdapter(name) {
 
 export async function initData() {
   const cfg = await loadConfig();
+  let previouslyCloud = false;
+  try { previouslyCloud = localStorage.getItem(CLOUD_CONFIG_MARKER) === 'yes'; } catch {}
+  const storageMode = resolveStorageMode({config:cfg,previouslyCloud});
 
   // ---- local-only mode ----------------------------------------------------
-  if (!isRealConfig(cfg)) {
+  if (storageMode === 'local') {
     const store = createStore({ adapter: await openAdapter('personal-tracker-local') });
     await seedSample(store);
     await upgradeLayouts(store);
@@ -46,6 +62,9 @@ export async function initData() {
   }
 
   // ---- cloud mode ---------------------------------------------------------
+  // Record this BEFORE loading the CDN. If it fails, the next launch still
+  // recognizes that cloud mode was intended rather than seeding local data.
+  try { localStorage.setItem(CLOUD_CONFIG_MARKER, 'yes'); } catch {}
   const { createClient } = await import(SUPABASE_CDN);
   const client = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
