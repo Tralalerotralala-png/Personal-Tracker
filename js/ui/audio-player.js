@@ -67,6 +67,9 @@ export function createAudioPlayer({store}){
  function clearSource(){audio.pause();audio.removeAttribute('src');audio.load();if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null;}}
  async function start(item,kind){
   if(!item)return;clearSource();active={...item,kind};audio.src=kind==='music'?(objectUrl=URL.createObjectURL(item.blob)):item.url;
+  if('mediaSession' in navigator&&globalThis.MediaMetadata){
+    navigator.mediaSession.metadata=new MediaMetadata({title:item.name||'Audio',artist:kind==='radio'?'Internet radio':'Local audio',album:'Personal Tracker'});
+  }
   try{await audio.play();showStatus('');}catch{showStatus(tr('Playback unavailable. Try another file or station.','No se pudo reproducir. Prueba otro archivo o estación.'));}refreshTransport();
  }
  function step(delta){if(!tracks.length)return;const i=tracks.findIndex(t=>t.id===active?.id);start(tracks[(i<0?(delta>0?0:tracks.length-1):(i+delta+tracks.length)%tracks.length)],'music');}
@@ -75,6 +78,10 @@ export function createAudioPlayer({store}){
  progress.oninput=()=>{if(Number.isFinite(audio.duration)&&active?.kind!=='radio')audio.currentTime=audio.duration*Number(progress.value)/1000;};
  volume.oninput=()=>{audio.volume=Number(volume.value)/100;savePrefs();};
  for(const event of ['play','pause','loadedmetadata','durationchange','timeupdate','emptied'])audio.addEventListener(event,refreshTransport);
+ if('mediaSession' in navigator){
+   const actions={play:()=>audio.play().catch(()=>{}),pause:()=>audio.pause(),nexttrack:()=>step(1),previoustrack:()=>step(-1),seekto:d=>{if(Number.isFinite(audio.duration)&&d.seekTime!=null)audio.currentTime=Math.max(0,Math.min(audio.duration,d.seekTime));}};
+   for(const [key,handler] of Object.entries(actions))try{navigator.mediaSession.setActionHandler(key,handler);}catch{}
+ }
  audio.addEventListener('ended',()=>{if(active?.kind==='music')step(1);});
  audio.addEventListener('error',()=>{if(active)showStatus(tr('Audio unavailable or format unsupported by this browser.','Audio no disponible o formato incompatible con este navegador.'));});
  file.onchange=async()=>{let count=0;for(const blob of file.files||[]){if(!blob.size||blob.size>150*1024*1024)continue;const item={id:uuid(),name:blob.name.slice(0,250),blob,addedAt:Date.now()};try{await dbOp('readwrite',s=>s.put(item));tracks.push(item);count++;}catch{showStatus(tr('Device storage is full or unavailable.','El almacenamiento local está lleno o no disponible.'));break;}}file.value='';if(count)showStatus(tr(count+' tracks added locally',count+' pistas agregadas al dispositivo'));drawLibrary();};

@@ -2083,3 +2083,19 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 .temporary-storage-banner{background:#482d23;color:#fff0d1;border:2px solid #b4784d;}
 .sync-queue-details{border-top:1px solid var(--edge);margin-top:8px;padding-top:9px;min-width:0;max-height:210px;overflow-y:auto;}
 .sync-queue-details ul{padding-left:20px;overflow-wrap:anywhere;font-size:.78rem;}
+
+.quick-capture-choice{position:relative;min-width:0;min-height:54px;}
+.quick-capture-choice>.quick-capture-kind{width:100%;height:100%;padding-right:19px;}
+.quick-capture-favorite{position:absolute;right:2px;top:2px;min-width:23px;min-height:23px;border:0;background:transparent;color:var(--accent);cursor:pointer;font-size:.95rem;}
+.quick-capture-favorite:focus-visible{outline:2px solid var(--accent);}
+.quick-capture-favorite[aria-pressed=true]{color:#edc56a;}
+@container widget (max-width:250px){
+ .widget-head{font-size:.78rem;gap:2px;}
+ .widget-head-tools{gap:0;}
+ .widget-scroll-toggle,.widget-expand{min-width:28px;min-height:28px;}
+ .widget .w-weather-clock .w-analog-clock{max-width:38px;}
+ .widget .currency-range{display:grid;grid-template-columns:1fr;}
+ .widget .currency-result{font-size:.85rem;}
+ .widget .w-sky-scroll{max-height:115px;}
+ .widget .w-feed-scroll{max-height:145px;}
+}

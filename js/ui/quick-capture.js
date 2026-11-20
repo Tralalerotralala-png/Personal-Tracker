@@ -63,7 +63,12 @@ const privateTypes=new Set(['dreams','sleep','moods','habits','vault']);
 let activeCapture=null;
 export function openQuickCapture({store}){
  if(activeCapture?.el?.open)return;
- let chosen='task',busy=false,locations=[],categories=[];
+ const recentKey='tracker-capture-recent:'+(store.accountId||'local'),favoriteKey='tracker-capture-favorites:'+(store.accountId||'local');
+ const loadArray=key=>{try{const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value)?value.filter(x=>types.some(t=>t[0]===x)).slice(0,12):[];}catch{return [];}};
+ let recents=loadArray(recentKey),favorites=loadArray(favoriteKey);
+ let chosen=recents[0]||'task',busy=false,locations=[],categories=[];
+ const remember=kind=>{recents=[kind,...recents.filter(x=>x!==kind)].slice(0,8);try{localStorage.setItem(recentKey,JSON.stringify(recents));}catch{};};
+ const toggleFavorite=kind=>{favorites=favorites.includes(kind)?favorites.filter(x=>x!==kind):[...favorites,kind];try{localStorage.setItem(favoriteKey,JSON.stringify(favorites));}catch{};drawKinds();};
  const kindBar=h('div',{class:'quick-capture-types'}),search=h('input',{type:'search',placeholder:tr('Find an action…','Buscar una acción…'),'aria-label':tr('Find capture action','Buscar acción')});
  const title=h('input',{type:'text',maxlength:200,required:true,placeholder:tr('What do you want to add?','¿Qué quieres agregar?')});
  const body=h('textarea',{rows:3,placeholder:tr('Details (optional)','Detalles (opcional)')});
@@ -78,7 +83,16 @@ export function openQuickCapture({store}){
  const repeatLabels={none:['No repeat','Sin repetición'],daily:['Daily','Diaria'],weekly:['Weekly','Semanal'],biweekly:['Every two weeks','Cada dos semanas'],monthly:['Monthly','Mensual'],yearly:['Yearly','Anual']};
  const statusEs={'Backlog':'Pendiente','Playing':'Jugando','Completed':'Terminado','On hold':'En pausa','Dropped':'Abandonado','To read':'Por leer','Reading':'Leyendo','Finished':'Terminado','To watch':'Por ver','Watching':'Viendo','Watched':'Vista','To listen':'Por escuchar','Listening':'Escuchando','Listened':'Escuchado'};
  function fillPlaces(){const c=cat.value,l=location.value;replace(cat,option('',tr('None','Sin categoría')),...categories.map(x=>option(x.id,x.name)));replace(location,option('',tr('None / top level','Ninguno / nivel superior')),...locations.map(x=>option(x.id,x.name)));cat.value=c;location.value=l;}
- function drawKinds(){const q=search.value.toLowerCase().trim();replace(kindBar,...types.filter(x=>!q||x.join(' ').toLowerCase().includes(q)).map(([id,en,es,icon])=>h('button',{class:'btn quick-capture-kind'+(chosen===id?' primary':''),type:'button','aria-pressed':String(chosen===id),onclick:()=>{chosen=id;error.textContent='';draw();if(!privateTypes.has(id))title.focus();}},h('span',{'aria-hidden':'true'},icon),tr(en,es))));}
+ function drawKinds(){
+  const q=search.value.toLowerCase().trim();
+  const options=types.filter(x=>!q||x.join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(favorites.includes(b[0])?1:0)-(favorites.includes(a[0])?1:0)||
+      (recents.includes(b[0])?1:0)-(recents.includes(a[0])?1:0)||
+      (recents.indexOf(a[0])<0?99:recents.indexOf(a[0]))-(recents.indexOf(b[0])<0?99:recents.indexOf(b[0])));
+  replace(kindBar,...options.map(([id,en,es,icon])=>h('div',{class:'quick-capture-choice'},
+    h('button',{class:'btn quick-capture-kind'+(chosen===id?' primary':''),type:'button','aria-pressed':String(chosen===id),onclick:()=>{chosen=id;error.textContent='';draw();if(!privateTypes.has(id))title.focus();}},h('span',{'aria-hidden':'true'},icon),tr(en,es)),
+    h('button',{class:'quick-capture-favorite',type:'button','aria-pressed':String(favorites.includes(id)),'aria-label':tr('Toggle favorite: ','Marcar favorito: ')+tr(en,es),onclick:()=>toggleFavorite(id)},favorites.includes(id)?'★':'☆'))));
+ }
  function draw(){
   drawKinds();const priv=privateTypes.has(chosen);saveButton.textContent=priv?tr('Open encrypted editor','Abrir editor cifrado'):tr('Save','Guardar');again.hidden=priv;
   if(priv){replace(fields,h('p',{class:'hint'},tr('This opens the original encrypted journal editor. Your PIN and private text never go into Quick Capture.','Se abre el editor cifrado original. Tu PIN y texto privado nunca pasan por captura rápida.')));return;}
@@ -96,11 +110,12 @@ export function openQuickCapture({store}){
  }
  timed.onchange=draw;search.oninput=drawKinds;form.append(fields,error);
  activeCapture=openSheet({title:tr('Quick Capture','Captura rápida'),body:h('div',{class:'quick-capture'},search,kindBar,form),footer:[h('button',{class:'btn ghost',type:'button',onclick:()=>activeCapture?.close()},tr('Cancel','Cancelar')),again,saveButton],onClose:()=>{activeCapture=null;}});
+ activeCapture.el.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();save(e.shiftKey);}});
  async function save(keep){
   if(busy)return;
-  if(privateTypes.has(chosen)){const type=chosen;activeCapture?.close();window.dispatchEvent(new CustomEvent('tracker-private-capture',{detail:{type}}));location.hash='#diary';return;}
+  if(privateTypes.has(chosen)){remember(chosen);const type=chosen;activeCapture?.close();window.dispatchEvent(new CustomEvent('tracker-private-capture',{detail:{type}}));location.hash='#diary';return;}
   busy=true;saveButton.disabled=again.disabled=true;error.textContent='';
-  try{if(chosen==='event'&&timed.checked&&!time.value)throw Error(tr('Choose a starting time.','Elige una hora de inicio.'));await saveQuickCapture(store,{kind:chosen,title:title.value,body:body.value,date:date.value,amount:amount.value,currency:currency.value,category:category.value,account:account.value,repeat:repeat.value,time:timed.checked?time.value:'',endTime:endTime.value,quantity:quantity.value,categoryId:cat.value,locationId:location.value,rarity:rarity.value,creator:creator.value,platform:creator.value,status:status.value,url:url.value});window.dispatchEvent(new CustomEvent('tracker-quick-capture-saved',{detail:{kind:chosen}}));if(keep){title.value=body.value=amount.value=url.value='';title.focus();toast(tr('Saved','Guardado'));refreshLists();}else{activeCapture?.close();toast(tr('Saved','Guardado'));}}
+  try{if(chosen==='event'&&timed.checked&&!time.value)throw Error(tr('Choose a starting time.','Elige una hora de inicio.'));await saveQuickCapture(store,{kind:chosen,title:title.value,body:body.value,date:date.value,amount:amount.value,currency:currency.value,category:category.value,account:account.value,repeat:repeat.value,time:timed.checked?time.value:'',endTime:endTime.value,quantity:quantity.value,categoryId:cat.value,locationId:location.value,rarity:rarity.value,creator:creator.value,platform:creator.value,status:status.value,url:url.value});window.dispatchEvent(new CustomEvent('tracker-quick-capture-saved',{detail:{kind:chosen}}));remember(chosen);drawKinds();if(keep){title.value=body.value=amount.value=url.value='';title.focus();toast(tr('Saved','Guardado'));refreshLists();}else{activeCapture?.close();toast(tr('Saved','Guardado'));}}
   catch(e){error.textContent=e.message;}finally{busy=false;saveButton.disabled=again.disabled=false;}
  }
  function refreshLists(){Promise.all([store.list('categories'),store.list('locations')]).then(([c,l])=>{categories=c;locations=l;fillPlaces();}).catch(()=>{});}
