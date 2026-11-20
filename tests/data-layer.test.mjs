@@ -37,12 +37,13 @@ function createFakeRemote() {
     onPush: null,
     rows: (table) => [...tbl(table).values()],
 
-    async pull(table, since, limit) {
+    async pull(table, since, limit, offset = 0) {
       if (!remote.online) throw new Error('TypeError: Failed to fetch');
       return [...tbl(table).values()]
         .filter((r) => !since || parseTs(r.synced_at) >= parseTs(since))
-        .sort((a, b) => parseTs(a.synced_at) - parseTs(b.synced_at))
-        .slice(0, limit)
+        .sort((a, b) => parseTs(a.synced_at) - parseTs(b.synced_at) ||
+          String(a[TABLES[table].pk]).localeCompare(String(b[TABLES[table].pk])))
+        .slice(offset, offset + limit)
         .map((r) => ({ ...r, user_id: 'u1' }));
     },
 

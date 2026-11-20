@@ -141,17 +141,22 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
     for (const table of TABLE_NAMES) {
       const meta = await adapter.get('meta', `cursor:${table}`);
       let cursor = meta?.value ?? null;
-      let since = cursor ? new Date(parseTs(cursor).getTime() - OVERLAP_MS).toISOString() : null;
+      // Stable lower bound + deterministic (timestamp, PK) server order.
+      // Range offsets avoid losing rows with identical synced_at timestamps.
+      const since = cursor ? new Date(parseTs(cursor).getTime() - OVERLAP_MS).toISOString() : null;
+      let offset = 0, exhausted = false;
 
       for (let page = 0; page < 100; page += 1) {
-        const rows = await remote.pull(table, since, PAGE);
+        const rows = await remote.pull(table, since, PAGE, offset);
         for (const raw of rows) {
           if (await applyRemote(table, raw)) touched.add(table);
         }
         if (rows.length) cursor = rows[rows.length - 1].synced_at;
-        if (rows.length < PAGE) break;
-        since = cursor; // later pages continue exactly from the last row
+        if (rows.length < PAGE) { exhausted = true; break; }
+        offset += rows.length;
       }
+      // Never mark this table fully fetched after hitting the safety cap.
+      if (!exhausted) throw new Error('Sync page limit reached for ' + table + '; retry after reducing the dataset.');
       if (cursor && cursor !== meta?.value) await adapter.put('meta', { key: `cursor:${table}`, value: cursor });
     }
     if (touched.size) emit({ type: 'change', tables: [...touched], source: 'sync' });

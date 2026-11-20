@@ -37,17 +37,18 @@ export function createSupabaseRemote(client, expectedUserId=null) {
   }
 
   return {
-    async pull(table, since, limit) {
+    async pull(table, since, limit, offset = 0) {
       const uid=await currentUserId();
       let q = client
         .from(table)
         .select('*')
         .eq('user_id',uid)
         .order('synced_at', { ascending: true })
-        .order(TABLES[table].pk, { ascending: true })
-        .limit(limit);
+        .order(TABLES[table].pk, { ascending: true });
+      // Keep the same lower bound for every page. Advancing a timestamp-only
+      // cursor between pages can skip records when many share a timestamp.
       if (since) q = q.gte('synced_at', since);
-      const { data, error, status } = await q;
+      const { data, error, status } = await q.range(offset, offset + limit - 1);
       if (error) throw wrap(error, status);
       await currentUserId();
       if(data.some(r=>r.user_id!==uid))throw Object.assign(new Error('Unexpected row owner'),{code:'AUTH'});
