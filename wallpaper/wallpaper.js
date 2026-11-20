@@ -4441,14 +4441,16 @@ __define("js/widgets/store.js", function (__require, __exports) {
 // Reading and saving layouts. A saved layout that is empty or no longer valid
 // falls back to the default, so a screen is never left blank.
 const { WIDGET_DEFS, PROFILES } = __require("js/widgets/defs.js");
-const { normalizeLayout } = __require("js/widgets/layout.js");
+const { recoverLayout } = __require("js/widgets/layout.js");
 const { DEFAULT_LAYOUTS } = __require("js/data/defaults.js");
 
 const boundsFor = (profile) => ({ cols: PROFILES[profile].cols, rows: PROFILES[profile].rows });
 
 function cleanLayout(raw, profile) {
   const input=profile==='wallpaper'&&Array.isArray(raw)?raw.filter(w=>!WIDGET_DEFS[w?.id]?.appOnly):raw;
-  return normalizeLayout(input, WIDGET_DEFS, boundsFor(profile));
+  const {layout,unplaced}=recoverLayout(input,WIDGET_DEFS,boundsFor(profile));
+  if(unplaced.length)console.warn('Some widgets could not fit; original saved layout remains unchanged:',unplaced.join(', '));
+  return layout;
 }
 
 async function loadLayout(store, profile) {
