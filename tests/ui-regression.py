@@ -28,6 +28,23 @@ for width,height in [(390,844),(1280,900)]:
         assert "Headlamp" in first_result.inner_text(),"Global search did not return a seeded inventory item"
         first_result.click()
         assert page.evaluate("window.location.hash")=="#inventory","Search result failed to navigate"
+        page.locator("dialog.sheet[open]").wait_for(state="visible",timeout=10000)
+        assert page.locator("dialog.sheet[open] #it-name").input_value()=="Headlamp","Search did not open the actual item"
+        page.keyboard.press("Escape")
+        page.locator("dialog.sheet[open]").wait_for(state="detached",timeout=5000)
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
+        page.locator(".pixel-search-toggle").click()
+        page.locator(".global-search-input").fill("Bin day")
+        calendar_result=page.locator(".global-search-results .global-search-result").first
+        calendar_result.wait_for(state="visible",timeout=5000)
+        assert "Bin day" in calendar_result.inner_text()
+        calendar_result.click()
+        assert page.evaluate("location.hash")=="#calendar","Event search did not open Calendar"
+        page.locator("dialog.sheet[open] #ev-title").wait_for(state="visible",timeout=10000)
+        assert page.locator("dialog.sheet[open] #ev-title").input_value()=="Bin day"
+        page.keyboard.press("Escape")
+        page.locator("dialog.sheet[open]").wait_for(state="detached",timeout=5000)
         page.locator(".overview").evaluate("(el) => { location.hash='#overview'; }")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # The decrypted private journal must close on navigation, not merely

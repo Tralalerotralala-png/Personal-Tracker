@@ -24,6 +24,7 @@ import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings, createAnalogClockSettings } from './ui/settings.js';
 import { openQuickCapture } from './ui/quick-capture.js';
+import { startParts } from './calendar/recurrence.js';
 
 const root = document.getElementById('app');
 let ctx;
@@ -328,8 +329,8 @@ async function renderGlobalSearch() {
   if (seq !== searchSeq) return;
   const languageLabel=(en,es)=>locale().startsWith('es')?es:en;
   const entries = [
-    ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory' })),
-    ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar' })),
+    ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory', itemId: x.id })),
+    ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar', eventId: x.id, dateKey: startParts(x).key })),
     ...places.map(x => ({ type: t('Places'), title: x.name, detail: x.notes || '', target: 'inventory' })),
     ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', hub: true })),
     ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', hub: true })),
@@ -345,7 +346,20 @@ async function renderGlobalSearch() {
   const found = entries.filter(x => `${x.title || ''} ${x.detail} ${x.type}`.toLocaleLowerCase().includes(query)).slice(0, 12);
   searchResults.replaceChildren(...(found.length ? found.map(entry => h('button', { class: 'global-search-result', type: 'button', role: 'option', onclick: () => {
     closeSearch();
-    if (entry.hub) openPersonalHub({ store }); else location.hash = `#${entry.target}`;
+    // Open saved records directly rather than landing on a long list. These
+    // paths reuse the same item/event editors as ordinary navigation.
+    if(entry.itemId){
+      try{sessionStorage.setItem('tracker-open-item',entry.itemId);}catch{}
+      if(location.hash==='#inventory')void inventory.show();
+      else location.hash='#inventory';
+    }else if(entry.eventId){
+      window.dispatchEvent(new CustomEvent('tracker-calendar-open',{
+        detail:{eventId:entry.eventId,dateKey:entry.dateKey}
+      }));
+      if(location.hash==='#calendar')void calendar.show();
+      else location.hash='#calendar';
+    }else if (entry.hub) openPersonalHub({ store });
+    else location.hash = `#${entry.target}`;
   } }, h('span', {}, entry.title || entry.type), h('small', {}, entry.type))) : [h('p', { class: 'hint' }, t('No matching results.'))]));
   searchResults.hidden = false;
 }
