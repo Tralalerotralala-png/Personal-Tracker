@@ -386,6 +386,52 @@ test('service: changing the place fetches again', async () => {
   assert.equal(fetchImpl.calls.length, n + 2);
 });
 
+test('service: switching location during an in-flight request ignores the old result', async () => {
+  const base = routedFetch();
+  let begun, release;
+  const firstFetchStarted = new Promise(resolve => { begun = resolve; });
+  const unblocked = new Promise(resolve => { release = resolve; });
+  let notified = false;
+  const fetchImpl = async (url) => {
+    if (new URL(url).searchParams.get('latitude') === '52.52') {
+      if (!notified) { notified = true; begun(); }
+      await unblocked;
+    }
+    return base(url);
+  };
+  const { svc, store } = serviceFixture({ fetchImpl });
+  const oldRequest = svc.setPlace(berlin);
+  await firstFetchStarted;
+  const newer = { ...berlin, name: 'Hamburg', label: 'Hamburg, Germany', lat: 53.55, lon: 9.99 };
+  const latestRequest = svc.setPlace(newer);
+  release();
+  await Promise.all([oldRequest, latestRequest]);
+  assert.equal(svc.getState().place.name, 'Hamburg');
+  assert.equal((await store.getSetting('location')).name, 'Hamburg');
+  assert.equal(svc.getState().status, 'ok');
+  assert.equal(svc.getState().rows.length, 11);
+  assert.equal(base.calls.filter(url => url.includes('latitude=53.55')).length, 2);
+});
+
+test('service: hourly requests are coalesced and cache is isolated per location', async () => {
+  const base = routedFetch();
+  let hourlyRequests = 0;
+  const fetchImpl = async url => {
+    if (new URL(url).searchParams.get('hourly')?.startsWith('precipitation_probability')) hourlyRequests++;
+    return base(url);
+  };
+  const { svc } = serviceFixture({ fetchImpl });
+  await svc.setPlace(berlin);
+  const [one,two] = await Promise.all([svc.loadHourly(),svc.loadHourly()]);
+  assert.equal(one.length > 0, true);
+  assert.deepEqual(one,two);
+  assert.equal(hourlyRequests,1,'same-place simultaneous requests should share one fetch');
+  await svc.setPlace({ ...berlin, name:'Hamburg',lat:53.55,lon:9.99 });
+  assert.deepEqual(svc.getState().hourly,[], 'old hourly forecast should be removed when location changes');
+  await svc.loadHourly();
+  assert.equal(hourlyRequests,2,'new location must not reuse prior forecast');
+});
+
 test('moon icons: rounded disk, correct illumination and detailed opposing crescents', () => {
   const ref = Date.UTC(2000, 0, 6, 18, 14);
   const synodic = 29.530588853 * 86400000;
