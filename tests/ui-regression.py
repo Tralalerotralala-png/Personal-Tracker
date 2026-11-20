@@ -30,6 +30,23 @@ for width,height in [(390,844),(1280,900)]:
         assert page.evaluate("window.location.hash")=="#inventory","Search result failed to navigate"
         page.locator(".overview").evaluate("(el) => { location.hash='#overview'; }")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
+        # The decrypted private journal must close on navigation, not merely
+        # disappear visually while its plaintext remains in memory.
+        page.evaluate("location.hash='#diary'")
+        page.locator(".journal-unlock input[type=password]").first.wait_for(timeout=10000)
+        keys=page.locator(".journal-unlock input[type=password]")
+        assert keys.count()==2,"Expected new local journal key setup"
+        keys.nth(0).fill("local regression passphrase")
+        keys.nth(1).fill("local regression passphrase")
+        page.get_by_role("button",name="Create journal key").click()
+        page.locator(".journal-shell").wait_for(state="visible",timeout=12000)
+        page.evaluate("location.hash='#overview'")
+        page.locator(".journal-shell").wait_for(state="detached",timeout=5000)
+        page.evaluate("location.hash='#diary'")
+        page.locator(".journal-unlock input[type=password]").first.wait_for(timeout=10000)
+        assert page.locator(".journal-shell").count()==0,"Private journal remained unlocked after navigating away"
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         page.locator(".top .gear").click()
         page.locator("dialog.sheet[open]").wait_for(timeout=5000)
         page.keyboard.press("Escape")
