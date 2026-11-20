@@ -130,6 +130,20 @@ screen. (If you see a plain "404", wait another minute. If it stays 404, check t
 3. Under **Redirect URLs** click **Add URL** and add the same address. Save.
 4. Open your Pages address in your browser. Type your email and click **Email me a code**.
 5. Open the email (check spam), type the 6-digit code into the app, and click **Sign in**.
+   **On a new project, the first sign-in creates your Supabase user but the app will not
+   unlock yet.** It requires a separate single-owner authorization check; seeing
+   "Authorization unavailable" at this step is expected before the next step.
+6. In your Supabase dashboard, open **Authentication → Users**, find the new account
+   and copy its **User UID** (a UUID, not your email address). Open
+   `supabase/owner-authorization.sql` from this repository in a local text editor,
+   replace `REPLACE_WITH_OWNER_USER_UUID` with your exact User UID, then execute
+   the entire edited SQL in **SQL Editor**. Run this script **only for a new project**.
+   It refuses to replace an existing `tracker_account_allowed()` function, so do
+   not use it to change ownership of an established deployment.
+7. Reload the Tracker app and sign in using the same email-code account again.
+   The account gate and optional Edge Functions now share the same owner check.
+   Before entering personal data, run the three verification queries at the bottom
+   of `supabase/owner-authorization.sql`; they should show **1**, **false**, **true**.
 
 **You will know it worked when...** you see the **Pack** screen. It starts empty (the sample
 data only appears when you run without a database). The small label at the top changes to
@@ -141,6 +155,12 @@ few emails an hour on the free plan. Wait a bit rather than pressing the button 
 ---
 
 ## Part 7. Lock it down (3 minutes)
+
+**Existing installations:** If your app already authenticates successfully,
+do not run the owner bootstrap or replace its existing owner function. The
+bootstrap sets the initial owner of a fresh project, not a recovery or
+account-transfer procedure. If you lose access to the owner account, recover
+it through Supabase Authentication rather than making a new account the owner.
 
 Now that your account exists, stop strangers from creating accounts in your project.
 
