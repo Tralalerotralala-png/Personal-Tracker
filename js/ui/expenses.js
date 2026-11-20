@@ -51,13 +51,23 @@ export function splitAmountExactly(amount,people,currency='MXN'){
  return Array.from({length:people},(_,i)=>(base+(i<extra?1:0))/scale);
 }
 export function summarizeTransactions(entries, month, currency) {
-  const rows = entries.map(normalizeTransaction).filter(x=>monthOf(x.due)===month && x.currency===currency);
-  const expenses = rows.filter(x=>x.type==='expense');
-  const income = rows.filter(x=>x.type==='income');
+  const rows=[], categoryMinor=new Map();
   const scale=minorUnitScale(currency);
-  const spentMinor=expenses.reduce((s,x)=>s+toMinorUnits(x.amount,currency),0);
-  const receivedMinor=income.reduce((s,x)=>s+toMinorUnits(x.amount,currency),0);
-  const categories=[...new Set(expenses.map(x=>x.category))].map(name=>({name,amount:expenses.filter(x=>x.category===name).reduce((s,x)=>s+toMinorUnits(x.amount,currency),0)/scale})).sort((a,b)=>b.amount-a.amount);
+  let spentMinor=0,receivedMinor=0;
+  // One pass preserves integer-minor-unit totals without rescanning the same
+  // transactions for each category (formerly quadratic in distinct categories).
+  for(const entry of entries){
+    if(monthOf(entry.due)!==month)continue;
+    const row=normalizeTransaction(entry);
+    if(row.currency!==currency)continue;
+    rows.push(row);
+    const amountMinor=toMinorUnits(row.amount,currency);
+    if(row.type==='expense'){
+      spentMinor+=amountMinor;
+      categoryMinor.set(row.category,(categoryMinor.get(row.category)||0)+amountMinor);
+    } else receivedMinor+=amountMinor;
+  }
+  const categories=[...categoryMinor].map(([name,minor])=>({name,amount:minor/scale})).sort((a,b)=>b.amount-a.amount);
   return {rows,spent:spentMinor/scale,received:receivedMinor/scale,balance:(receivedMinor-spentMinor)/scale,categories,transactions:rows.length};
 }
 export function calculateBill({subtotal=0,taxPercent=0,tipPercent=0,people=1}={}) {
