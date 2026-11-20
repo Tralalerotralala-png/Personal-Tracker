@@ -322,7 +322,7 @@ async function renderGlobalSearch() {
   const query = globalSearchInput.value.trim().toLocaleLowerCase();
   if (!query) { searchResults.hidden = true; searchResults.replaceChildren(); return; }
   const [items, events, places, hub, gameLibrary, otherMedia] = await Promise.all([
-    store.list('items'),store.list('events'),store.list('places'),loadHub(store),
+    store.list('items'),store.list('events'),store.list('locations'),loadHub(store),
     store.getSetting('game_library_v1'),store.getSetting('other_media_library_v1')
   ]);
   if (seq !== searchSeq) return;
