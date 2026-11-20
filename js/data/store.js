@@ -20,6 +20,16 @@ export function createStore({
   clock = () => new Date().toISOString(),
 }) {
   const listeners = new Set();
+  // Concurrent writes to one record are serialized before reading its old stamp.
+  const writeQueues=new Map();
+  function serialize(table,id,fn) {
+    const key=table+':'+id,previous=writeQueues.get(key)||Promise.resolve();
+    const next=previous.catch(()=>{}).then(fn);
+    writeQueues.set(key,next);
+    next.then(()=>{if(writeQueues.get(key)===next)writeQueues.delete(key);},
+              ()=>{if(writeQueues.get(key)===next)writeQueues.delete(key);});
+    return next;
+  }
   const emit = (event) => {
     for (const fn of [...listeners]) {
       try { fn(event); } catch (err) { console.error('store listener failed', err); }
@@ -38,6 +48,14 @@ export function createStore({
     return def;
   };
 
+  async function writeLocal(table,row,id) {
+    if(sync&&adapter.putWithOutbox){
+      await adapter.putWithOutbox(table,row,{key:table+':'+id,table,id,queuedAt:clock()});
+      sync.noteLocalWrite();return;
+    }
+    await adapter.put(table,row);
+    await markDirty(table,id);
+  }
   async function markDirty(table, id) {
     if (!sync) return;
     await adapter.put('outbox', { key: `${table}:${id}`, table, id, queuedAt: clock() });
@@ -65,38 +83,30 @@ export function createStore({
   // Upserting always un-deletes (unless you pass deleted_at explicitly).
   async function upsert(table, input) {
     assertWritable();
-    const def = tableDef(table);
-    const id = input[def.pk] ?? (def.pk === 'id' ? uuid() : undefined);
-    if (id === undefined) throw new Error(`${table}.${def.pk} is required`);
-
-    const existing = await adapter.get(table, id);
-    const now = nextTimestamp(clock, existing?.updated_at);
-    const row = normalizeRow(table, {
-      ...existing,
-      ...input,
-      [def.pk]: id,
-      created_at: existing?.created_at ?? now,
-      updated_at: now,
-      deleted_at: input.deleted_at ?? null,
+    const def=tableDef(table),id=input[def.pk]??(def.pk==='id'?uuid():undefined);
+    if(id===undefined)throw new Error(table+'.'+def.pk+' is required');
+    return serialize(table,id,async()=>{
+      const existing=await adapter.get(table,id);
+      const now=nextTimestamp(clock,existing?.updated_at);
+      const row=normalizeRow(table,{...existing,...input,[def.pk]:id,
+        created_at:existing?.created_at??now,updated_at:now,deleted_at:input.deleted_at??null});
+      await writeLocal(table,row,id);
+      emit({type:'change',tables:[table],ids:[id],source:'local'});
+      return row;
     });
-
-    await adapter.put(table, row);
-    await markDirty(table, id);
-    emit({ type: 'change', tables: [table], ids: [id], source: 'local' });
-    return row;
   }
 
   // Soft delete (a tombstone, so other devices learn about it).
-  async function remove(table, id) {
-    assertWritable();
-    tableDef(table);
-    const existing = await adapter.get(table, id);
-    if (!existing || existing.deleted_at) return false;
-    const now = nextTimestamp(clock, existing.updated_at);
-    await adapter.put(table, { ...existing, deleted_at: now, updated_at: now });
-    await markDirty(table, id);
-    emit({ type: 'change', tables: [table], ids: [id], source: 'local' });
-    return true;
+  async function remove(table,id){
+    assertWritable();tableDef(table);
+    return serialize(table,id,async()=>{
+      const old=await adapter.get(table,id);
+      if(!old||old.deleted_at)return false;
+      const now=nextTimestamp(clock,old.updated_at),row={...old,deleted_at:now,updated_at:now};
+      await writeLocal(table,row,id);
+      emit({type:'change',tables:[table],ids:[id],source:'local'});
+      return true;
+    });
   }
 
   // Deleting a location moves its child locations and items up to its parent
@@ -138,22 +148,46 @@ export function createStore({
 
   // Write a row as-is (used by backup import). With touch:true the row gets a
   // fresh updated_at so it wins over whatever the server holds.
-  async function importRow(table, row, { touch = true } = {}) {
-    assertWritable();
-    const def = tableDef(table);
-    const existing = await adapter.get(table, row[def.pk]);
-    const now = nextTimestamp(clock, existing?.updated_at);
-    const clean = normalizeRow(table, {
-      ...row,
-      created_at: row.created_at ?? existing?.created_at ?? now,
-      updated_at: touch ? now : (row.updated_at ?? now),
-      deleted_at: row.deleted_at ?? null,
+  async function importRow(table,row,{touch=true}={}){
+    assertWritable();const def=tableDef(table),id=row[def.pk];
+    if(id===undefined)throw new Error(table+'.'+def.pk+' is required');
+    return serialize(table,id,async()=>{
+      const old=await adapter.get(table,id),now=nextTimestamp(clock,old?.updated_at);
+      const clean=normalizeRow(table,{...row,created_at:row.created_at??old?.created_at??now,
+        updated_at:touch?now:(row.updated_at??now),deleted_at:row.deleted_at??null});
+      delete clean.synced_at;
+      await writeLocal(table,clean,id);
+      emit({type:'change',tables:[table],ids:[id],source:'local'});
+      return clean;
     });
-    delete clean.synced_at;
-    await adapter.put(table, clean);
-    await markDirty(table, clean[def.pk]);
-    emit({ type: 'change', tables: [table], ids: [clean[def.pk]], source: 'local' });
-    return clean;
+  }
+  // A validated restore plan commits all affected tables and upload markers in
+  // one IndexedDB transaction. It cannot leave a half-written local restore.
+  async function applyRestorePlan(operations){
+    assertWritable();
+    if(!adapter.putBatchWithOutbox)throw new Error('Atomic restores are unavailable with this storage adapter.');
+    const changes=[],tables=new Set(),seen=new Set();
+    for(const op of operations){
+      const def=tableDef(op.table),id=op.id??op.row?.[def.pk],key=op.table+':'+id;
+      if(id===undefined||seen.has(key))throw new Error('Invalid or duplicate restore operation: '+key);
+      seen.add(key);
+      const existing=await adapter.get(op.table,id),now=nextTimestamp(clock,existing?.updated_at);
+      let row;
+      if(op.kind==='remove'){
+        if(!existing||existing.deleted_at)continue;
+        row={...existing,updated_at:now,deleted_at:now};
+      }else if(op.kind==='import'){
+        row=normalizeRow(op.table,{...op.row,[def.pk]:id,updated_at:now,
+          created_at:op.row.created_at??existing?.created_at??now,deleted_at:op.row.deleted_at??null});
+        delete row.synced_at;
+      }else throw new Error('Invalid restore operation');
+      changes.push({table:op.table,row,entry:{key,table:op.table,id,queuedAt:clock()}});
+      tables.add(op.table);
+    }
+    await adapter.putBatchWithOutbox(changes);
+    if(sync&&changes.length)sync.noteLocalWrite();
+    if(tables.size)emit({type:'change',tables:[...tables],source:'restore'});
+    return changes.length;
   }
 
   // Wipe the cache (rows, outbox, pull cursors) but keep 'meta' flags.
@@ -180,6 +214,6 @@ export function createStore({
     subscribe,
     list, get, upsert, remove, removeLocation, removeCategory,
     getSetting, setSetting,
-    importRow, resetCache,
+    importRow, applyRestorePlan, resetCache,
   };
 }

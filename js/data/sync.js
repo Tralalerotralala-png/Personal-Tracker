@@ -51,7 +51,8 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
     // the request was in flight; otherwise that newer edit would be lost.
     for (const { entry, row } of group) {
       const current = await adapter.get(entry.table, entry.id);
-      if (!current || current.updated_at === row.updated_at) await adapter.del('outbox', entry.key);
+      if(adapter.settleIfUnchanged)await adapter.settleIfUnchanged(entry.table,entry.id,row.updated_at,entry.key);
+      else if(!current||current.updated_at===row.updated_at)await adapter.del('outbox',entry.key);
     }
   }
 
@@ -103,6 +104,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
     const def = TABLES[table];
     const row = normalizeRemoteRow(table, raw);
     const id = row[def.pk];
+    if(adapter.applyRemoteRow)return adapter.applyRemoteRow(table,row);
     const local = await adapter.get(table, id);
 
     // The local copy is newer: keep it. Its outbox entry (if any) stays so it

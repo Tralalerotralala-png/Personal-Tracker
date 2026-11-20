@@ -55,10 +55,16 @@ export async function initData() {
   const uid=initial?.user?.id||null;
   // No account cache is opened until the server confirms the owner.
   if(!uid)return {mode:'cloud',store:null,auth,client,config:cfg};
-  const {data:allowed,error}=await client.rpc('tracker_account_allowed');
-  if(error||allowed!==true){
-    if(!error)await auth.signOut();
-    return {mode:'cloud',store:null,auth,client,config:cfg,accessError:error?'Unable to verify account. Reconnect and reload.':'This account is not authorized.'};
+  const marker='tracker-verified-owner:'+new URL(cfg.SUPABASE_URL).host;
+  let verified=null;try{verified=localStorage.getItem(marker);}catch{}
+  const offlineAuthorized=authorizedOfflineOwner({uid,previouslyVerified:verified,online:globalThis.navigator?.onLine});
+  if(!offlineAuthorized){
+    const {data:allowed,error}=await client.rpc('tracker_account_allowed');
+    if(error||allowed!==true){
+      if(!error)await auth.signOut();
+      return {mode:'cloud',store:null,auth,client,config:cfg,accessError:error?'Authorization unavailable. Reconnect to verify this account.':'This account is not authorized.'};
+    }
+    try{localStorage.setItem(marker,uid);}catch{}
   }
   const adapter=await openAdapter('personal-tracker-cloud:'+uid);
   // The old cache has no trustworthy owner stamp. Preserve it untouched;
@@ -67,5 +73,9 @@ export async function initData() {
   store.accountId=uid;
   store.sync.start();
   store.sync.syncNow().then(async status=>{if(status.state==='synced'){await ensureDefaults(store);await upgradeLayouts(store);}}).catch(console.warn);
-  return {mode:'cloud',store,auth,client,config:cfg,accountId:uid};
+  return {mode:'cloud',store,auth,client,config:cfg,accountId:uid,offlineAuthorized};
+}
+
+export function authorizedOfflineOwner({uid,previouslyVerified,online}){
+ return Boolean(uid&&previouslyVerified===uid&&online===false);
 }

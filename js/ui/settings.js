@@ -37,6 +37,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       ? 'Running on this device only, with sample data. Add your Supabase keys in config.js to sync with your phone and computer.'
       : `Signed in as ${session?.user?.email ?? 'unknown'}.`),
     mode === 'cloud' ? h('p', { class: 'prose' }, syncStatus()) : null,
+    ctx.offlineAuthorized?h('p',{class:'hint',role:'status'},'Offline: this device is using the previously verified account cache. Reconnect to verify access and upload changes.'):null,
     mode === 'cloud' ? h('div', { class: 'inline-actions' },
       h('button', { class: 'btn small', type: 'button', onclick: () => { store.sync.syncNow(); toast('Syncing'); } }, 'Sync now'),
       h('button', { class: 'btn small', type: 'button', onclick: async () => {
@@ -44,9 +45,9 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
         if (ok) { store.sync.fullResync(); toast('Downloading everything'); }
       } }, 'Re-download everything'),
       h('button', { class: 'btn small danger', type: 'button', onclick: async () => {
-        const ok = await confirmDialog({ title: 'Sign out?', message: 'This clears the copy stored on this device. Anything not yet uploaded will be lost, so sync first.', confirmLabel: 'Sign out', danger: true });
+        const ok = await confirmDialog({ title: 'Sign out?', message: 'Your account cache and pending uploads will be preserved on this device, but are NOT encrypted. Do not sign out on a shared computer without securely clearing device storage. For sensitive data, export a backup first.', confirmLabel: 'Sign out', danger: true });
         if (!ok) return;
-        await auth.signOut(); await store.resetCache(); location.reload();
+        store.sync.stop();await auth.signOut();location.reload();
       } }, 'Sign out')) : null);
 
   // -- mud forecast
