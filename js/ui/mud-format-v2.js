@@ -55,3 +55,20 @@ export function localizedMudWhy(why){
  .replace(/little drying/gi,'se seca muy poco');
 }
 export const localizedWeather = text => language()==='es' ? t(text) : text;
+
+export function uvMeter(value, { stale = false, peak = false } = {}) {
+  const es = language() === 'es';
+  const label = peak ? (es ? 'UV máximo' : 'Peak UV') : (es ? 'Índice UV' : 'UV index');
+  if (!Number.isFinite(value) || value < 0) {
+    return h('span', { class: 'uv-meter' }, label + (es ? ' · Sin datos' : ' · Unavailable'));
+  }
+  const score = Math.round(value);
+  const band = [3, 6, 8, 11].filter(threshold => score >= threshold).length;
+  const levels = es ? ['Bajo', 'Moderado', 'Alto', 'Muy alto', 'Extremo']
+    : ['Low', 'Moderate', 'High', 'Very high', 'Extreme'];
+  const cached = stale ? (es ? ' · En caché' : ' · Cached') : '';
+  return h('span', { class: 'uv-meter' },
+    h('span', {}, label + ' ' + score + ' · ' + levels[band] + cached),
+    h('span', { class: 'uv-scale', 'aria-hidden': 'true' },
+      levels.map((_, i) => h('i', { class: i === band ? 'selected' : '' }))));
+}

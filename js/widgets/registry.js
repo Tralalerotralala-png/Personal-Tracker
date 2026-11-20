@@ -6,7 +6,7 @@
 import { h, replace, daysSince, openSheet, toast } from '../ui/dom.js';
 import { WIDGET_DEFS } from './defs.js';
 import { mountCurrency } from './currency.js';
-import { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
+import { uvMeter, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
 import { locationPath } from '../data/inventory-logic.js';
 import { resolveDailyLoot } from '../data/daily-loot.js';
@@ -100,6 +100,7 @@ function mountMud(el, { weather, store, interactive }) {
         sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
           h('span', { class: 'w-mud-label' }, localizedMudLabel(sum.today.label)),
           h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
+        uvMeter(c?.uv_index, { stale: s.status === 'stale' }),
         h('div', { class: 'w-forecast-cards' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) => {
           const icon = weatherGlyph(r.raw?.weather_code);
           const temperature = Number.isFinite(r.raw?.tmax) ? `${Math.round(r.raw.tmax)}°` : '—';

@@ -1673,7 +1673,24 @@ function localizedMudWhy(why){
  .replace(/little drying/gi,'se seca muy poco');
 }
 const localizedWeather = text => language()==='es' ? t(text) : text;
-Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, localizedMudLabel, mudChip, summarySentence, localizedMudWhy, localizedWeather });
+
+function uvMeter(value, { stale = false, peak = false } = {}) {
+  const es = language() === 'es';
+  const label = peak ? (es ? 'UV máximo' : 'Peak UV') : (es ? 'Índice UV' : 'UV index');
+  if (!Number.isFinite(value) || value < 0) {
+    return h('span', { class: 'uv-meter' }, label + (es ? ' · Sin datos' : ' · Unavailable'));
+  }
+  const score = Math.round(value);
+  const band = [3, 6, 8, 11].filter(threshold => score >= threshold).length;
+  const levels = es ? ['Bajo', 'Moderado', 'Alto', 'Muy alto', 'Extremo']
+    : ['Low', 'Moderate', 'High', 'Very high', 'Extreme'];
+  const cached = stale ? (es ? ' · En caché' : ' · Cached') : '';
+  return h('span', { class: 'uv-meter' },
+    h('span', {}, label + ' ' + score + ' · ' + levels[band] + cached),
+    h('span', { class: 'uv-scale', 'aria-hidden': 'true' },
+      levels.map((_, i) => h('i', { class: i === band ? 'selected' : '' }))));
+}
+Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, localizedMudLabel, mudChip, summarySentence, localizedMudWhy, localizedWeather, uvMeter });
 });
 __define("js/ui/pixel-icon.js", function (__require, __exports) {
 "use strict";
@@ -3262,7 +3279,7 @@ const FORECAST_DAYS = 6;
 
 const DAILY_VARS = [
   'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'rain_sum',
-  'snowfall_sum', 'et0_fao_evapotranspiration', 'wind_speed_10m_max', 'sunrise', 'sunset',
+  'snowfall_sum', 'et0_fao_evapotranspiration', 'wind_speed_10m_max', 'sunrise', 'sunset', 'uv_index_max',
 ];
 const SOIL_VARS = ['soil_moisture_0_to_1cm', 'soil_moisture_1_to_3cm', 'soil_moisture_3_to_9cm'];
 
@@ -3285,7 +3302,7 @@ function buildForecastUrl({ lat, lon }, kind) {
   else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
   else {
     p.set('daily', DAILY_VARS.join(','));
-    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover');
+    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover,uv_index');
   }
   return `${FORECAST_URL}?${p}`;
 }
@@ -3339,6 +3356,7 @@ function parseDaily(json) {
   return d.time.map((date, i) => ({
     date,
     weather_code: at('weather_code', i),
+    uvMax: at('uv_index_max', i),
     tmax: at('temperature_2m_max', i),
     tmin: at('temperature_2m_min', i),
     precip: at('precipitation_sum', i),
@@ -3479,7 +3497,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       // Display its cached forecast immediately, but refresh the new fields.
       const needsLightingData = sameplace && !cached.raw.skyRefreshChecked && (!cached.raw.days?.some(d => d.sunrise && d.sunset)
         || !('cloud_cover' in (cached.raw.current || {})));
-      const age = sameplace && !needsLightingData
+      const age = sameplace && !needsLightingData && cached.raw.uvRequested
         ? now().getTime() - new Date(cached.raw.fetchedAt).getTime() : Infinity;
 
       // Show what we have straight away.
@@ -3493,6 +3511,7 @@ function createWeatherService({ store, fetchImpl = globalThis.fetch, now = () =>
       try {
         if (!state.rows.length) set({ status: 'loading' });
         const raw = await fetchWeather(place, { fetchImpl });
+        raw.uvRequested = true;
         raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         const archive=await store.meta.get(FORECAST_ARCHIVE_KEY) || {};
@@ -4051,7 +4070,7 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 const { h, replace, daysSince, openSheet, toast } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
 const { mountCurrency } = __require("js/widgets/currency.js");
-const { mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
+const { uvMeter, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
 const { locationPath } = __require("js/data/inventory-logic.js");
 const { resolveDailyLoot } = __require("js/data/daily-loot.js");
@@ -4145,6 +4164,7 @@ function mountMud(el, { weather, store, interactive }) {
         sum ? h('div', { class: `w-mud-now ${mudClass(sum.today.label)}` },
           h('span', { class: 'w-mud-label' }, localizedMudLabel(sum.today.label)),
           h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
+        uvMeter(c?.uv_index, { stale: s.status === 'stale' }),
         h('div', { class: 'w-forecast-cards' }, s.rows.filter(r => r.phase !== 'past').slice(0, 6).map((r) => {
           const icon = weatherGlyph(r.raw?.weather_code);
           const temperature = Number.isFinite(r.raw?.tmax) ? `${Math.round(r.raw.tmax)}°` : '—';

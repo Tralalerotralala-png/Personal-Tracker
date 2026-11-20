@@ -44,7 +44,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
       // Display its cached forecast immediately, but refresh the new fields.
       const needsLightingData = sameplace && !cached.raw.skyRefreshChecked && (!cached.raw.days?.some(d => d.sunrise && d.sunset)
         || !('cloud_cover' in (cached.raw.current || {})));
-      const age = sameplace && !needsLightingData
+      const age = sameplace && !needsLightingData && cached.raw.uvRequested
         ? now().getTime() - new Date(cached.raw.fetchedAt).getTime() : Infinity;
 
       // Show what we have straight away.
@@ -58,6 +58,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
       try {
         if (!state.rows.length) set({ status: 'loading' });
         const raw = await fetchWeather(place, { fetchImpl });
+        raw.uvRequested = true;
         raw.skyRefreshChecked = true;
         raw.fetchedAt = now().toISOString(); // one clock for the whole service, so cache age is consistent
         const archive=await store.meta.get(FORECAST_ARCHIVE_KEY) || {};

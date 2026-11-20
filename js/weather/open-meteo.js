@@ -17,7 +17,7 @@ export const FORECAST_DAYS = 6;
 
 export const DAILY_VARS = [
   'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'rain_sum',
-  'snowfall_sum', 'et0_fao_evapotranspiration', 'wind_speed_10m_max', 'sunrise', 'sunset',
+  'snowfall_sum', 'et0_fao_evapotranspiration', 'wind_speed_10m_max', 'sunrise', 'sunset', 'uv_index_max',
 ];
 export const SOIL_VARS = ['soil_moisture_0_to_1cm', 'soil_moisture_1_to_3cm', 'soil_moisture_3_to_9cm'];
 
@@ -40,7 +40,7 @@ export function buildForecastUrl({ lat, lon }, kind) {
   else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
   else {
     p.set('daily', DAILY_VARS.join(','));
-    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover');
+    p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover,uv_index');
   }
   return `${FORECAST_URL}?${p}`;
 }
@@ -94,6 +94,7 @@ export function parseDaily(json) {
   return d.time.map((date, i) => ({
     date,
     weather_code: at('weather_code', i),
+    uvMax: at('uv_index_max', i),
     tmax: at('temperature_2m_max', i),
     tmin: at('temperature_2m_min', i),
     precip: at('precipitation_sum', i),

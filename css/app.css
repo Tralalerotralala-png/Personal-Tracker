@@ -2071,3 +2071,8 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 .ed-item:not(.dragging){transition:left .14s ease,top .14s ease;}
 @media(prefers-reduced-motion:reduce){.ed-item{transition:none!important;}}
 .reduce-animations .ed-item{transition:none!important;}
+
+.uv-meter { display:inline-flex; flex-wrap:wrap; align-items:center; gap:.3em .5em; font-size:.85em; font-weight:600; }
+.uv-scale { display:inline-flex; gap:2px; align-items:center; }
+.uv-scale i { width:.65em; height:.4em; background:var(--ink-dim); opacity:.25; }
+.uv-scale i.selected { height:.65em; opacity:1; background:var(--accent); }

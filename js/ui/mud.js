@@ -5,7 +5,7 @@ import { t, language } from './language.js';
 import { isNightAtLocation, moonPhaseSvg } from '../weather/moon-phase.js';
 import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
 import { skyLighting, dateKeyAt } from '../weather/environment.js';
-import { dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
+import { uvMeter, dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
 import { glyphSvg, weatherGlyph, weatherIconSvg } from './pixel-icon.js';
 import { createPlaceSearch, openPlaceSearchSheet } from './place-search.js';
 import { describeModel, COMPONENTS } from '../weather/mud.js';
@@ -146,6 +146,7 @@ export function createMudView({ store, weather }) {
         stat('Humidity', number(current?.relative_humidity_2m, '%')),
         stat('Wind', number(current?.wind_speed_10m ?? raw.wind_max, ' km/h')),
         stat('Rain today', raw.precip === null ? '—' : `${fmt(raw.precip)} mm`)),
+      uvMeter(current?.uv_index, { stale: state.status === 'stale' }),
       h('p', { class:'wx-confidence', role:'note' },
         h('strong', {}, language()==='es'?'Confianza de la estimación: ':'Estimate confidence: ',
           state.status==='stale'||[raw.precip,raw.tmax,raw.tmin,raw.wind_max].filter(Number.isFinite).length<3
@@ -162,7 +163,8 @@ export function createMudView({ store, weather }) {
           h('strong', {}, `${number(d.raw.tmax, '°')} / ${number(d.raw.tmin, '°')}`),
           h('span', { class: 'hint' }, d.raw.precip === null ? '—' : `${fmt(d.raw.precip)} mm`),
           h('span', { class: `wx-ground-label ${mudClass(d.label)}` }, `${localizedMudLabel(d.label)} ${d.index}/100`),
-          mudBar(d));
+          mudBar(d),
+          uvMeter(d.raw.uvMax, { peak: true }));
       })));
 
   }
@@ -269,7 +271,8 @@ export function createMudView({ store, weather }) {
             h('strong', {}, `${fmt(d.raw.tmax)}° / ${fmt(d.raw.tmin)}°`),
             h('span', { class: 'hint' }, `${fmt(d.raw.precip)} mm`),
             h('span', { class: `wx-ground-label ${mudClass(d.label)}` }, `${localizedMudLabel(d.label)} ${d.index}/100`),
-            mudBar(d));
+            mudBar(d),
+          uvMeter(d.raw.uvMax, { peak: true }));
         }))),
       h('div', { class: 'mud-foot' },
         h('button', { class: 'btn small ghost', type: 'button', onclick: () => openHowScored({ weather, store }) }, language()==='es'?'¿Cómo se calcula el índice?':'How is this scored?'),
