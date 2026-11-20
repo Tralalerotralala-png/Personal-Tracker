@@ -33,6 +33,7 @@ for width,height in [(390,844),(1280,900)]:
         # The decrypted private journal must close on navigation, not merely
         # disappear visually while its plaintext remains in memory.
         page.evaluate("location.hash='#diary'")
+        page.get_by_role("button",name="Open private journal").click(timeout=10000)
         page.locator(".journal-unlock input[type=password]").first.wait_for(timeout=10000)
         keys=page.locator(".journal-unlock input[type=password]")
         assert keys.count()==2,"Expected new local journal key setup"
@@ -43,7 +44,7 @@ for width,height in [(390,844),(1280,900)]:
         page.evaluate("location.hash='#overview'")
         page.locator(".journal-shell").wait_for(state="detached",timeout=5000)
         page.evaluate("location.hash='#diary'")
-        page.locator(".journal-unlock input[type=password]").first.wait_for(timeout=10000)
+        page.get_by_role("button",name="Open private journal").wait_for(state="visible",timeout=10000)
         assert page.locator(".journal-shell").count()==0,"Private journal remained unlocked after navigating away"
         page.evaluate("location.hash='#overview'")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
