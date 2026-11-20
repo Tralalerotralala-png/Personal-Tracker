@@ -74,4 +74,19 @@ for width,height in [(390,844),(1280,900)]:
         page.keyboard.press("Escape")
         assert not errors,"Browser JS errors: "+str(errors)
         print(f"OK {width}x{height}: {page.locator('.widget').count()} widgets")
+        # Simulate private-browsing/storage-blocked environments. Report volatile
+        # data explicitly and offer a structured backup instead of "Synced".
+        memory_page=ctx.new_page()
+        memory_page.add_init_script("""Object.defineProperty(window,'indexedDB',{
+          configurable:true,
+          value:{open(){throw new Error('IndexedDB blocked by test');}}
+        });""")
+        memory_page.route("**/config.js",lambda route: route.fulfill(status=200,content_type="text/javascript",body="export const CONFIG=null;"))
+        memory_page.goto(BASE,wait_until="domcontentloaded")
+        memory_page.locator(".pill").wait_for(timeout=25000)
+        assert "Temporary session" in memory_page.locator(".pill").inner_text(),"Volatile storage was not reported"
+        memory_page.locator(".pill").click()
+        memory_page.locator("dialog.sheet[open]").wait_for(timeout=5000)
+        assert "Download backup" in memory_page.locator("dialog.sheet[open]").inner_text()
+        memory_page.close()
         browser.close()
