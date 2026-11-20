@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const file = p => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-test('Dream Diary retains unlocked session across tabs for 40 minutes of inactivity',()=>{
+test('Dream Diary locks immediately when hidden or when leaving the view',()=>{
  const s=file('js/ui/dream-diary.js');
  assert.match(s,/const DURATION=40\*60\*1000/);
- assert.match(s,/hide:\(\)=>\{\}/);
+ assert.match(s,/visibilitychange/);
+ assert.match(s,/document\.visibilityState==='hidden'&&session\)lock\(\)/);
+ assert.match(s,/hide:\(\)=>\{if\(session\)lock\(\);\}/);
+ assert.match(s,/activeDraftFlush\(\)\.catch/);
 });
 test('Game Library is a routed main view and its optional widget is registered',()=>{
  assert.match(file('js/app.js'),/createMediaLibraryView/);
