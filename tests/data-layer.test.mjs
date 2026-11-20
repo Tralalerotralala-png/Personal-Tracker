@@ -602,7 +602,7 @@ test('locations: flattened tree order and descendants', async () => {
 
 test('service worker: precache list matches the real files', () => {
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
-  const listed = [...sw.slice(sw.indexOf('const PRECACHE'), sw.indexOf('];')).matchAll(/'(\.\/[^']*)'/g)].map((m) => m[1]);
+  const listed = [...sw.slice(sw.indexOf('const PRECACHE'), sw.indexOf('];', sw.indexOf('const PRECACHE'))).matchAll(/'(\.\/[^']*)'/g)].map((m) => m[1]);
   assert.ok(listed.length > 20);
   for (const p of listed) {
     if (p === './') continue;

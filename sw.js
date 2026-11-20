@@ -3,9 +3,10 @@
 //  - Fonts and the Supabase script (CDN) are cached the same way.
 //  - Requests to Supabase itself are never touched (sync handles those).
 // Bump VERSION whenever you deploy, so installed copies notice the update.
-const VERSION = 'v91';
+const VERSION = 'v92';
 const SHELL = `tracker-shell-${VERSION}`;
 const RUNTIME = `tracker-runtime-${VERSION}`;
+const OWNED_CACHE_PREFIXES = ['tracker-shell-', 'tracker-runtime-'];
 
 const PRECACHE = [
   './',
@@ -99,8 +100,9 @@ const CDN_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsd
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL);
-    await Promise.all(PRECACHE.map((url) =>
-      cache.add(new Request(url, { cache: 'reload' })).catch((err) => console.warn('precache failed:', url, err))));
+    // Do not activate an offline shell missing critical JavaScript or CSS.
+    // A failed install leaves the previous working service worker active.
+    await Promise.all(PRECACHE.map((url) => cache.add(new Request(url, { cache: 'reload' }))));
     await Promise.all(OPTIONAL.map((url) => cache.add(new Request(url, { cache: 'reload' })).catch(() => {})));
     await self.skipWaiting();
   })());
@@ -109,7 +111,10 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     for (const key of await caches.keys()) {
-      if (key !== SHELL && key !== RUNTIME) await caches.delete(key);
+      // CacheStorage is origin-wide: never delete another app's caches.
+      if (OWNED_CACHE_PREFIXES.some(prefix => key.startsWith(prefix)) && key !== SHELL && key !== RUNTIME) {
+        await caches.delete(key);
+      }
     }
     await self.clients.claim();
   })());
