@@ -7,7 +7,7 @@ import { groupByDay, addDaysKey } from '../calendar/recurrence.js';
 import { t, locale, categoryLabel } from './language.js';
 const TYPES = ['task','note','expense'];
 const keyFor = (type, id) => `hub_${type}:${id}`;
-const dateNow = () => new Date().toLocaleDateString('en-CA');
+const dateNow=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');};
 const fmtDate = date => date ? new Date(`${date}T12:00:00`).toLocaleDateString(locale(), { year:'numeric',month:'short',day:'numeric' }) : '—';
 
 const REMINDER_KEY='notification_preferences';
@@ -51,7 +51,7 @@ export function startBrowserReminders(store){
   }
   setInterval(check,60000);window.addEventListener('focus',check);document.addEventListener('visibilitychange',check);check();
 }
-const nextDate = (date, repeat) => {
+export const nextDate = (date, repeat) => {
   const day = new Date(`${date || dateNow()}T12:00:00`);
   if (repeat === 'daily') day.setDate(day.getDate() + 1);
   if (repeat === 'weekly') day.setDate(day.getDate() + 7);

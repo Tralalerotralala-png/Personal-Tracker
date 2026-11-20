@@ -2078,3 +2078,8 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 .uv-scale i.selected { height:.65em; opacity:1; background:var(--accent); }
 
 .verified-offline-banner{font-size:.8rem;padding:6px 12px;background:var(--panel-2);border-bottom:1px solid var(--edge-hi);color:var(--accent);text-align:center;}
+
+.temporary-storage-banner,.verified-offline-banner{font-size:.78rem;line-height:1.4;padding:7px 12px;text-align:center;}
+.temporary-storage-banner{background:#482d23;color:#fff0d1;border:2px solid #b4784d;}
+.sync-queue-details{border-top:1px solid var(--edge);margin-top:8px;padding-top:9px;min-width:0;max-height:210px;overflow-y:auto;}
+.sync-queue-details ul{padding-left:20px;overflow-wrap:anywhere;font-size:.78rem;}

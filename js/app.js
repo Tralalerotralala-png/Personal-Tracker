@@ -91,7 +91,7 @@ function syncStatus() {
   return `${bits.join('. ')}.`;
 }
 
-const pill = h('button', { class: 'pill', type: 'button', onclick: showSyncInfo });
+const pill = h('button', { class: 'pill', type: 'button', onclick: showSyncInfo,'aria-label':'Synchronization status','aria-live':'polite' });
 function renderPill(s) {
   const state = mode === 'local' ? 'local' : s.state;
   pill.className = `pill s-${state}`;
@@ -102,6 +102,13 @@ function showSyncInfo() {
   if (mode === 'local') { toast('Data is stored on this device only'); return; }
   const s = store.sync.getStatus();
   const body = [h('p', { class: 'prose' }, syncStatus())];
+  const queue=h('div',{class:'sync-queue-details',role:'status'},h('p',{class:'hint'},'Checking queued changes…'));
+  store.adapter.getAll('outbox').then(entries=>{
+    queue.replaceChildren(h('h3',{},'Pending device changes ('+entries.length+')'),
+      entries.length?h('ul',{},entries.slice(0,40).map(x=>h('li',{},x.table+' / '+x.id+(x.failedFor?' — rejected: '+(x.error||'validation error'):' — waiting to sync')))):h('p',{class:'hint'},'No pending uploads.'),
+      entries.length>40?h('small',{},(entries.length-40)+' more changes not shown'):null);
+  }).catch(()=>queue.replaceChildren(h('p',{class:'hint'},'Queue details unavailable.')));
+  body.push(queue);
   if (s.error) body.push(h('p', { class: 'prose' }, `Details: ${s.error}`));
   if (s.state === 'unreachable') {
     body.push(h('p', { class: 'prose' },
@@ -390,7 +397,10 @@ const header = h('header', { class: 'top' },
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
     onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
-root.replaceChildren(header,ctx.offlineAuthorized?h('div',{class:'verified-offline-banner',role:'status'},'Offline device mode: previously verified account data is available. Uploads resume when you reconnect.'):null,main,nav,audioPlayer.el);
+root.replaceChildren(header,
+  store.adapter.kind==='memory'?h('div',{class:'temporary-storage-banner',role:'alert'},'Temporary device storage: changes may disappear after a refresh. Export a backup before leaving this page.'):null,
+  ctx.offlineAuthorized?h('div',{class:'verified-offline-banner',role:'status'},'Offline device mode: previously verified account data is available. Uploads resume when you reconnect.'):null,
+  main,nav,audioPlayer.el);
 startTranslations(document.body);
 
 const mounted = new Set();

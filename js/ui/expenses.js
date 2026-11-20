@@ -39,14 +39,26 @@ export function normalizeTransaction(entry) {
     category: String(entry.category || 'Other').trim() || 'Other', title: String(entry.title || '').trim(),
     due: String(entry.due || ''), repeat: entry.repeat || 'none', account: String(entry.account || '') };
 }
+export function minorUnitScale(currency){return currency==='JPY'?1:100;}
+export function toMinorUnits(amount,currency){
+ const value=Number(amount),scale=minorUnitScale(currency);
+ if(!Number.isFinite(value)||value<0||value>Number.MAX_SAFE_INTEGER/scale)throw Error('Invalid amount');
+ return Math.round((value+Number.EPSILON)*scale);
+}
+export function splitAmountExactly(amount,people,currency='MXN'){
+ if(!Number.isInteger(people)||people<1||people>1000)throw Error('Invalid number of people');
+ const total=toMinorUnits(amount,currency),base=Math.floor(total/people),extra=total%people,scale=minorUnitScale(currency);
+ return Array.from({length:people},(_,i)=>(base+(i<extra?1:0))/scale);
+}
 export function summarizeTransactions(entries, month, currency) {
   const rows = entries.map(normalizeTransaction).filter(x=>monthOf(x.due)===month && x.currency===currency);
   const expenses = rows.filter(x=>x.type==='expense');
   const income = rows.filter(x=>x.type==='income');
-  const spent = expenses.reduce((s,x)=>s+x.amount,0);
-  const received = income.reduce((s,x)=>s+x.amount,0);
-  const categories = [...new Set(expenses.map(x=>x.category))].map(name=>({name,amount:expenses.filter(x=>x.category===name).reduce((s,x)=>s+x.amount,0)})).sort((a,b)=>b.amount-a.amount);
-  return {rows,spent,received,balance:received-spent,categories,transactions:rows.length};
+  const scale=minorUnitScale(currency);
+  const spentMinor=expenses.reduce((s,x)=>s+toMinorUnits(x.amount,currency),0);
+  const receivedMinor=income.reduce((s,x)=>s+toMinorUnits(x.amount,currency),0);
+  const categories=[...new Set(expenses.map(x=>x.category))].map(name=>({name,amount:expenses.filter(x=>x.category===name).reduce((s,x)=>s+toMinorUnits(x.amount,currency),0)/scale})).sort((a,b)=>b.amount-a.amount);
+  return {rows,spent:spentMinor/scale,received:receivedMinor/scale,balance:(receivedMinor-spentMinor)/scale,categories,transactions:rows.length};
 }
 export function calculateBill({subtotal=0,taxPercent=0,tipPercent=0,people=1}={}) {
   const price = Number(subtotal), tax = Number(taxPercent), tip = Number(tipPercent), parties = Number(people);
