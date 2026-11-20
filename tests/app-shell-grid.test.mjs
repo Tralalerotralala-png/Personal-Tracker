@@ -6,7 +6,8 @@ import { replace } from '../js/ui/dom.js';
 test('desktop app shell omits missing banners instead of adding anonymous grid items', () => {
   const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   assert.match(app, /import\s+\{[^}]*\breplace\b[^}]*\}\s+from '\.\/ui\/dom\.js'/);
-  assert.match(app, /replace\(root,\s*header,/);
+  assert.match(app, /replace\(root,\s*h\('a', \{ class: 'skip-link'/);
+  assert.match(app, /tabindex: '-1'/);
   assert.doesNotMatch(app, /root\.replaceChildren\(header,/);
 
   const shell = {
