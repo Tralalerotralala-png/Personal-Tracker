@@ -24,6 +24,7 @@ import { createExpensesView } from './ui/expenses.js';
 import { createLogin } from './ui/login.js';
 import { openSettings, createAnalogClockSettings } from './ui/settings.js';
 import { openQuickCapture } from './ui/quick-capture.js';
+import { exportAll, downloadBackup } from './data/backup.js';
 import { startParts } from './calendar/recurrence.js';
 
 const root = document.getElementById('app');
@@ -84,6 +85,7 @@ const SYNC_TEXT = {
   unreachable: "Can't reach database", 'auth-required': 'Sign in', error: 'Needs attention', local: 'Local',
 };
 function syncStatus() {
+  if (store.adapter.kind === 'memory') return 'Temporary session: browser storage is unavailable. Changes can disappear when this page reloads. Export your records now.';
   if (mode === 'local') return 'Data is stored on this device only.';
   const s = store.sync.getStatus();
   const bits = [SYNC_TEXT[s.state] ?? s.state];
@@ -94,12 +96,28 @@ function syncStatus() {
 
 const pill = h('button', { class: 'pill', type: 'button', onclick: showSyncInfo,'aria-label':'Synchronization status','aria-live':'polite' });
 function renderPill(s) {
+  if (store.adapter.kind === 'memory') {
+    pill.className = 'pill s-error';
+    pill.textContent = locale().startsWith('es') ? 'Sesión temporal' : 'Temporary session';
+    pill.setAttribute('aria-label', 'Temporary session: data may be lost after reload');
+    return;
+  }
   const state = mode === 'local' ? 'local' : s.state;
   pill.className = `pill s-${state}`;
   pill.textContent = SYNC_TEXT[state] ?? state;
   if (mode === 'cloud' && s.pending && state !== 'synced') pill.textContent += ` (${s.pending})`;
 }
 function showSyncInfo() {
+  if (store.adapter.kind === 'memory') {
+    const body = h('p', { class: 'prose', role: 'alert' },
+      'Browser storage is blocked or unavailable. This temporary session will disappear after a reload or closed tab. If online, some cloud writes may have synced, but pending writes may be lost. Download a structured backup now; photos, audio, and game backup files are not included.');
+    openSheet({ title: 'Temporary session', size: 'small', body,
+      footer: [h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+        try { downloadBackup(await exportAll(store)); }
+        catch (error) { toast('Could not export temporary data: ' + error.message); }
+      } }, 'Download backup')] });
+    return;
+  }
   if (mode === 'local') { toast('Data is stored on this device only'); return; }
   const s = store.sync.getStatus();
   const body = [h('p', { class: 'prose' }, syncStatus())];
