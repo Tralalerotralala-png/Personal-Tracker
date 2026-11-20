@@ -12,6 +12,14 @@ for width,height in [(390,844),(1280,900)]:
         page.goto(BASE,wait_until="domcontentloaded")
         page.locator(".top .gear").wait_for(timeout=25000)
         assert page.locator(".widget").count()>=3,"Dashboard widgets missing"
+        first_widget=page.locator(".overview .widget").first
+        first_widget.wait_for(state="visible",timeout=10000)
+        rect=first_widget.bounding_box()
+        assert rect and 0<=rect["y"]<height,"Overview widgets were pushed below the viewport"
+        stray_text=page.locator("#app").evaluate(
+            "(el) => [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim())"
+        )
+        assert not stray_text,"Unexpected text nodes in app grid: "+str(stray_text)
         page.locator(".top .gear").click()
         page.locator("dialog.sheet[open]").wait_for(timeout=5000)
         page.keyboard.press("Escape")
