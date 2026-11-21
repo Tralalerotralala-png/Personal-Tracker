@@ -38,6 +38,13 @@ export function createMemoryAdapter() {
     async put(name, value) { s(name).set(keyOf(name, value), clone(value)); },
     async putMany(name, values) { for (const v of values) s(name).set(keyOf(name, v), clone(v)); },
     async del(name, key) { s(name).delete(key); },
+    // An asynchronous photo upload may finish after a newer photo is queued.
+    // Never delete the replacement's retry marker using a stale queue snapshot.
+    async deleteMetaIfPath(key,expectedPath){
+      const row=s('meta').get(key);
+      if(row?.value?.path!==expectedPath)return false;
+      s('meta').delete(key);return true;
+    },
     async clear(name) { s(name).clear(); },
     async putWithOutbox(name,value,entry) {
       s(name).set(keyOf(name,value),clone(value));
@@ -122,6 +129,13 @@ export async function openIdbAdapter(dbName) {
         const row=req.result;
         if(row&&row.updated_at!==stamp){done(false);return;}
         tx.objectStore('outbox').delete(key);done(true);
+      };
+    }),
+    deleteMetaIfPath:(key,expectedPath)=>atomic(['meta'],(tx,done)=>{
+      const store=tx.objectStore('meta'),req=store.get(key);
+      req.onsuccess=()=>{
+        if(req.result?.value?.path!==expectedPath){done(false);return;}
+        store.delete(key);done(true);
       };
     }),
     applyRemoteRow:(table,row)=>atomic([table,'outbox','meta'],(tx,done)=>{
