@@ -51,7 +51,7 @@ export function createMediaLibraryView({store,backups=null}) {
    return h('div',{},form,saveButton);
  }
  function render(){
-   const tabs=h('div',{class:'hub-tabs'},['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),onclick:()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;dirty=false;page=null;active=k;render();}},L()[k])));
+   const tabs=h('div',{class:'hub-tabs'},['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),onclick:()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;dirty=false;page=null;active=k;query='';statusFilter='all';render();}},L()[k])));
    const top=h('div',{class:'panel-head'},h('h2',{},L().library),tabs);
    if(active==='games'){games.el.hidden=false;replace(el,top,games.el);return;}
    games.el.hidden=true;

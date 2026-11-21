@@ -327,6 +327,8 @@ navButtons.forEach((a) => {
 });
 window.addEventListener('tracker-nav-change', e => { moveNav(e.detail.from, e.detail.to); });
 
+// Fold accents in both the query and indexed labels (e.g. "album" -> "Álbum").
+const searchFold = value => String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
 const globalSearchInput = h('input', { type: 'search', class: 'global-search-input', placeholder: t('Search everything'), 'aria-label': t('Search everything'), autocomplete: 'off' });
 const searchResults = h('div', { class: 'global-search-results', hidden: true, role: 'listbox', 'aria-label': t('Search') });
 const searchToggle = h('button', { class: 'pixel-search-toggle', type: 'button', 'aria-label': t('Search'), title: 'Search (Ctrl+K)', 'aria-expanded': 'false', html: '<svg viewBox="0 0 16 16" width="24" height="24" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M4 1h6v2H4zM2 3h2v7H2zM10 3h2v7h-2zM4 10h6v2H4zM10 11h2v2h-2zM12 13h2v2h-2z"/></svg>' });
@@ -338,7 +340,7 @@ document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.s
 let searchSeq = 0;
 async function renderGlobalSearch() {
   const seq = ++searchSeq;
-  const query = globalSearchInput.value.trim().toLocaleLowerCase();
+  const query = searchFold(globalSearchInput.value.trim());
   if (!query) { searchResults.hidden = true; searchResults.replaceChildren(); return; }
   const [items, events, places, hub, gameLibrary, otherMedia] = await Promise.all([
     store.list('items'),store.list('events'),store.list('locations'),loadHub(store),
@@ -347,6 +349,7 @@ async function renderGlobalSearch() {
   if (seq !== searchSeq) return;
   const languageLabel=(en,es)=>locale().startsWith('es')?es:en;
   const entries = [
+    ...NAV.map(([target,label])=>({type:languageLabel('Section','Sección'),title:t(label),detail:target,target})),
     ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory', itemId: x.id })),
     ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar', eventId: x.id, dateKey: startParts(x).key })),
     ...places.map(x => ({ type: t('Places'), title: x.name, detail: x.notes || '', target: 'inventory' })),
@@ -361,7 +364,7 @@ async function renderGlobalSearch() {
       title:x.title,detail:[x.creator,x.notes,x.status].filter(Boolean).join(' '),target:'games'
     }))),
   ];
-  const found = entries.filter(x => `${x.title || ''} ${x.detail} ${x.type}`.toLocaleLowerCase().includes(query)).slice(0, 12);
+  const found = entries.filter(x => searchFold(`${x.title || ''} ${x.detail} ${x.type}`).includes(query)).slice(0, 12);
   searchResults.replaceChildren(...(found.length ? found.map(entry => h('button', { class: 'global-search-result', type: 'button', role: 'option', onclick: () => {
     closeSearch();
     // Open saved records directly rather than landing on a long list. These

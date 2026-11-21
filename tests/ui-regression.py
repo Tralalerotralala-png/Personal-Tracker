@@ -52,6 +52,22 @@ for width,height in [(390,844),(1280,900)]:
         page.locator("dialog.sheet[open]").wait_for(state="detached",timeout=5000)
         page.locator(".overview").evaluate("(el) => { location.hash='#overview'; }")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
+        # Search doubles as a keyboard-accessible section picker.
+        page.locator(".pixel-search-toggle").click()
+        page.locator(".global-search-input").fill("weather")
+        page.locator(".global-search-result").filter(has=page.locator("small",has_text="Section")).first.click()
+        assert page.evaluate("location.hash")=="#mud","Search did not route to a section"
+        # Each media collection must start without the previous shelf's filters.
+        page.evaluate("location.hash='#games'")
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        media_search=page.locator(".media-library-view .media-search-filters input")
+        media_search.fill("unmatched title")
+        page.locator(".media-library-view .media-search-filters select").select_option("Finished")
+        page.locator(".media-library-view .hub-tabs button",has_text="Albums").click()
+        assert page.locator(".media-library-view .media-search-filters input").input_value()==""
+        assert page.locator(".media-library-view .media-search-filters select").input_value()=="all"
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # The decrypted private journal must close on navigation, not merely
         # disappear visually while its plaintext remains in memory.
         page.evaluate("location.hash='#diary'")
