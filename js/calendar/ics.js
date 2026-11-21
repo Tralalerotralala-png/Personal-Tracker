@@ -3,6 +3,7 @@
 // RRULE (the supported subset), escaped text. Skips cancelled events and
 // per-occurrence overrides.
 import { parseRRule, buildRRule } from './recurrence.js';
+import { uuid } from '../data/util.js';
 
 export function unfold(text) {
   return String(text).replace(/\r\n|\r/g, '\n').replace(/\n[ \t]/g, '').split('\n');
@@ -43,8 +44,13 @@ export function parseIcsDate(value, params = {}) {
   if (!m) return null;
   const [, Y, Mo, D, H, Mi, S, Z] = m;
   const y = +Y; const mo = +Mo; const d = +D;
+  // JavaScript normally normalizes impossible dates (e.g. 2026-02-30) into
+  // March. Reject them before a calendar import can silently move an event.
+  const check=new Date(Date.UTC(y,mo-1,d));
+  if(check.getUTCFullYear()!==y||check.getUTCMonth()+1!==mo||check.getUTCDate()!==d)return null;
   if (H === undefined || params.VALUE === 'DATE') return { date: new Date(Date.UTC(y, mo - 1, d)), allDay: true };
   const h = +H; const mi = +Mi; const s = +(S ?? 0);
+  if(h>23||mi>59||s>59)return null;
   if (Z) return { date: new Date(Date.UTC(y, mo - 1, d, h, mi, s)), allDay: false };
   if (params.TZID) {
     try { return { date: new Date(zonedToUtc(y, mo, d, h, mi, s, params.TZID)), allDay: false }; } catch { /* unknown zone: treat as local */ }
@@ -113,16 +119,25 @@ function finish(p, report) {
 
 // Add parsed events to the store; the same UID updates instead of duplicating.
 export async function importIcsText(store, text) {
-  const { events, skipped, simplified } = parseIcs(text);
-  const existing = await store.list('events');
-  const byUid = new Map(existing.filter((e) => e.source === 'ics' && e.external_uid).map((e) => [e.external_uid, e]));
-  let added = 0; let updated = 0;
-  for (const ev of events) {
-    const match = ev.external_uid ? byUid.get(ev.external_uid) : null;
-    await store.upsert('events', match ? { ...match, ...ev } : ev);
-    if (match) updated += 1; else added += 1;
+  const parsed=parseIcs(text),existing=await store.list('events');
+  const byUid=new Map(existing.filter(e=>e.source==='ics'&&e.external_uid)
+    .map(e=>[e.external_uid,e]));
+  // The same calendar UID may appear twice in one feed. Last occurrence wins,
+  // and every UID is written at most once to the atomic transaction.
+  const dedup=new Map();
+  for(const event of parsed.events)
+    dedup.set(event.external_uid?'uid:'+event.external_uid:'new:'+uuid(),event);
+  const plan=[];
+  let added=0,updated=0;
+  for(const event of dedup.values()){
+    const original=event.external_uid?byUid.get(event.external_uid):null;
+    plan.push({kind:'import',table:'events',row:{...original,...event,id:original?.id||uuid()}});
+    if(original)updated++;else added++;
   }
-  return { added, updated, skipped, simplified };
+  // Never leave half of an imported calendar on the device after an IDB
+  // quota failure, invalid row or other error. The outbox is atomic too.
+  await store.applyRestorePlan(plan);
+  return {added,updated,skipped:parsed.skipped+(parsed.events.length-dedup.size),simplified:parsed.simplified};
 }
 
 // Try to read a calendar link. Most calendar sites do not allow browsers to
