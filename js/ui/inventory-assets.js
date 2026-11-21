@@ -27,8 +27,9 @@ const RAMP = {
  c:['#4e768e','#91bdd3','#b9dce6','#e2f1ed'],p:['#625078','#a483b4','#cba8d6','#edd1e6']
 };
 const cache=new Map();
-export function inventoryAssetSvg(preset) {
-  if(cache.has(preset))return cache.get(preset);
+export function inventoryAssetSvg(preset,{style='stack'}={}) {
+  const cacheKey=(style==='flat'?'flat:':'stack:')+preset;
+  if(cache.has(cacheKey))return cache.get(cacheKey);
   const asset=byId.get(preset);if(!asset)return '';
   // Derive a stack of actual horizontal slices from the catalog's authored
   // pixel silhouette. We cannot infer hidden geometry without four separate
@@ -46,9 +47,9 @@ export function inventoryAssetSvg(preset) {
   const thickness={tools:3,electronics:4,outdoor:4,clothing:2,household:5,keepsakes:3,pharmacy:4}[asset.group]||4;
   const specialThin=/^(asset:phone|asset:tablet-device|asset:laptop|asset:letter|asset:postcard|asset:book|asset:mask|asset:blade)$/.test(preset);
   const stack=renderLayeredSprite(front,{depth:specialThin?2:thickness});
-  if(stack){
+  if(style!=='flat'&&stack){
     const svg=stack.replace('class="sprite-stacked-asset"','class="sprite-inventory-depth sprite-stacked-asset"');
-    cache.set(preset,svg);
+    cache.set(cacheKey,svg);
     return svg;
   }
   // Keep the original carefully shaded flat renderer as a safe fallback.
@@ -91,7 +92,7 @@ export function inventoryAssetSvg(preset) {
   const silhouette=[];
   for(let y=0;y<34;y++)for(let x=0;x<34;){const filled=Boolean(lit(x,y));let end=x+1;while(end<34&&Boolean(lit(end,y))===filled)end++;if(filled)silhouette.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="#5e4d39"/>');x=end;}
   const svg='<svg class="sprite-inventory-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(out.join(''),silhouette.join(''))+'</svg>';
-  cache.set(preset,svg);return svg;
+  cache.set(cacheKey,svg);return svg;
 }
 // Match meaningful item names, never override an explicitly selected sprite.
 const normalizeName=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
