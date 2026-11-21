@@ -117,6 +117,25 @@ export function importTransactionsCsv(text) {
   });
 }
 
+// Avoid duplicates both against the existing ledger AND within the uploaded
+// CSV itself. Build collision-safe keys over the full transaction identity;
+// amount, account, description and repeat settings can all distinguish rows.
+export function uniqueTransactionsForImport(imported,existing=[]) {
+ const key=entry=>{
+  const row=normalizeTransaction(entry);
+  return JSON.stringify([row.due,row.type,row.title,row.amount,row.currency,
+    row.category,row.account,row.body||'',row.repeat]);
+ };
+ const seen=new Set(existing.map(key)),unique=[];
+ for(const row of imported){
+  const identity=key(row);
+  if(seen.has(identity))continue;
+  seen.add(identity);
+  unique.push(row);
+ }
+ return unique;
+}
+
 // Commit a validated CSV import and its sync outbox in one IndexedDB
 // transaction. A single invalid/quota-failing row must not leave a partial
 // financial ledger on this device.
@@ -175,8 +194,7 @@ export function createExpensesView({store}) {
     const upload=h('input',{type:'file',accept:'.csv,text/csv',hidden:true,onchange:async e=>{
       const file=e.target.files?.[0];if(!file)return;
       try{const imported=importTransactionsCsv(await file.text());if(!imported.length){toast(label('Nothing to import','Nada que importar'));return;}
-        const existing=new Set(entries.map(x=>[x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
-        const unique=imported.filter(x=>!existing.has([x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
+        const unique=uniqueTransactionsForImport(imported,entries);
         if(!unique.length){toast(label('All records are already present','Los registros ya existen'));return;}
         if(!await confirmDialog({title:label('Import transactions?','¿Importar movimientos?'),message:`${unique.length} ${label('new rows will be saved. Review your CSV before importing.','se guardarán nuevos registros. Revisa tu CSV antes de importar.')}`,confirmLabel:label('Import','Importar')}))return;
         await saveImportedTransactionsBatch(store,unique);
