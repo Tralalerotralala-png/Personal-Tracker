@@ -2294,13 +2294,17 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 }
 :root[data-sprite-style="flat"] svg[data-pixel-stack] .sprite-stack-echo{display:none!important;}
 
-/* Seven forecast cards: when the widget is narrow, preserve legible labels. */
+/* Forecast columns fill the desktop; incomplete last rows stay centered on narrow widgets. */
 .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(var(--forecast-day-count,7),minmax(0,1fr));}
 @container widget (max-width:650px){
- .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));}
+ .widget.wd-mud .w-forecast-cards{
+  display:flex;flex-wrap:wrap;justify-content:center;align-content:start;
+  --forecast-wrap-gap:4px;column-gap:var(--forecast-wrap-gap);row-gap:var(--forecast-wrap-gap);
+ }
+ .widget.wd-mud .w-forecast-day{flex:0 0 calc((100% - 3 * var(--forecast-wrap-gap))/4);}
 }
 @container widget (max-width:330px){
- .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));}
+ .widget.wd-mud .w-forecast-day{flex-basis:calc((100% - 2 * var(--forecast-wrap-gap))/3);}
 }
 .widget.wd-calendar .w-cal-estimated{font-size:.61rem;line-height:1.1;color:var(--warn);font-weight:600;}
 .day-weather-summary .day-weather-explanation{max-width:100%;}
