@@ -3,7 +3,7 @@ import { openMedications } from './medications.js';
 // forecast, the next two weeks as a list, and add / edit / import of events.
 import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
 import { t, locale } from './language.js';
-import { mudClass, dayLong, dayMonth, mudChip } from './mud-format-v2.js';
+import { mudClass, dayLong, dayMonth, mudChip, uvMeter } from './mud-format-v2.js';
 import {
   groupByDay, keyOf, addDaysKey, weekdayOfKey, parseKey, parseRRule, buildRRule, describeRRule, startParts, excludeOccurrence, excludeThrough, excludeFrom,
 } from '../calendar/recurrence.js';
@@ -126,7 +126,12 @@ export function createCalendarView({ store, weather }) {
     const sheet = openSheet({
       title: `${dayLong(key)} ${dayMonth(key)}`,
       body: [
-        dm ? h('div', { class: `day-mud ${mudClass(dm.label)}` }, mudChip(dm), h('span', {}, `${dm.why}.`)) : null,
+        dm ? h('div', { class: `day-mud day-weather-summary ${mudClass(dm.label)}` },
+          h('div', { class:'day-weather-readings' },
+            mudChip(dm),
+            key===todayKey()?uvMeter(weather.getState().current?.uv_index,{stale:weather.getState().status==='stale'}):null,
+            uvMeter(dm.raw?.uvMax,{peak:true,stale:weather.getState().status==='stale'})),
+          h('span', { class:'day-weather-explanation' }, `${dm.why}.`)) : null,
         occs.length
           ? h('ul', { class: 'day-events' }, occs.map((o) => h('li', {},
             h('button', { class: 'day-event', type: 'button', style: `--c:${o.event.color || EVENT_COLORS[0]}`, onclick: () => { sheet.close(); openEventSheet({ event: o.event, occurrenceKey: o.key }); } },
