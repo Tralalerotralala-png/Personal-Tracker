@@ -94,7 +94,6 @@ const PRECACHE = [
   './js/wallpaper/store.js',
   './js/weather/mud.js',
   './js/weather/moon-phase.js',
-  './icons/inventory/methotrexate-16.png',
   './js/weather/open-meteo.js',
   './js/weather/service.js',
   './js/widgets/currency.js',
