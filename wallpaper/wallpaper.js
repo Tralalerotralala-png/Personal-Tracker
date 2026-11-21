@@ -4877,9 +4877,7 @@ function mountSky(el,{weather,interactive}) {
       h('p',{class:'hint'},event.date+(event.at?' · '+eventLocalTime(event,tz,language()):'')),
       h('h3',{},es?'Qué ocurre':'What is happening'),h('p',{},info.what),
       h('h3',{},es?'Qué podría significar':'What it might mean'),h('p',{},info.meaning),
-      h('small',{class:'hint'},es
-       ?'Las fechas son aproximadas y la visibilidad local no está confirmada. Las interpretaciones simbólicas no son predicciones.'
-       :'Dates may be approximate and local visibility is not verified. Symbolic readings are not predictions.'))});
+      h('small',{class:'hint'},es?'Hora en la zona de tu lugar seleccionado.':'Times follow the selected place’s time zone.'))});
  };
  const render=async()=>{
   const now=new Date(),place=weather?.getState()?.place,tz=place?.timezone,es=language()==='es';
@@ -4887,7 +4885,7 @@ function mountSky(el,{weather,interactive}) {
    if(dead)return;
    const events=mergeSkyAndZodiacEvents(now,rows,{timezone:tz,skyLimit:4,zodiacLimit:4});
    replace(el,h('div',{class:'w-sky'},
-    h('p',{class:'w-note w-sky-intro'},t('Dates are approximate. Check local visibility and the weather.')),
+    h('p',{class:'w-note w-sky-intro'},es?'Toca un evento para ver detalles.':'Select an event for details.'),
     h('div',{class:'w-sky-scroll'},...events.map(e=>h('button',{type:'button',
        class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':''),
        title:es?'Explicar este evento celeste':'Explain this sky event',
