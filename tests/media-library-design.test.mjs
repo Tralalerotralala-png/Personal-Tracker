@@ -73,7 +73,7 @@ test('all categories use the exact same three-action component and category shel
  assert.match(helper,/action\(newShelfLabel,onNewShelf\)/);
  assert.match(helper,/action\(addLabel,onAdd,true\)/);
  assert.match(media,/shelvesByKind/);
- assert.match(media,/data\.shelvesByKind\[kind\]\.push\(name\)/);
+ assert.match(media,/draft\.shelvesByKind\[kind\]\.push\(name\)/);
  assert.match(games,/customShelves/);
  assert.match(media,/transition:false/);
  assert.match(dom,/\{transition=true\}=\{\}/);
