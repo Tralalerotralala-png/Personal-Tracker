@@ -164,3 +164,21 @@ export function renderOrthographicSprite(views,options={}){
   pixels:projectOrthographic(slices,{angle:a,squash,spacing}),
  })),{slices:slices.layers.length,source:'four-views'});
 }
+
+
+// Small symbolic icons have no four-view geometry. Preserve their exact
+// weather/celestial/symbol artwork while giving each a shared integer-pixel
+// shallow extrusion, rather than inaccurately claiming full 3D voxels.
+// Inventory props continue to use the actual layered renderer above.
+// Generated app SVG only; never accept outside markup or strings from users.
+export function pixelStackIconSvg(svg,{layers=2}={}){
+ const match=/^<svg\b([^>]*)>([\s\S]*)<\/svg>$/.exec(svg||'');
+ if(!match)return svg;
+ const count=Math.max(1,Math.min(3,Math.trunc(layers)||2));
+ const root=match[1],face=match[2];
+ const back=Array.from({length:count},(_,i)=>
+  '<g class="sprite-stack-echo sprite-stack-echo-'+(count-i)+
+  '" aria-hidden="true">'+face+'</g>').join('');
+ return '<svg'+root+' data-pixel-stack="'+(count+1)+'">'+
+  back+'<g class="sprite-stack-foreground">'+face+'</g></svg>';
+}
