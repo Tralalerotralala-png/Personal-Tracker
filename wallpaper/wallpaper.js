@@ -6169,7 +6169,7 @@ function mountMud(el, { weather, store, interactive }) {
           h('span', { class: 'w-mud-label' }, localizedMudLabel(sum.today.label)),
           h('span', { class: 'w-mud-num' }, `${sum.today.index}/100`)) : null,
         uvMeter(c?.uv_index, { stale: s.status === 'stale' }),
-        h('div', { class: 'w-forecast-cards', style: `--forecast-day-count:${Math.max(1, days.length)}` }, days.map((r) => {
+        h('div', { class: 'w-forecast-cards' }, days.map((r) => {
           const icon = weatherGlyph(r.raw?.weather_code);
           const temperature = Number.isFinite(r.raw?.tmax) ? `${Math.round(r.raw.tmax)}°` : '—';
           const precipitation = Number.isFinite(r.raw?.precip) ? `${Number(r.raw.precip).toFixed(1)} mm` : '—';
