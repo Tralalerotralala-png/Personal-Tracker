@@ -38,6 +38,21 @@ for width,height in [(390,844),(1280,900)]:
             conflicts:saved.filter(x=>x.key.startsWith('sync-conflict:')).map(x=>x.value.local.name)};
         }""")
         assert pull_case=={"name":"Other-device version","outbox":0,"conflicts":["Offline edit"]},pull_case
+        # A stale upload must not remove a newer photo queue entry after an
+        # IndexedDB transaction has committed that newer upload marker.
+        photo_case=page.evaluate("""async () => {
+          const {openIdbAdapter}=await import('./js/data/adapters.js');
+          const db=await openIdbAdapter('tracker-regression-photo-queue');
+          await db.clear('meta');
+          const key='photoq:77777777-7777-4777-8777-777777777777';
+          await db.put('meta',{key,value:{path:'photo-A.webp'}});
+          await db.put('meta',{key,value:{path:'photo-B.webp'}});
+          const stale=await db.deleteMetaIfPath(key,'photo-A.webp');
+          const kept=(await db.get('meta',key))?.value?.path;
+          const current=await db.deleteMetaIfPath(key,'photo-B.webp');
+          return {stale,kept,current,empty:(await db.get('meta',key))===undefined};
+        }""")
+        assert photo_case=={"stale":False,"kept":"photo-B.webp","current":True,"empty":True},photo_case
         skip=page.locator(".skip-link")
         skip.focus()
         assert skip.bounding_box()["y"]>=0,"Keyboard skip link did not appear on focus"
