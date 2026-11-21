@@ -318,7 +318,7 @@ export function createMudView({ store, weather }) {
   return {
     el,
     showAfterMount: false,
-    async mount() { render(weather.getState()); await weather.refresh(); weather.loadHourly?.(); },
+    async mount() { render(weather.getState());openPendingDay(); await weather.refresh();weather.loadHourly?.();openPendingDay(); },
     show() { render(weather.getState()); weather.loadHourly?.(); openPendingDay(); },
     hide() { skyMap?.stopSky?.(); },
     destroy(){destroyed=true;unsubWeather?.();clearInterval(skyTimer);window.removeEventListener('tracker-weather-open-day',onDayRequest);skyMap?.stopSky?.();},
