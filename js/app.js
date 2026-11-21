@@ -155,7 +155,7 @@ function showSyncInfo() {
       try{downloadBackup(await exportSyncConflicts(store),'personal-tracker-sync-conflicts.json');}
       catch(error){toast('Could not export conflicting edits: '+error.message);}
     }},'Export conflicting edits'));
-  if (s.error) body.push(h('p', { class: 'prose' }, `Details: ${s.error}`);
+  if (s.error) body.push(h('p', { class: 'prose' }, `Details: ${s.error}`));
   if (s.state === 'unreachable') {
     body.push(h('p', { class: 'prose' },
       'The database is not responding. Free Supabase projects pause after a week with no activity. Open the Supabase dashboard, find your project and choose Restore. Your changes are safe on this device and will upload afterwards.'));
