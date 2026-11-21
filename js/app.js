@@ -564,7 +564,7 @@ const mountPromises = new Map();
 let navigationVersion = 0;
 async function route() {
   const version = ++navigationVersion;
-  const wanted = location.hash.replace(/^#\\/?/, '');
+  const wanted = location.hash.replace(/^#\/?/, '');
   const key = VIEWS[wanted] ? wanted : 'overview';
   for (const [k, view] of Object.entries(VIEWS)) {
     view.el.hidden = k !== key;
