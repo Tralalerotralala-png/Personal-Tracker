@@ -1,5 +1,5 @@
 import { moonPhaseSvg } from '../weather/moon-phase.js';
-import { renderLayeredSprite } from './sprite-stack.js';
+import { renderLayeredSprite,pixelStackIconSvg } from './sprite-stack.js';
 // Pixel art generated in code: a unique little sprite per item (from its id),
 // and the small glyphs used in the navigation. Pure functions, no DOM.
 
@@ -487,7 +487,7 @@ export function weatherIconSvg(code, { night = false, date = new Date() } = {}) 
       }
     }
   }
-  return '<svg class="sprite-weather-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>';
+  return pixelStackIconSvg('<svg class="sprite-weather-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>');
 }
 
 /** Compact monochrome weather art shares the detailed weather silhouettes.
