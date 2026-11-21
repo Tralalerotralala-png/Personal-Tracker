@@ -82,7 +82,7 @@ export function createMudView({ store, weather }) {
   let destroyed=false;
   const onDayRequest=event=>{
     const date=event.detail?.date;
-    if(typeof date!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return;
+    if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
     pendingDay=date;
     weatherTab='forecast';
     if(!el.hidden){render(weather.getState());openPendingDay();}
