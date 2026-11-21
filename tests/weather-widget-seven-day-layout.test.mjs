@@ -17,6 +17,9 @@ test('forecast grid fills available width even with a partial response', () => {
   assert.match(css, /\.widget\.wd-mud \.w-forecast-cards\{grid-template-columns:repeat\(var\(--forecast-day-count,7\),minmax\(0,1fr\)\);\}/);
   assert.match(css, /@container widget \(max-width:650px\)/);
   assert.match(css, /@container widget \(max-width:330px\)/);
+  assert.match(css, /display:flex;flex-wrap:wrap;justify-content:center/);
+  assert.match(css, /flex:0 0 calc/);
+  assert.match(css, /flex-basis:calc/);
 });
 
 test('web, wallpaper, and offline PWA share the weather layout fix', () => {
