@@ -242,3 +242,33 @@ test('a stale or mismatched cloud deletion marker cannot authorize Storage remov
  await assert.rejects(service.remove(entry),/Could not confirm game-backup deletion marker/);
  assert.equal(objects.has(entry.path),true);
 });
+
+test('a second device sees a pending deletion and can finish an interrupted delete',async()=>{
+ const {adapter,client,objects,cloudSettings}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['bytes to delete'],'slot.sav'));
+ const originalFrom=client.from;
+ client.from=table=>({upsert:(row,opts)=>{
+   if(row.key==='game_backup_removed_v2:'+entry.id)
+     return {select:async()=>({data:null,error:{message:'Temporary network failure'}})};
+   return originalFrom(table).upsert(row,opts);
+ }});
+ await assert.rejects(service.remove(entry),/Could not confirm game-backup deletion marker/);
+ assert.equal(objects.has(entry.path),false);
+ assert.equal(cloudSettings.get('game_backup_delete_pending_v3:'+entry.id)?.pending,true);
+ const deviceB=createMemoryAdapter(),bStore=createStore({adapter:deviceB});
+ // A second device sees only remote-synced metadata (the entry and durable
+ // pending marker); the failed final tombstone did not reach the cloud.
+ const entryRow=await store.get('settings','game_backup_entry_v2:'+entry.id);
+ await deviceB.put('settings',entryRow);
+ const pendingValue=cloudSettings.get('game_backup_delete_pending_v3:'+entry.id);
+ await bStore.setSetting('game_backup_delete_pending_v3:'+entry.id,pendingValue);
+ const other=createGameBackupService({client,store:bStore});
+ const listed=await other.list(GAME);
+ assert.equal(listed.length,1);
+ assert.equal(listed[0].deletionPending,true);
+ client.from=originalFrom;
+ await other.remove(listed[0]);
+ assert.deepEqual(await other.listAll(),[]);
+ assert.equal(cloudSettings.get('game_backup_removed_v2:'+entry.id)?.deleted,true);
+});
