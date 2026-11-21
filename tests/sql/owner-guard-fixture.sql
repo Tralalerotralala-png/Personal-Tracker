@@ -24,7 +24,7 @@ GRANT EXECUTE ON FUNCTION public.tracker_account_allowed() TO authenticated,anon
 DO $tables$
 DECLARE tab text;
 BEGIN
- FOREACH tab IN ARRAY ARRAY['categories','locations','items','events','news_sources','settings','widget_layout']
+ FOREACH tab IN ARRAY ARRAY['categories','locations','items','events','news_sources','widget_layout']
  LOOP
   EXECUTE format('CREATE TABLE public.%I (id uuid PRIMARY KEY, user_id uuid NOT NULL, name text)',tab);
   EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',tab);
@@ -36,6 +36,23 @@ BEGIN
  END LOOP;
 END
 $tables$;
+
+-- The real Tracker settings API uses a composite (user_id,key) primary key,
+-- not an id column. Model that faithfully to test deletion-intent upserts.
+CREATE TABLE public.settings (
+ user_id uuid NOT NULL,
+ key text NOT NULL,
+ value jsonb NOT NULL,
+ created_at timestamptz NOT NULL,
+ updated_at timestamptz NOT NULL,
+ deleted_at timestamptz,
+ PRIMARY KEY(user_id,key)
+);
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.settings TO authenticated;
+CREATE POLICY uid_owner ON public.settings FOR ALL TO authenticated
+ USING (user_id=(SELECT auth.uid()))
+ WITH CHECK (user_id=(SELECT auth.uid()));
 
 CREATE TABLE storage.objects (id bigint generated always as identity primary key,bucket_id text,name text);
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;

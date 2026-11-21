@@ -15,11 +15,24 @@ function fixture() {
     download: async path => ({data:objects.get(path),error:objects.has(path)?null:{message:'Not found'}}),
     remove: async paths => {for(const path of paths)objects.delete(path);return {error:null};},
   };
+  const cloudSettings=new Map(),confirmed=[];
   const client = {
     auth:{getSession:async () => ({data:{session:{user:{id:UID}}}})},
     storage:{from:() => api},
+    from:table=>{
+      assert.equal(table,'settings');
+      return {upsert:(row,opts)=>{
+        assert.equal(opts?.onConflict,'user_id,key');
+        assert.equal(row.user_id,UID);
+        return {select:async columns=>{
+          assert.equal(columns,'key,value');
+          cloudSettings.set(row.key,row.value);confirmed.push(row.key);
+          return {data:[{key:row.key,value:row.value}],error:null};
+        }};
+      }};
+    },
   };
-  return {adapter,objects,client};
+  return {adapter,objects,client,cloudSettings,confirmed};
 }
 
 test('two concurrent uploads retain independent metadata records', async () => {
@@ -183,4 +196,79 @@ test('metadata finalization failure after object deletion remains retryable',asy
  await service.remove(entry);
  assert.deepEqual(await service.listAll(),[]);
  assert.equal(await store.getSetting('game_backup_delete_pending_v3:'+entry.id,null),null);
+});
+
+test('a game-save deletion confirms its per-ID intent in Supabase before removing bytes',async()=>{
+ const {adapter,client,objects,cloudSettings,confirmed}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['important bytes'],'slot.sav'));
+ const pending='game_backup_delete_pending_v3:'+entry.id;
+ const final='game_backup_removed_v2:'+entry.id;
+ const api=client.storage.from();
+ const remove=api.remove;
+ let pendingConfirmedBeforeDelete=false;
+ api.remove=async paths=>{
+  pendingConfirmedBeforeDelete=cloudSettings.get(pending)?.pending===true;
+  return remove(paths);
+ };
+ await service.remove(entry);
+ assert.equal(pendingConfirmedBeforeDelete,true);
+ assert.equal(objects.has(entry.path),false);
+ assert.equal(cloudSettings.get(final)?.deleted,true);
+ assert.deepEqual(confirmed,[pending,final]);
+});
+
+test('cloud confirmation error prevents deleting the only game-save bytes',async()=>{
+ const {adapter,client,objects,cloudSettings}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['preserve this'],'slot.sav'));
+ client.from=()=>({upsert:()=>({select:async()=>({
+  data:null,error:{message:'Network unavailable'}
+ })})});
+ await assert.rejects(service.remove(entry),/Could not confirm game-backup deletion marker/);
+ assert.equal(objects.has(entry.path),true);
+ assert.deepEqual((await service.listAll()).map(x=>x.id),[entry.id]);
+ assert.equal(cloudSettings.has('game_backup_delete_pending_v3:'+entry.id),false);
+});
+
+test('a stale or mismatched cloud deletion marker cannot authorize Storage removal',async()=>{
+ const {adapter,client,objects}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['untouched'],'slot.sav'));
+ client.from=()=>({upsert:()=>({select:async()=>({
+  data:[{key:'game_backup_delete_pending_v3:'+entry.id,
+    value:{id:entry.id,path:'wrong-file.sav',pending:true}}],error:null
+ })})});
+ await assert.rejects(service.remove(entry),/Could not confirm game-backup deletion marker/);
+ assert.equal(objects.has(entry.path),true);
+});
+
+test('a second device sees a pending deletion and can finish an interrupted delete',async()=>{
+ const {adapter,client,objects,cloudSettings}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['bytes to delete'],'slot.sav'));
+ const originalFrom=client.from;
+ client.from=table=>({upsert:(row,opts)=>{
+   if(row.key==='game_backup_removed_v2:'+entry.id)
+     return {select:async()=>({data:null,error:{message:'Temporary network failure'}})};
+   return originalFrom(table).upsert(row,opts);
+ }});
+ await assert.rejects(service.remove(entry),/Could not confirm game-backup deletion marker/);
+ assert.equal(objects.has(entry.path),false);
+ assert.equal(cloudSettings.get('game_backup_delete_pending_v3:'+entry.id)?.pending,true);
+ const deviceB=createMemoryAdapter(),bStore=createStore({adapter:deviceB});
+ // A second device sees only remote-synced metadata (the entry and durable
+ // pending marker); the failed final tombstone did not reach the cloud.
+ const entryRow=await store.get('settings','game_backup_entry_v2:'+entry.id);
+ await deviceB.put('settings',entryRow);
+ const pendingValue=cloudSettings.get('game_backup_delete_pending_v3:'+entry.id);
+ await bStore.setSetting('game_backup_delete_pending_v3:'+entry.id,pendingValue);
+ const other=createGameBackupService({client,store:bStore});
+ const listed=await other.list(GAME);
+ assert.equal(listed.length,1);
+ assert.equal(listed[0].deletionPending,true);
+ client.from=originalFrom;
+ await other.remove(listed[0]);
+ assert.deepEqual(await other.listAll(),[]);
+ assert.equal(cloudSettings.get('game_backup_removed_v2:'+entry.id)?.deleted,true);
 });

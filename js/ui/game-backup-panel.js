@@ -43,7 +43,9 @@ export function createGameBackupPanel({backups,gameId}) {
      if(rows.length>1)compareOther.value=rows[1].id;
      const comparePanel=section.querySelector('.backup-comparison-panel');if(comparePanel)comparePanel.hidden=rows.length<2;
      replace(entries,...(rows.length?rows.map(entry=>h('div',{class:'backup-entry'},
-       h('div',{class:'backup-entry-meta'},h('strong',{},entry.name),h('small',{},`${categoryLabel(entry.category)} · ${size(entry.size)} · ${new Date(entry.createdAt).toLocaleString(language()==='es'?'es-MX':'en-US')}`),entry.notes?h('p',{},entry.notes):null),
+       h('div',{class:'backup-entry-meta'},h('strong',{},entry.name),h('small',{},`${categoryLabel(entry.category)} · ${size(entry.size)} · ${new Date(entry.createdAt).toLocaleString(language()==='es'?'es-MX':'en-US')}`),
+         entry.deletionPending?h('p',{class:'hint',role:'status'},tr('Deletion pending on another device. The file may already be gone; retry deletion to finish synchronizing.','Eliminación pendiente en otro dispositivo. Puede que el archivo ya no exista; vuelve a eliminar para terminar de sincronizar.')):null,
+         entry.notes?h('p',{},entry.notes):null),
        h('div',{class:'inline-actions'},
          h('button',{class:'btn small',onclick:async()=>{
            status.textContent=tr('Verifying download…','Verificando descarga…');
@@ -60,7 +62,7 @@ export function createGameBackupPanel({backups,gameId}) {
              message:entry.name+(rows.length===1?' — No other backup exists for this game. This cannot be undone.':''),
              confirmLabel:tr('Delete permanently','Eliminar para siempre'),danger:true}))return;
            try{await backups.remove(entry);status.textContent=tr('Backup deleted.','Copia eliminada.');await refresh();}catch(err){status.textContent=err.message;}
-         }},tr('Delete','Eliminar'))))):[h('p',{class:'hint'},tr('No backups for this game yet.','Todavía no hay copias de este juego.'))]));
+         }},entry.deletionPending?tr('Retry deletion','Reintentar eliminación'):tr('Delete','Eliminar'))))):[h('p',{class:'hint'},tr('No backups for this game yet.','Todavía no hay copias de este juego.'))]));
      const summary=section.querySelector('.backup-vault-overview');
      if(summary){
        const biggest=[...all].sort((a,b)=>(Number(b.size)||0)-(Number(a.size)||0)).slice(0,3);

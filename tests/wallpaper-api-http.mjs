@@ -79,4 +79,40 @@ const tamperedToken=other.slice(0,-1)+(other.endsWith('a')?'b':'a');
 const badAuth=await call('/items?select=id',{token:tamperedToken});
 statusOneOf('invalid JWT signature rejected',badAuth,401,403);
 
-console.log('PASS: disposable PostgREST HTTP owner/nonowner/anon JWT, RLS and wallpaper capability checks');
+// Verify the actual HTTP contract used before a destructive game-save delete.
+// The fixture uses the same settings composite primary key as production.
+const backupId='44444444-4444-4444-8444-444444444444';
+const filePath=OWNER+'/'+backupId+'/save.bin';
+const pendingKey='game_backup_delete_pending_v3:'+backupId;
+const now=new Date().toISOString();
+const settingBody={
+ user_id:OWNER,key:pendingKey,created_at:now,updated_at:now,
+ value:{id:backupId,path:filePath,pending:true,requestedAt:now}
+};
+const pendingWrite=await call('/settings?on_conflict=user_id,key',{
+ token:owner,method:'POST',body:settingBody,
+ headers:{Prefer:'resolution=merge-duplicates,return=representation'}
+});
+statusOneOf('owner can durably upsert pending deletion intent',pendingWrite,200,201);
+assert.equal(pendingWrite.data[0]?.key,pendingKey);
+assert.equal(pendingWrite.data[0]?.value?.pending,true);
+const pendingRead=await call('/settings?select=key,value&key=eq.'+encodeURIComponent(pendingKey),{token:owner});
+statusOneOf('owner can confirm persisted deletion marker',pendingRead,200);
+assert.equal(pendingRead.data[0]?.value?.path,filePath);
+const deniedSetting=await call('/settings?on_conflict=user_id,key',{
+ token:other,method:'POST',body:{...settingBody,user_id:OTHER},
+ headers:{Prefer:'resolution=merge-duplicates,return=representation'}
+});
+statusOneOf('nonowner cannot forge a cloud deletion marker',deniedSetting,401,403);
+const finalKey='game_backup_removed_v2:'+backupId;
+const finalBody={...settingBody,key:finalKey,value:{id:backupId,path:filePath,deleted:true,deletedAt:now}};
+const finalWrite=await call('/settings?on_conflict=user_id,key',{
+ token:owner,method:'POST',body:finalBody,
+ headers:{Prefer:'resolution=merge-duplicates,return=representation'}
+});
+statusOneOf('owner can durably upsert final deletion marker',finalWrite,200,201);
+assert.equal(finalWrite.data[0]?.value?.deleted,true);
+const anonSettings=await call('/settings?select=key');
+statusOneOf('anonymous clients cannot enumerate game-save deletion markers',anonSettings,401,403);
+
+console.log('PASS: disposable PostgREST HTTP owner/nonowner/anon JWT, RLS, wallpaper capability and durable game-save marker checks');
