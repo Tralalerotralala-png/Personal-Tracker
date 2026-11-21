@@ -9,6 +9,7 @@ import { createMemoryAdapter, openIdbAdapter } from './adapters.js';
 import { createAuth, createSupabaseRemote } from './supabase.js';
 import { ensureDefaults, upgradeLayouts } from './defaults.js';
 import { seedSample } from './sample-data.js';
+import {purgeLegacyJournalCache} from './purge-journal.js';
 
 const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm';
 
@@ -55,7 +56,9 @@ export async function initData() {
 
   // ---- local-only mode ----------------------------------------------------
   if (storageMode === 'local') {
-    const store = createStore({ adapter: await openAdapter('personal-tracker-local') });
+    const adapter=await openAdapter('personal-tracker-local');
+    await purgeLegacyJournalCache(adapter);
+    const store = createStore({ adapter });
     await seedSample(store);
     await upgradeLayouts(store);
     return { mode: 'local', store, auth: null, config: cfg };
@@ -86,6 +89,7 @@ export async function initData() {
     try{localStorage.setItem(marker,uid);}catch{}
   }
   const adapter=await openAdapter('personal-tracker-cloud:'+uid);
+  await purgeLegacyJournalCache(adapter);
   // The old cache has no trustworthy owner stamp. Preserve it untouched;
   // download authoritative cloud rows instead of importing ambiguous data.
   const store=createStore({adapter,remote:createSupabaseRemote(client,uid)});
