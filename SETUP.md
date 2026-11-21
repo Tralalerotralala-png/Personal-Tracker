@@ -325,3 +325,21 @@ No SQL changes are necessary for Environmental Lighting. It is opt-in by
 settings (Automatic by default), and uses Open-Meteo sunrise, sunset and
 cloud cover plus the approximate lunar phase. Eclipse notices show worldwide
 events and do not imply local visibility.
+
+
+### Optional cloud functions (off by default)
+
+The public tracker works without Edge Functions. The Feed's Supabase proxy and
+AI-powered pixel-icon generator are **not installed automatically** by hosting
+these files on GitHub Pages. To avoid presenting broken controls, they are
+hidden/unsuggested until deliberately enabled in `config.js`:
+
+- Deploy `supabase/functions/feed-proxy`, then set `ENABLE_FEED_PROXY: true`.
+  Its endpoint fetches remote URLs; use it only for feeds you trust. It remains
+  an optional capability and must be security-reviewed for your deployment.
+- Deploy `supabase/functions/pixel-icon-ai` with a private provider API key,
+  verify the usage/billing limits, then set `ENABLE_AI_ICONS: true`.
+  The provider key must remain in Supabase secrets, never `config.js`.
+
+Leave both flags `false` if you have not deployed them. This repository's
+hosted production project does not have those functions installed by default.
