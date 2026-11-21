@@ -136,7 +136,9 @@ test('each built-in category has sixteen distinct hand-drawn objects',()=>{
 
 test('inventory assets use the finer shaded material grid and automatic named matches',()=>{
  for(const a of INVENTORY_ASSETS){
-   const svg=inventoryAssetSvg(a.id);assert.match(svg,/viewBox="0 0 34 34"/);
+   const svg=inventoryAssetSvg(a.id);assert.match(svg,/viewBox="-?\\d+ -?\\d+ \\d+ \\d+"/);
+   assert.match(svg,/data-stack-slices="16"/,a.id);
+   assert.match(inventoryAssetSvg(a.id,{style:'flat'}),/viewBox="0 0 34 34"/);
    assert.ok(new Set([...svg.matchAll(/fill="(#[0-9a-f]+)"/g)].map(m=>m[1])).size>=3,a.id);
  }
  assert.equal(defaultInventoryAsset('Steel hammer',{name:'Tools'}),'asset:hammer');
