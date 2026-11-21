@@ -73,6 +73,44 @@ export function createPhotos({ store, client }) {
   const memory = new Map(); // itemId + path -> data URL, so lists don't re-read IndexedDB
   const cacheKey = (id) => `photo:${id}`;
   const queueKey = (id) => `photoq:${id}`;
+  const cleanupPrefix='photo-cleanup:';
+  const CLEANUP_GRACE_MS=7*24*60*60*1000;
+
+  // Removing remote objects before the item row is acknowledged by Supabase
+  // can destroy the only photo referenced by another still-offline device.
+  // Give old photos a recovery window and keep the cleanup intent device-local.
+  async function queueOldPhotoCleanup(itemId,path){
+    if(!client||!path||path.startsWith('local/'))return;
+    const uid=await userId();
+    if(!uid||!path.startsWith(uid+'/'))return;
+    await store.meta.set(cleanupPrefix+itemId+':'+path,{
+      itemId,path,notBefore:Date.now()+CLEANUP_GRACE_MS
+    });
+  }
+
+  async function flushOldPhotoCleanup(uid){
+    const syncState=store.sync?.getStatus?.();
+    if(syncState && (syncState.state!=='synced'||syncState.pending||syncState.failed))return;
+    const entries=(await store.adapter.getAll('meta')).filter(row=>row.key.startsWith(cleanupPrefix));
+    for(const row of entries){
+      const {itemId,path,notBefore}=row.value||{};
+      if(typeof itemId!=='string'||typeof path!=='string'||!path.startsWith(uid+'/'))continue;
+      if(!Number.isFinite(notBefore)||Date.now()<notBefore)continue;
+      if(await store.adapter.get('outbox','items:'+itemId))continue;
+      const current=await store.get('items',itemId,{includeDeleted:true});
+      if(!current||current.photo_path===path)continue;
+      try {
+        // The *server*, not the local cache, must confirm that NO owner
+        // record still references this file (even a different or soft-deleted
+        // item). On query failure, retain the file for another retry.
+        const {data,error}=await client.from('items').select('id').eq('photo_path',path).limit(1);
+        if(error||!Array.isArray(data)||data.length)continue;
+        const result=await client.storage.from(BUCKET).remove([path]);
+        if(result.error)continue;
+        await store.adapter.del('meta',row.key);
+      } catch { /* Keep cleanup queued; retry after reconnect and sync. */ }
+    }
+  }
 
   async function userId() {
     if (!client) return null;
@@ -135,10 +173,11 @@ export function createPhotos({ store, client }) {
         // would lose the newer photo's only retry marker while offline.
         const cleared=await store.adapter.deleteMetaIfPath(q.key,q.value.path);
         if(cleared && q.value.replaces)
-          await client.storage.from(BUCKET).remove([q.value.replaces]).catch(() => {});
+          await queueOldPhotoCleanup(itemId,q.value.replaces);
         done += 1;
       } catch { /* still offline or signed out; the entry stays queued */ }
     }
+    await flushOldPhotoCleanup(uid);
     return done;
   }
 
@@ -172,7 +211,8 @@ export function createPhotos({ store, client }) {
     await store.upsert('items', { ...item, photo_path: null });
     await store.adapter.del('meta', cacheKey(itemId));
     await store.adapter.del('meta', queueKey(itemId));
-    if (client && !old.startsWith('local/')) client.storage.from(BUCKET).remove([old]).catch(() => {});
+    if (client && !old.startsWith('local/'))
+      await queueOldPhotoCleanup(itemId,old);
   }
 
   // Export the exact cached or signed private photo; never substitute another
