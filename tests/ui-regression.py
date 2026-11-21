@@ -90,7 +90,7 @@ for width,height in [(390,844),(1280,900)]:
           const {mountWidget}=await import('./js/widgets/registry.js');
           const store={getSetting:async()=>({}),subscribe:()=>()=>{}};
           const weather={getState:()=>({
-            status:'ok',place:{name:'Irapuato'},
+            status:'ok',place:{name:'Example City'},
             current:{temperature_2m:14,weather_code:2},rows:[],summary:null
           }),subscribe:()=>()=>{}};
           const results=[];
@@ -112,7 +112,52 @@ for width,height in [(390,844),(1280,900)]:
           }
           return results;
         }""")
-        assert len(city_layout)==2 and all(x["text"]=="Irapuato" and x["whitespace"]=="nowrap" and not x["wraps"] and x["beforeIcon"] and x["allTextFits"] for x in city_layout),city_layout
+        assert len(city_layout)==2 and all(x["text"]=="Example City" and x["whitespace"]=="nowrap" and not x["wraps"] and x["beforeIcon"] and x["allTextFits"] for x in city_layout),city_layout
+
+        # A partial forecast must occupy the entire row, never reserve a
+        # blank seventh column; wrapped mobile rows must fill their own width.
+        forecast_widths=page.evaluate("""async () => {
+          const {mountWidget}=await import('./js/widgets/registry.js');
+          const store={getSetting:async()=>({}),subscribe:()=>()=>{}};
+          const sizes=window.innerWidth>=900
+            ?[[1270,1],[1270,3],[1270,6],[1270,7],[900,6],[620,6]]
+            :[[390,6],[320,7],[390,3],[320,1]];
+          const results=[];
+          for(const [width,count] of sizes){
+            const weather={getState:()=>({
+              status:'ok',place:{name:'Example City'},
+              current:{temperature_2m:24,weather_code:3,uv_index:2},
+              summary:null,
+              rows:Array.from({length:count},(_,i)=>({
+                date:new Date(Date.UTC(2026,10,21+i)).toISOString().slice(0,10),
+                phase:i===0?'today':'future',
+                raw:{weather_code:3,tmax:24,precip:.3},
+                label:'Dry',index:i
+              }))
+            }),subscribe:()=>()=>{}};
+            const widget=document.createElement('section');
+            widget.className='widget wd-mud';
+            widget.style.cssText='position:fixed;top:4px;left:4px;width:'+width+'px;height:420px;z-index:9999';
+            const body=document.createElement('div');
+            body.className='widget-body';widget.append(body);document.body.append(widget);
+            const instance=mountWidget('mud',body,{weather,store,interactive:true});
+            await new Promise(resolve=>setTimeout(resolve,80));
+            const grid=body.querySelector('.w-forecast-cards');
+            const cards=[...body.querySelectorAll('.w-forecast-day')];
+            if(grid&&cards.length){
+              const g=grid.getBoundingClientRect(),bounds=cards.map(x=>x.getBoundingClientRect());
+              results.push({width,count,rendered:cards.length,display:getComputedStyle(grid).display,
+                leftGap:Math.round(Math.min(...bounds.map(x=>x.left))-g.left),
+                rightGap:Math.round(g.right-Math.max(...bounds.map(x=>x.right))),
+                overflow:grid.scrollWidth>grid.clientWidth+2});
+            }else results.push({width,count,rendered:cards.length,missing:true});
+            instance.destroy();widget.remove();
+          }
+          return results;
+        }""")
+        assert all(x["rendered"]==x["count"] and not x.get("missing") and
+                   abs(x["leftGap"])<=4 and abs(x["rightGap"])<=4 and
+                   not x["overflow"] for x in forecast_widths),forecast_widths
         # Spanish translations and literal word chunks work from a compact
         # dashboard widget, and history lists both target languages and their
         # English/Spanish meanings.
