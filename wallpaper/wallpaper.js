@@ -4203,7 +4203,7 @@ function start() {
     engineProps = { ...engineProps, ...fromProperties(props) };
     config=mergeConfig(loadSaved(),addressSettings,engineProps);
     if(props?.clearstoreddata?.value===true){
-      clearCachedSnapshot();clearSavedConfig();config.cacheSnapshot=false;
+      clearCachedSnapshot();clearSavedConfig();config.cacheSnapshot=false;config.rememberCredentials=false;
       showStatus('Stored wallpaper data cleared. Turn off Clear stored data to allow offline caching again.');
     }
     begin();
@@ -4214,7 +4214,7 @@ function start() {
   setTimeout(() => { if (!session) begin(); }, 600);
   window.__wallpaper = {
     reload: begin,
-    clearPrivateData:()=>{clearCachedSnapshot();clearSavedConfig();config.cacheSnapshot=false;},
+    clearPrivateData:()=>{clearCachedSnapshot();clearSavedConfig();config.cacheSnapshot=false;config.rememberCredentials=false;},
     getConfig:()=>({...config,anonKey:config.anonKey?'(set)':'',wallpaperKey:config.wallpaperKey?'(set)':''}),
   };
 }
