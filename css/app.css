@@ -1065,6 +1065,27 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .media-case-disc{position:absolute;top:16%;left:13%;width:74%;aspect-ratio:1/1;border-radius:50%;border:4px solid var(--edge-hi);background:radial-gradient(circle at center,var(--panel) 0 11%,var(--ink-dim) 12% 14%,var(--accent) 15% 17%,#586472 18% 37%,#222a35 38% 42%,#9c8aa5 43% 65%,#333844 66%);box-shadow:inset 0 0 12px #000a,3px 3px 0 #0006;transform:translateX(0);animation:ptDiscSlide .9s .24s cubic-bezier(.18,.72,.2,1) both;z-index:1;}
 .media-case-books .media-case-front{transform-origin:left center;animation:ptBookOpen .85s ease-out both;}
 .media-case-books .media-book-pages{position:absolute;inset:5% 7% 4% 8%;border:3px solid var(--edge-hi);background:repeating-linear-gradient(to bottom,var(--panel-2) 0 8px,var(--edge) 9px 10px);z-index:0;}
+/* Book and comic art: an actual two-page flip, never a DVD disc. */
+.media-case-books .media-book-pages{overflow:visible;transform-style:preserve-3d;background:repeating-linear-gradient(90deg,#f0e6cb 0 3px,#c6b998 3px 5px);}
+.media-case-books .media-page-flip{position:absolute;inset:1% 1% 1% 6%;display:block;
+ transform-origin:left center;backface-visibility:visible;background:repeating-linear-gradient(to bottom,#e8ddc4 0 13px,#b1a18b 14px 15px);border:1px solid #968468;
+ animation:ptPageTurn .95s .18s cubic-bezier(.25,.7,.2,1) both;}
+.media-case-books .media-page-flip.second{inset:3% 2% 2% 9%;animation-delay:.44s;background:repeating-linear-gradient(to bottom,#f7eccf 0 10px,#a5947f 11px 12px)}
+.media-case-comic .media-page-flip{background:repeating-linear-gradient(165deg,#f3e4bc 0 16px,#c1b399 17px 18px,#f3e4bc 19px 32px);}
+@keyframes ptPageTurn{from{transform:rotateY(0deg)}to{transform:rotateY(-105deg)}}
+/* Album art: a black grooved vinyl record rotates out of its square sleeve. */
+.media-case-albums{aspect-ratio:1;margin-right:48px;}
+.media-case-albums .media-case-front{animation:ptVinylSleeveOpen .95s cubic-bezier(.25,.7,.2,1) both;}
+.media-vinyl-record{position:absolute;top:8%;left:9%;width:84%;aspect-ratio:1;border-radius:50%;z-index:1;
+ background:radial-gradient(circle at 50% 50%,#101114 0 5%,#e4c28e 5.4% 12%,#4d6769 12.4% 16%,#121315 16.5% 18%,#323338 18.5% 19%,#101113 20% 27%,#33353a 27.5% 28%,#101113 29% 38%,#303237 38.5% 39%,#0d0e10 40% 49%,#292b2f 49.5% 50%,#0f1012 51% 59%,#34363b 59.5% 60%,#101114 61%);
+ box-shadow:inset -5px -5px 10px #0009,2px 4px 8px #0008;
+ animation:ptVinylSlide 1.1s .2s cubic-bezier(.2,.7,.2,1) both;}
+.media-vinyl-label{position:absolute;inset:38%;border-radius:50%;background:radial-gradient(circle,#151515 0 14%,#eacb7d 15% 48%,var(--accent) 49%);}
+@keyframes ptVinylSleeveOpen{from{transform:translateX(0) rotateY(0)}to{transform:translateX(-3%) rotateY(-14deg)}}
+@keyframes ptVinylSlide{from{transform:translateX(0) rotate(0)}to{transform:translateX(48%) rotate(150deg)}}
+@media(prefers-reduced-motion:reduce){.media-page-flip,.media-vinyl-record{animation:none!important;transform:none!important}}
+.reduce-animations .media-page-flip,.reduce-animations .media-vinyl-record{animation:none!important;transform:none!important}
+
 @keyframes ptCaseOpen{from{transform:rotateY(0)}to{transform:rotateY(-34deg)}}
 @keyframes ptBookOpen{from{transform:rotateY(0)}to{transform:rotateY(-52deg)}}
 @keyframes ptDiscSlide{from{transform:translateX(0)}to{transform:translateX(47%)}}
@@ -2294,13 +2315,21 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 }
 :root[data-sprite-style="flat"] svg[data-pixel-stack] .sprite-stack-echo{display:none!important;}
 
-/* Seven forecast cards: when the widget is narrow, preserve legible labels. */
-.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(7,minmax(0,1fr));}
+/* Every weather forecast card is keyboard- and touch-accessible in the app.
+   The wallpaper uses noninteractive divs with the same geometry. */
+button.w-forecast-day{appearance:none;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;}
+button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px;}
+/* Forecast columns fill the desktop; incomplete last rows stay centered on narrow widgets. */
+.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(var(--forecast-day-count,7),minmax(0,1fr));}
 @container widget (max-width:650px){
- .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));}
+ .widget.wd-mud .w-forecast-cards{
+  display:flex;flex-wrap:wrap;justify-content:center;align-content:start;
+  --forecast-wrap-gap:4px;column-gap:var(--forecast-wrap-gap);row-gap:var(--forecast-wrap-gap);
+ }
+ .widget.wd-mud .w-forecast-day{flex:0 0 calc((100% - 3 * var(--forecast-wrap-gap))/4);}
 }
 @container widget (max-width:330px){
- .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));}
+ .widget.wd-mud .w-forecast-day{flex-basis:calc((100% - 2 * var(--forecast-wrap-gap))/3);}
 }
 .widget.wd-calendar .w-cal-estimated{font-size:.61rem;line-height:1.1;color:var(--warn);font-weight:600;}
 .day-weather-summary .day-weather-explanation{max-width:100%;}
@@ -2435,9 +2464,13 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 .phrase-b2-literal-column{display:grid;align-content:start;gap:5px;min-width:0}
 .phrase-b2-literal-column>small{font-size:.65rem;color:var(--ink-dim);letter-spacing:.04em}
 .phrase-b2-literal-chips{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
-.phrase-b2-gloss-chip{display:inline-flex;min-height:27px;align-items:center;
+.phrase-b2-gloss-chip{display:inline-flex;flex-direction:column;gap:2px;
+ min-height:38px;align-items:flex-start;justify-content:center;
  color:var(--ink);background:var(--panel);border:1px solid var(--edge);
- padding:3px 6px;font-size:.78rem;line-height:1.25;cursor:pointer;text-align:left}
+ padding:4px 7px;font-size:.78rem;line-height:1.25;cursor:pointer;text-align:left}
+.phrase-b2-chip-pinyin{display:block;font-size:.67rem;line-height:1.2;
+ color:var(--ink-dim);font-weight:400;white-space:normal}
+.phrase-b2-gloss-chip:is(:hover,:focus-visible) .phrase-b2-chip-pinyin{color:var(--accent)}
 .phrase-b2-gloss-chip:hover,.phrase-b2-gloss-chip:focus-visible{
  outline:1px solid var(--accent);color:var(--accent);border-color:var(--accent)}
 .phrase-b2-literal-note{padding:5px 7px;color:var(--ink);

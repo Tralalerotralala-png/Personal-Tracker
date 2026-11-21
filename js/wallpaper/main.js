@@ -11,8 +11,8 @@ import { DEFAULT_LAYOUTS } from '../data/defaults.js';
 import { createWeatherService } from '../weather/service.js';
 import { createFeedService } from '../feed/service.js';
 import { createSnapshotStore } from './store.js';
-import { fetchSnapshot, loadCachedSnapshot, saveCachedSnapshot, validateSnapshot } from './snapshot.js';
-import { mergeConfig, fromProperties, fromAddress, loadSaved, saveConfig, isConfigured, fingerprint } from './config.js';
+import { fetchSnapshot, loadCachedSnapshot, saveCachedSnapshot, clearCachedSnapshot, validateSnapshot } from './snapshot.js';
+import { mergeConfig, fromProperties, fromAddress, loadSaved, saveConfig, clearSavedConfig, isConfigured, fingerprint } from './config.js';
 
 // Wallpaper Engine looks for this at load time, so it is defined straight away, outside any event.
 const pending = [];
@@ -27,7 +27,18 @@ const EMPTY = validateSnapshot({});
 function start() {
   const root = document.getElementById('wallpaper');
   let engineProps = {};
-  let config = mergeConfig(loadSaved(), fromAddress(location.search, location.hash));
+  // Capture URL preview settings once, then erase credential-bearing parameters
+  // from the address to avoid accidental sharing or browser history exposure.
+  const addressSettings=fromAddress(location.search,location.hash);
+  let config=mergeConfig(loadSaved(),addressSettings);
+  try{
+    const clean=new URL(location.href);
+    let changed=false;
+    for(const name of ['key','anon'])if(clean.searchParams.has(name)){clean.searchParams.delete(name);changed=true;}
+    const fragment=new URLSearchParams(clean.hash.replace(/^#/,''));
+    for(const name of ['key','anon'])if(fragment.has(name)){fragment.delete(name);changed=true;}
+    if(changed){clean.hash=fragment.toString();history.replaceState(history.state,'',clean.href);}
+  }catch{/* file:// wallpaper previews may not support history replacement */}
   let session = null; // everything that belongs to one running configuration
 
   const status = h('div', { class: 'wp-status', role: 'status', hidden: true });
@@ -86,7 +97,8 @@ function start() {
     saveConfig(config);
 
     const fp = fingerprint(config);
-    const cached = loadCachedSnapshot(fp);
+    if(!config.cacheSnapshot)clearCachedSnapshot();
+    const cached = config.cacheSnapshot ? loadCachedSnapshot(fp) : null;
     const store = createSnapshotStore(cached ? cached.snapshot : EMPTY);
     const weather = createWeatherService({ store });
     const feed = createFeedService({ store });
@@ -102,7 +114,7 @@ function start() {
       try {
         const snap = await fetchSnapshot(config);
         if (session !== mine) return; // the configuration changed while waiting
-        saveCachedSnapshot(fp, snap);
+        if(config.cacheSnapshot)saveCachedSnapshot(fp,snap);
         session.hasData = true;
         session.ctx.showPlaces = snap.show_places;
         session.store.update(snap);
@@ -136,14 +148,22 @@ function start() {
   // Wallpaper Engine properties arrive at load and whenever you change them.
   onProperties = (props) => {
     engineProps = { ...engineProps, ...fromProperties(props) };
-    config = mergeConfig(loadSaved(), fromAddress(location.search, location.hash), engineProps);
+    config=mergeConfig(loadSaved(),addressSettings,engineProps);
+    if(props?.clearstoreddata?.value===true){
+      clearCachedSnapshot();clearSavedConfig();config.cacheSnapshot=false;config.rememberCredentials=false;
+      showStatus('Stored wallpaper data cleared. Turn off Clear stored data to allow offline caching again.');
+    }
     begin();
   };
   pending.splice(0).forEach(onProperties);
 
   // In a plain browser no properties ever arrive, so start on our own after a moment.
   setTimeout(() => { if (!session) begin(); }, 600);
-  window.__wallpaper = { reload: begin, getConfig: () => ({ ...config, wallpaperKey: config.wallpaperKey ? '(set)' : '' }) };
+  window.__wallpaper = {
+    reload: begin,
+    clearPrivateData:()=>{clearCachedSnapshot();clearSavedConfig();config.cacheSnapshot=false;config.rememberCredentials=false;},
+    getConfig:()=>({...config,anonKey:config.anonKey?'(set)':'',wallpaperKey:config.wallpaperKey?'(set)':''}),
+  };
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

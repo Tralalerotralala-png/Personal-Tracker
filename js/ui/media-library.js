@@ -4,9 +4,10 @@ import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGamesView } from './games.js';
+import { ensureRequestedMedia } from '../data/library-starter.js';
 const KEY='other_media_library_v1';
 const KINDS=['books','films','albums'];
-const LABELS={en:{games:'Games',books:'Books',films:'Films',albums:'Albums',library:'Media Library',add:'Add',name:'Title',creator:'Author / Director / Artist',status:'Status',notes:'Notes',cover:'Cover URL (HTTPS)',save:'Save',cancel:'Back',edit:'Edit',delete:'Delete',journal:'Personal journal',entry:'Add note',shelf:'Shelf',view:'Toggle shelf/grid',rating:'Rating'},es:{games:'Juegos',books:'Libros',films:'Películas',albums:'Álbumes',library:'Biblioteca multimedia',add:'Agregar',name:'Título',creator:'Autor / Director / Artista',status:'Estado',notes:'Notas',cover:'URL de portada (HTTPS)',save:'Guardar',cancel:'Volver',edit:'Editar',delete:'Eliminar',journal:'Diario personal',entry:'Agregar nota',shelf:'Estante',view:'Cambiar estantes/cuadrícula',rating:'Calificación'}};
+const LABELS={en:{games:'Games',books:'Books',films:'Films & TV',albums:'Albums',library:'Media Library',add:'Add',name:'Title',creator:'Author / Director / Artist',status:'Status',notes:'Notes',cover:'Cover URL (HTTPS)',save:'Save',cancel:'Back',edit:'Edit',delete:'Delete',journal:'Personal journal',entry:'Add note',shelf:'Shelf',view:'Toggle shelf/grid',rating:'Rating'},es:{games:'Juegos',books:'Libros',films:'Películas y TV',albums:'Álbumes',library:'Biblioteca multimedia',add:'Agregar',name:'Título',creator:'Autor / Director / Artista',status:'Estado',notes:'Notas',cover:'URL de portada (HTTPS)',save:'Guardar',cancel:'Volver',edit:'Editar',delete:'Eliminar',journal:'Diario personal',entry:'Agregar nota',shelf:'Estante',view:'Cambiar estantes/cuadrícula',rating:'Calificación'}};
 const names={books:{en:['To read','Reading','Finished'],es:['Por leer','Leyendo','Terminado']},films:{en:['To watch','Watching','Watched'],es:['Por ver','Viendo','Vista']},albums:{en:['To listen','Listening','Listened'],es:['Por escuchar','Escuchando','Escuchado']}};
 const clamp=(x,max)=>String(x??'').slice(0,max);
 export function createMediaLibraryView({store,backups=null}) {
@@ -19,13 +20,19 @@ export function createMediaLibraryView({store,backups=null}) {
    pendingSearch={kind:event.detail.kind,id:event.detail.id};
  });
  const list=kind=>data[kind]||[];
- async function load(){const val=await store.getSetting(KEY);if(val&&typeof val==='object')data=Object.fromEntries(KINDS.map(k=>[k,Array.isArray(val[k])?val[k]:[]]));await games.mount();render();}
+ async function load(){await ensureRequestedMedia(store);const val=await store.getSetting(KEY);if(val&&typeof val==='object')data=Object.fromEntries(KINDS.map(k=>[k,Array.isArray(val[k])?val[k]:[]]));await games.mount();render();}
  const save=async()=>{await store.setSetting(KEY,data);};
  function cover(row){return row.cover&&(/^(https:\/\/|data:image\/)/i.test(row.cover))?h('img',{src:row.cover,alt:row.title,loading:'lazy',referrerpolicy:'no-referrer'}):h('span',{class:'game-placeholder'},active[0].toUpperCase());}
  function back(){if(dirty&&!confirm(language()==='es'?'¿Descartar cambios sin guardar?':'Discard unsaved changes?'))return;dirty=false;page=null;render();}
  function show(entry=null,editing=false){page={entry,editing};render();}
  function edit(entry){page={entry,editing:true};render();}
- function caseArt(row){return h('div',{class:`media-case media-case-${active}`},active!=='books'?h('div',{class:'media-case-disc','aria-hidden':'true'}):h('div',{class:'media-book-pages','aria-hidden':'true'}),h('div',{class:'media-case-front'},cover(row)));}
+ function caseArt(row){
+  const book=active==='books',vinyl=active==='albums';
+  const media=book?h('div',{class:'media-book-pages','aria-hidden':'true'},h('span',{class:'media-page-flip'}),h('span',{class:'media-page-flip second'})):
+   vinyl?h('div',{class:'media-vinyl-record','aria-hidden':'true'},h('span',{class:'media-vinyl-label'})):
+   h('div',{class:'media-case-disc','aria-hidden':'true'});
+  return h('div',{class:`media-case media-case-${active} ${book&&row.mediaType==='comic'?'media-case-comic':''}`},media,h('div',{class:'media-case-front'},cover(row)));
+ }
  function renderDetail(row){const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
   const journalPanel=h('div',{class:'game-journal'},h('h3',{},L().journal),journal,
     h('button',{class:'btn small',onclick:async()=>{if(!journal.value.trim())return;row.journal=[{id:uuid(),date:new Date().toISOString(),text:clamp(journal.value.trim(),5000)},...(row.journal||[])];await save();show(row);}},L().entry),
@@ -41,14 +48,16 @@ export function createMediaLibraryView({store,backups=null}) {
    const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:row?.rating??''});
    const status=h('select',{},names[active].en.map((s,i)=>h('option',{value:s,selected:(row?.status||names[active].en[0])===s},names[active][language()][i])));
    const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||'Collection'});
+   const choices=active==='books'?[['book','Book','Libro'],['comic','Comic book','Cómic']]:active==='films'?[['film','Film','Película'],['series','TV series','Serie de TV']]:[['vinyl','Vinyl record','Disco de vinilo'],['digital','Digital album','Álbum digital']];
+   const mediaType=h('select',{},choices.map(([value,en,es])=>h('option',{value,selected:(row?.mediaType||choices[0][0])===value},language()==='es'?es:en)));
    const error=h('p',{class:'form-error'});
-   const form=h('div',{class:'form media-editor'},field(L().name,title),field(L().creator,creator),field(L().status,status),field(L().shelf,shelf),field(L().rating,rating),field(L().cover,coverUrl),field(language()==='es'?'Subir portada':'Upload cover',upload),field(L().notes,notes),error);
+   const form=h('div',{class:'form media-editor'},field(L().name,title),field(L().creator,creator),field(L().status,status),field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),field(L().rating,rating),field(L().cover,coverUrl),field(language()==='es'?'Subir portada':'Upload cover',upload),field(L().notes,notes),error);
    form.addEventListener('input',()=>{dirty=true;});
    const saveButton=h('button',{class:'btn primary',onclick:async()=>{if(!title.value.trim()){error.textContent=L().name+' required';return;}
       let image=coverUrl.value.trim()||row?.cover||'';if(image&&!/^https:\/\//.test(image)&&!image.startsWith('data:image/')){error.textContent='HTTPS required';return;}
       if(upload.files?.length){const f=upload.files[0];if(f.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(f.type)){error.textContent='PNG/JPEG/WebP, 120 KB max';return;}
         image=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f);});}
-      const rec={id:row?.id||uuid(),title:clamp(title.value,120).trim(),creator:clamp(creator.value,150).trim(),status:status.value,shelf:shelf.value.trim()||'Collection',rating:rating.value?Number(rating.value):null,cover:image,notes:clamp(notes.value,10000),journal:row?.journal||[]};
+      const rec={id:row?.id||uuid(),title:clamp(title.value,120).trim(),creator:clamp(creator.value,150).trim(),status:status.value,mediaType:mediaType.value,shelf:shelf.value.trim()||'Collection',rating:rating.value?Number(rating.value):null,cover:image,notes:clamp(notes.value,10000),journal:row?.journal||[]};
       const ix=list(active).findIndex(x=>x.id===rec.id);if(ix>=0)data[active][ix]=rec;else data[active].push(rec);
       try {await save();dirty=false;show(rec);toast(L().save);}catch{error.textContent='Could not save. Try a smaller cover.';}
     }},L().save);

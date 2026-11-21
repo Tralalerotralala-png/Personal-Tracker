@@ -75,6 +75,27 @@
         "text": "Privacy display mode (hide personal widgets)",
         "type": "bool",
         "value": false
+      },
+      "cachesnapshot": {
+        "index": 9,
+        "order": 9,
+        "text": "Keep offline snapshot on this device (includes personal data)",
+        "type": "bool",
+        "value": true
+      },
+      "remembercredentials": {
+        "index": 10,
+        "order": 10,
+        "text": "Remember keys in browser storage (less private; not needed in Wallpaper Engine)",
+        "type": "bool",
+        "value": false
+      },
+      "clearstoreddata": {
+        "index": 11,
+        "order": 11,
+        "text": "Clear stored private data (leave enabled to keep offline cache off)",
+        "type": "bool",
+        "value": false
       }
     }
   },

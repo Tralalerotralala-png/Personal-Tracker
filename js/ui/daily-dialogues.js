@@ -1,5 +1,7 @@
 import {B2_SPANISH,B2_WHY_ES} from './daily-dialogues-es.js';
 import {B2_LITERAL} from './daily-dialogue-literal.js';
+import {B2_LITERAL_PINYIN} from './daily-dialogue-pinyin.js';
+import {B2_UI_ES} from './daily-dialogue-ui-es.js';
 // Curated B2-level everyday dialogue practice for both Mandarin and German.
 // Distinct two-turn scenarios focus on negotiation, concessions, indirectness,
 // interpersonal nuance and conversational repair. The English paraphrase
@@ -146,7 +148,7 @@ export const B2_DIALOGUES=[
  'Referencing an earlier conversation shows attention and invites a richer answer than a generic question.',
  [['进展','sich etwas ergeben','progress'],['认真','genauer','seriously / carefully']]),
  D('Reassessing a personal goal','Reflection · realistic goals','本来打算…没想到… / Eigentlich hatte ich vor …, aber …',
- ['我本来打算每天练一个小时，没想到坚持半小时反而更现实。','Wǒ běnlái dǎsuàn měitiān liàn yí ge xiǎoshí, méi xiǎng dào jiānchí bàn ge xiǎoshí fǎn\'ér gèng xiànshí.','Eigentlich hatte ich vor, jeden Tag eine Stunde zu üben. Mittlerweile merke ich aber, dass eine halbe Stunde langfristig realistischer ist.','I planned to practice an hour daily, but I have found that half an hour is more sustainable.'],
+ ['我本来打算每天练一个小时，没想到坚持半小时反而更现实。','Wǒ běnlái dǎsuàn měitiān liàn yí ge xiǎoshí, méi xiǎng dào jiānchí bàn xiǎoshí fǎn\'ér gèng xiànshí.','Eigentlich hatte ich vor, jeden Tag eine Stunde zu üben. Mittlerweile merke ich aber, dass eine halbe Stunde langfristig realistischer ist.','I planned to practice an hour daily, but I have found that half an hour is more sustainable.'],
  ['对，能长期坚持，比一开始要求太高更重要。','Duì, néng chángqī jiānchí, bǐ yì kāishǐ yāoqiú tài gāo gèng zhòngyào.','Genau. Dranzubleiben ist wichtiger, als sich am Anfang zu viel vorzunehmen.','Exactly. Consistency matters more than setting the bar too high at first.'],
  '反而 marks an unexpected reversal. German sich etwas vornehmen means setting yourself a goal.',
  [['反而','stattdessen / überraschenderweise','contrary to expectation'],['坚持','dranbleiben','stick with it']]),
@@ -198,11 +200,19 @@ export const B2_DIALOGUES=[
 ];
 
 if(B2_SPANISH.length!==B2_DIALOGUES.length||B2_WHY_ES.length!==B2_DIALOGUES.length||
- B2_LITERAL.length!==B2_DIALOGUES.length)throw Error('Daily dialogue translations and glosses must cover every lesson.');
+ B2_LITERAL.length!==B2_DIALOGUES.length||B2_LITERAL_PINYIN.length!==B2_DIALOGUES.length||
+ B2_UI_ES.length!==B2_DIALOGUES.length)throw Error('Daily dialogue translations and glosses must cover every lesson.');
 for(let i=0;i<B2_DIALOGUES.length;i++){
  const lesson=B2_DIALOGUES[i];
  lesson.es=B2_SPANISH[i][0];
  lesson.reply.es=B2_SPANISH[i][1];
  lesson.whyEs=B2_WHY_ES[i];
  lesson.literal=B2_LITERAL[i];
+ [lesson.topicEs,lesson.settingEs,...lesson.expressionEs]=B2_UI_ES[i];
+ for(const turn of ['a','b']){
+  const glosses=lesson.literal[turn].zh,pinyin=B2_LITERAL_PINYIN[i][turn];
+  if(!Array.isArray(pinyin)||pinyin.length!==glosses.length)
+   throw Error('Missing Mandarin pinyin glosses: '+lesson.topic+' '+turn);
+  glosses.forEach((gloss,index)=>{gloss.py=pinyin[index];});
+ }
 }
