@@ -378,6 +378,7 @@ export function createCalendarView({ store, weather }) {
 
   return {
     el,
+    showAfterMount: false,
     async mount() { await load(); render(); processOverviewSelection(); },
     async show() { await load(); render(); processOverviewSelection(); },
   };
