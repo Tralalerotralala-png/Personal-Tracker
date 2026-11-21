@@ -13,7 +13,11 @@ export function createMediaLibraryView({store,backups=null}) {
  const el=h('div',{class:'view media-library-view'});
  const games=createGamesView({store,backups});
  const L=()=>LABELS[language()];
- let active='games',data={books:[],films:[],albums:[]},shelfMode=true,page=null,dirty=false,query='',statusFilter='all';
+ let active='games',data={books:[],films:[],albums:[]},shelfMode=true,page=null,dirty=false,query='',statusFilter='all',pendingSearch=null;
+ window.addEventListener('tracker-search-open',event=>{
+  if(event.detail?.target==='games'&&['game','books','films','albums'].includes(event.detail.kind))
+   pendingSearch={kind:event.detail.kind,id:event.detail.id};
+ });
  const list=kind=>data[kind]||[];
  async function load(){const val=await store.getSetting(KEY);if(val&&typeof val==='object')data=Object.fromEntries(KINDS.map(k=>[k,Array.isArray(val[k])?val[k]:[]]));await games.mount();render();}
  const save=async()=>{await store.setSetting(KEY,data);};
@@ -70,5 +74,18 @@ export function createMediaLibraryView({store,backups=null}) {
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
- return {el,mount:load,show:render,hide:()=>{}};
+ return {el,mount:load,show:()=>{
+   if(pendingSearch){
+    const {kind,id}=pendingSearch;pendingSearch=null;
+    dirty=false;query='';statusFilter='all';page=null;
+    if(kind==='game'){
+     active='games';render();
+     games.openById(id);
+     return;
+    }
+    const row=data[kind]?.find(item=>item.id===id);
+    if(row){active=kind;page={entry:row,editing:false};render();return;}
+   }
+   render();
+  },hide:()=>{}};
 }
