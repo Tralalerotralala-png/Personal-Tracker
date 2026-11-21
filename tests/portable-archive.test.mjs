@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
-import {createPortableTar,inspectPortableTar,restorePortableArchive,chunkHashes} from '../js/data/portable-archive.js';
+import {createPortableTar,inspectPortableTar,restorePortableArchive,chunkHashes,exportPortableArchive} from '../js/data/portable-archive.js';
+import {createStore} from '../js/data/store.js';
+import {createMemoryAdapter} from '../js/data/adapters.js';
 import {TABLE_NAMES} from '../js/data/schema.js';
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 const PHOTO='11111111-1111-4111-8111-111111111111';
@@ -87,4 +89,29 @@ test('chunk hashes cover multiple slices without reading the whole Blob at once'
  assert.equal(hashes.length,2);
  assert.match(hashes[0],/^[0-9a-f]{64}$/);
  assert.notEqual(hashes[0],hashes[1]);
+});
+
+test('full media export fails visibly if a referenced photo cannot be retrieved',async()=>{
+ const store=createStore({adapter:createMemoryAdapter()});
+ await store.upsert('items',{id:PHOTO,name:'Camera',photo_path:'local/'+PHOTO});
+ await assert.rejects(exportPortableArchive({
+  store,photos:{readBlob:async()=>null},include:{photos:true,games:false,audio:false}
+ }),/Cannot read photo/);
+});
+
+test('conflicting existing remote objects never get overwritten by restore',async()=>{
+ const b=backup(),path=OWNER+'/'+PHOTO+'-'+PHOTO+'.webp';
+ b.tables.items.push({id:PHOTO,name:'Photo',photo_path:path});
+ const {blob}=await createPortableTar({backup:b,accountId:OWNER,assets:[
+  {kind:'photos',id:PHOTO,path:'media/photos/'+PHOTO+'.bin',sourcePath:path,blob:new Blob(['correct'],{type:'image/webp'})}
+ ]});
+ let mergeCalls=0;
+ const store={accountId:OWNER,async get(){return null;},async list(){return [];},
+  async applyRestorePlan(){mergeCalls++;}};
+ const client={storage:{from:()=>({
+  upload:async()=>({error:new Error('Already exists')}),
+  download:async()=>({data:new Blob(['invalid'],{type:'image/webp'}),error:null})
+ })}};
+ await assert.rejects(restorePortableArchive({store,client,archive:blob}),/Different cloud file already exists/);
+ assert.equal(mergeCalls,0);
 });
