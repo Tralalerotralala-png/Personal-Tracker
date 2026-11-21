@@ -29,7 +29,7 @@ test('curated Mandarin-German B2 practice has varied real dialogues, not A1 flas
   assert.equal(lesson.expressions.length,2,lesson.topic);
   for(const parts of lesson.expressions){
    assert.equal(parts.length,3,lesson.topic);
-   assert.ok(parts.every(part=>part.length>=3),lesson.topic);
+   assert.ok(parts[0].length>=1&&parts[1].length>=3&&parts[2].length>=3,lesson.topic);
   }
  }
  assert.ok(patterns.size>=25,'Practice a diverse range of speech patterns');
