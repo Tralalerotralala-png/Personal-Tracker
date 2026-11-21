@@ -3,6 +3,7 @@
 import { h, replace, openSheet } from './dom.js';
 import { language } from './language.js';
 import { B2_DIALOGUES } from './daily-dialogues.js';
+let dialoguePanelSequence=0;
 export const LESSONS = [
  {zh:'早上好',py:'zǎoshang hǎo',en:'Good morning',de:'Guten Morgen',ipa:'ˈɡuːtn̩ ˈmɔʁɡn̩',chars:['early / morning','up / on','good'],charPy:['zǎo','shang','hǎo'],words:['good (greeting form)','morning']},
  {zh:'谢谢你',py:'xièxie nǐ',en:'Thank you',de:'Danke schön',ipa:'ˈdaŋkə ʃøːn',chars:['thank','thank (repeated)','you'],charPy:['xiè','xie','nǐ'],words:['thanks','nicely / kindly']},
@@ -84,11 +85,12 @@ export function phraseHistory(until=new Date(), max=30) {
 // Reveal gives the response, full pinyin, translations and pragmatic reasoning
 // on demand. Historical beginner lessons retain their older per-character
 // and German word gloss interface without migrating or rewriting old dates.
-function createB2Dialogue({lesson,date,onHistory}){
+function createB2Dialogue({lesson,date,onHistory,expanded=false}){
  const es=language()==='es';
  const prompt=lesson;
  const reply=lesson.reply;
- const response=h('div',{class:'phrase-b2-answer',hidden:true,id:'phrase-b2-reply'},
+ const replyId='phrase-b2-reply-'+(++dialoguePanelSequence);
+ const response=h('div',{class:'phrase-b2-answer',hidden:!expanded,id:replyId},
   h('div',{class:'phrase-b2-turn-head'},h('b',{},'B · '+(es?'Respuesta':'Response'))),
   h('div',{class:'phrase-b2-grid'},
    h('div',{class:'phrase-b2-language',lang:'zh-Hans'},h('small',{},es?'MANDARÍN':'MANDARIN'),
@@ -106,15 +108,22 @@ function createB2Dialogue({lesson,date,onHistory}){
     h('div',{class:'phrase-b2-vocab'},h('span',{lang:'zh-Hans'},zh),
      h('span',{lang:'de'},de),h('small',{lang:'en'},en)))));
  const toggle=h('button',{class:'btn small phrase-b2-toggle',type:'button',
-  'aria-expanded':'false','aria-controls':'phrase-b2-reply',
+  'aria-expanded':String(expanded),'aria-controls':replyId,
   onclick:()=>{
+   // Small widgets stay self-contained rather than growing into a nested
+   // scrollbar. Reveal the full dialogue in a readable day-detail sheet.
+   if(toggle.closest('.widget.wd-phrase')){
+    openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:true})});
+    return;
+   }
    const opening=response.hidden;
    response.hidden=!opening;
    toggle.setAttribute('aria-expanded',String(opening));
    toggle.textContent=opening
     ?(es?'Ocultar respuesta':'Hide response')
     :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown');
-  }},es?'Mostrar respuesta y análisis':'Reveal reply & breakdown');
+  }},expanded?(es?'Ocultar respuesta':'Hide response')
+   :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown'));
  const panel=h('section',{class:'phrase-panel phrase-b2-panel','aria-label':es?'Diálogo del día B2':'B2 daily dialogue'},
   h('div',{class:'phrase-heading'},
    h('span',{class:'phrase-day'},phraseDateKey(date)+' · B2'),
@@ -165,7 +174,9 @@ export function openPhraseHistory() {
  }
  datePicker.addEventListener('change',()=>showKey(datePicker.value));
  const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>
-  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{},lesson.zh),h('span',{},lesson.de))));
+  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{class:lesson.level==='B2'?'phrase-history-topic':''},
+   lesson.level==='B2'?'B2 · '+lesson.topic:lesson.zh),
+  h('span',{},lesson.level==='B2'?lesson.zh:lesson.de))));
  const body=h('div',{class:'phrase-archive'},h('p',{class:'hint'},es?'Todas las frases desde el lanzamiento, incluso los días en que no abriste la aplicación.':'Every dated lesson since launch, including days when the app was closed.'),
   h('label',{class:'phrase-date-picker'},es?'Ver fecha':'Jump to date',datePicker),detail,
   h('h3',{},es?'Días anteriores':'Previous days'),history.length?recent:h('p',{class:'hint'},es?'El historial empieza mañana.':'Previous lessons will appear tomorrow.'));
