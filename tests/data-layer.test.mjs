@@ -553,7 +553,7 @@ test('pixel icon: deterministic, symmetric, sensible density', () => {
 
 test('pixel icon: svg is well formed and refuses unsafe colours', () => {
   const svg = pixelIconSvg('seed', { color: '#43b9ad' });
-  assert.match(svg, /^<svg [^>]*viewBox="-?\\d+ -?\\d+ \\d+ \\d+"/);
+  assert.match(svg, /^<svg [^>]*viewBox="-?\d+ -?\d+ \d+ \d+"/);
   assert.match(svg, /data-stack-slices="8"/);
   assert.match(svg, /sprite-stack-direction-b/);
   assert.match(pixelIconSvg('seed',{color:'#43b9ad',style:'flat'}),/viewBox="0 0 10 10"/);
