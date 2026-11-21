@@ -80,7 +80,7 @@ test('all categories use the exact same three-action component and category shel
   assert.match(file,/onToggle:/);
   assert.match(file,/onAdd:/);
  }
- assert.equal((helper.match(/class:'media-collection-toolbar'/g)||[]).length,1);
+ assert.equal((helper.match(/class:'media-collection-toolbar media-collection-toolbar-compact'/g)||[]).length,1);
  assert.equal((helper.match(/class:'media-collection-actions'/g)||[]).length,1);
  assert.match(helper,/action\(viewLabel,onToggle\)/);
  assert.match(helper,/action\(newShelfLabel,onNewShelf\)/);
