@@ -25,5 +25,5 @@ test('forecast grid fills available width even with a partial response', () => {
 test('web, wallpaper, and offline PWA share the weather layout fix', () => {
   assert.equal(read('wallpaper/app.css'), read('css/app.css'));
   assert.match(read('wallpaper/wallpaper.js'), /--forecast-day-count:\$\{Math\.max\(1, days\.length\)\}/);
-  assert.match(read('sw.js'), /const VERSION = 'v105'/);
+  assert.match(read('sw.js'), /const VERSION = 'v107'/);
 });
