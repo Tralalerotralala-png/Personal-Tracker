@@ -285,8 +285,11 @@ export function createDreamDiaryView({store}) {
    const cards=entries.map(entry=>active==='habits'
      ?h('div',{class:'journal-entry'},button(entry.title,()=>edit(active,entry)),h('small',{},dateDisplay(entry.date)),
        button((entry.completedDates||[]).includes(today())?(language()==='es'?'Completado hoy':'Done today'):(language()==='es'?'Marcar hoy':'Mark today'),async()=>{
-        const dates=new Set(entry.completedDates||[]);if(dates.has(today()))dates.delete(today());else dates.add(today());
-        entry.completedDates=[...dates].sort();await persist();draw();
+        const previous=[...(entry.completedDates||[])],dates=new Set(previous);
+        if(dates.has(today()))dates.delete(today());else dates.add(today());
+        entry.completedDates=[...dates].sort();
+        try{await persist();draw();}
+        catch(err){entry.completedDates=previous;toast(err.message||L().saveFailed);}
        }),h('span',{},`${(entry.completedDates||[]).length} ${language()==='es'?'días registrados':'days logged'}`))
      :h('button',{class:'journal-entry',onclick:()=>edit(active,entry)},h('strong',{},entry.title),h('small',{},dateDisplay(entry.date)),h('span',{},safeText(entry.body,110)),active==='dreams'&&entry.nightSky?h('span',{class:'dream-night-card-summary'},nightSummary(entry.nightSky)):null));
    const drafts=Object.keys(session.data.drafts||{}).filter(k=>k.startsWith(active+':'));
@@ -363,7 +366,7 @@ export function createDreamDiaryView({store}) {
       'Cada entrada se sincroniza por separado y permanece cifrada.'))),tabs,list);
   replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
   draw();touch();
-  openCaptureEditor=type=>{if(!session)return;if(editorDirty){toast(language()==='es'?'Guarda el editor actual primero.':'Save the current journal editor first.');return;}active=type;draw();edit(type);};
+  openCaptureEditor=type=>{if(!session)return;if(editorDirty){toast(language()==='es'?'Guarda el editor actual primero.':'Save the current journal editor first.');return;}active=type;selectedType=type;draw();edit(type);};
   if(pendingCapture){const type=pendingCapture;pendingCapture=null;openCaptureEditor(type);}
  }
  store.subscribe(e=>{
