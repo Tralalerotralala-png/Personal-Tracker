@@ -333,21 +333,26 @@ export function createDreamDiaryView({store}) {
         ...readable.map(conflict=>{
           const title=safeText(conflict.entry.title,140)||trNight('Untitled entry','Entrada sin título');
           const action=h('button',{type:'button',class:'btn small',onclick:async()=>{
+            if(session!==unlocked){toast(L().locked);return;}
             action.disabled=true;
             const recovered={...structuredClone(conflict.entry),id:uuid(),
               title:safeText(title+' (recovered)',140)};
             unlocked.data[conflict.type].unshift(recovered);
             try{
               await persist();
-              await store.meta.set('journal-v3-recovered:'+conflict.key,{savedAt:new Date().toISOString()});
-              dialog.close();
-              openEntries();
-              toast(trNight('Recovered entry saved as a separate copy.','Entrada recuperada como copia independiente.'));
             }catch(err){
               unlocked.data[conflict.type]=unlocked.data[conflict.type].filter(e=>e.id!==recovered.id);
               toast(err.message||L().saveFailed);
               action.disabled=false;
+              return;
             }
+            // The recovery marker is advisory. If writing it fails, the
+            // recovered entry must stay saved rather than being rolled back.
+            try{await store.meta.set('journal-v3-recovered:'+conflict.key,{savedAt:new Date().toISOString()});}
+            catch{toast(trNight('Entry recovered; its recovery marker could not be saved.','Entrada recuperada; no se pudo marcar el conflicto.'));}
+            dialog.close();
+            if(session===unlocked)openEntries();
+            toast(trNight('Recovered entry saved as a separate copy.','Entrada recuperada como copia independiente.'));
           }},trNight('Restore as a new entry','Restaurar como entrada nueva'));
           return h('div',{class:'journal-entry'},
             h('strong',{},title),
