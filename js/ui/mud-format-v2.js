@@ -57,11 +57,9 @@ export function localizedMudWhy(why){
 export const localizedWeather = text => language()==='es' ? t(text) : text;
 
 export function uvMeter(value, { stale = false, peak = false } = {}) {
+  if (!Number.isFinite(value) || value < 0) return null;
   const es = language() === 'es';
   const label = peak ? (es ? 'UV máximo' : 'Peak UV') : (es ? 'Índice UV' : 'UV index');
-  if (!Number.isFinite(value) || value < 0) {
-    return null; // Missing UV data should not create a misleading placeholder.
-  }
   const score = Math.round(value);
   const band = [3, 6, 8, 11].filter(threshold => score >= threshold).length;
   const levels = es ? ['Bajo', 'Moderado', 'Alto', 'Muy alto', 'Extremo']
