@@ -137,13 +137,14 @@ export function createGameBackupService({client, store}) {
       // The local device could be out of space. Attempt a direct PostgREST
       // index write before losing the session, since the Storage object
       // already exists and must not be destroyed as an error workaround.
+      let remoteSaved=false;
       try {
         await confirmServerUploadIndex(uid,key,rec,{allowMissingLocal:true});
+        remoteSaved=true;
+      }catch { /* The upload is still physically in private Storage. */ }
+      if(remoteSaved)
         throw new Error('Save file and cloud index were stored, but the device cache could not save metadata. Keep your original save, free browser storage, then reload and Sync to recover the cloud entry.');
-      }catch(err){
-        if(/cloud index were stored/.test(err.message))throw err;
-        throw new Error('Save bytes were uploaded to private Storage at '+path+', but indexing could not be confirmed on this device or Supabase. Keep your original save. Do not clear this account’s browser data until you recover the Storage file.');
-      }
+      throw new Error('Save bytes were uploaded to private Storage at '+path+', but indexing could not be confirmed on this device or Supabase. Keep your original save. Do not clear this account’s browser data until you recover the Storage file.');
     }
     try {await confirmServerUploadIndex(uid,key,rec);}
     catch {
