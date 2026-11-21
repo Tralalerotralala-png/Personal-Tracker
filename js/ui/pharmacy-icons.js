@@ -5,25 +5,22 @@ export const PHARMACY_PRESETS = ['auto','bottle','bottle-pill','bottle-tablet','
 export const isPharmacyCategory = category => category?.id === 'c0000000-0000-4000-8000-000000000007' ||
   /^(pharmacy|farmacia)$/i.test(String(category?.name || '').trim());
 const medication = name => String(name || '').trim().toLowerCase();
-export function defaultMedicinePreset(name, category) {
-  const n = medication(name);
-  if (/^oximetazolin[e a]?\b/.test(n)) return 'spray';
-  if (/^(methotrexate|metotrexato|montelukast|loratadin[e a]?)\b/.test(n)) return 'bottle-pill';
-  return isPharmacyCategory(category) ? 'bottle' : 'symbol';
+export function defaultMedicinePreset(name,category){
+ const value=medication(name);
+ if(/\b(spray|nasal|aerosol|atomizador|pulverizador)\b/.test(value))return 'spray';
+ if(/\b(capsules?|cápsulas?|tablets?|tabletas?|pills?|comprimidos?)\b/.test(value))
+  return 'bottle-pill';
+ return isPharmacyCategory(category)?'bottle':'symbol';
 }
-export function defaultMedicineColor(name) {
-  const n = medication(name);
-  return /^loratadin/.test(n) ? '#a39bdc' : /^montelukast/.test(n) ? '#62bda9' : '#0e908d';
-}
+export function defaultMedicineColor(){return '#0e908d';}
 export function medicineColor(value, fallback = '#49a89e') {
   return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback;
 }
 export function medicinePreset(value) {
   return value === 'bottle-pills' ? 'bottle-pill' : PHARMACY_PRESETS.includes(value) ? value : 'auto';
 }
-// Pixel samples from the two user-approved reference artworks. The shared
-// amber bottle is reconstructed only where covered by the foreground dose.
-// Each dose has its own sampled outline, highlights and independent palette.
+// General-purpose code-drawn pharmacy shapes. No named medications,
+// prescription examples or private reference photographs are bundled.
 const BOTTLE = [
   "....DDDDDDDDDDDDDDDDDDDD....",
   "....DDDDDDDDDDDDDDDDDDDD....",
