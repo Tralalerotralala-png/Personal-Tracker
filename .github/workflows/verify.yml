@@ -141,6 +141,20 @@ jobs:
             -f tests/sql/owner-guard-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
             -f supabase/owner-policy-hardening.sql
+      - name: Start disposable SMTP inbox and email-OTP template
+        run: |
+          set -euo pipefail
+          docker run --rm -d --network host --name tracker-mailpit-test axllent/mailpit:v1.34.0
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory tests/fixtures >/tmp/tracker-otp-template.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8025/api/v1/messages >/dev/null 2>&1 && \
+               curl -fsS http://127.0.0.1:8765/gotrue-otp.html >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8025/api/v1/messages >/dev/null
+          curl -fsS http://127.0.0.1:8765/gotrue-otp.html >/dev/null
       - name: Migrate and launch disposable Supabase Auth issuer
         run: |
           set -euo pipefail
@@ -224,9 +238,12 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3099/ >/dev/null
           node tests/gotrue-auth-http.mjs
+      - name: Verify app-style email OTP login with Auth-issued JWTs
+        run: node tests/gotrue-email-otp-http.mjs
       - name: Clean up disposable Auth and API containers
         if: always()
         run: |
           docker logs tracker-gotrue-test --tail 40 || true
+          docker logs tracker-mailpit-test --tail 40 || true
           docker logs tracker-auth-api-test --tail 40 || true
-          docker rm -f tracker-gotrue-test tracker-auth-api-test || true
+          docker rm -f tracker-gotrue-test tracker-auth-api-test tracker-mailpit-test || true
