@@ -146,7 +146,7 @@ export const B2_DIALOGUES=[
  'Referencing an earlier conversation shows attention and invites a richer answer than a generic question.',
  [['进展','sich etwas ergeben','progress'],['认真','genauer','seriously / carefully']]),
  D('Reassessing a personal goal','Reflection · realistic goals','本来打算…没想到… / Eigentlich hatte ich vor …, aber …',
- ['我本来打算每天练一个小时，没想到坚持半小时反而更现实。','Wǒ běnlái dǎsuàn měitiān liàn yí ge xiǎoshí, méi xiǎng dào jiānchí bàn ge xiǎoshí fǎn\'ér gèng xiànshí.','Eigentlich hatte ich vor, jeden Tag eine Stunde zu üben. Mittlerweile merke ich aber, dass eine halbe Stunde langfristig realistischer ist.','I planned to practice an hour daily, but I have found that half an hour is more sustainable.'],
+ ['我本来打算每天练一个小时，没想到坚持半小时反而更现实。','Wǒ běnlái dǎsuàn měitiān liàn yí ge xiǎoshí, méi xiǎng dào jiānchí bàn xiǎoshí fǎn\'ér gèng xiànshí.','Eigentlich hatte ich vor, jeden Tag eine Stunde zu üben. Mittlerweile merke ich aber, dass eine halbe Stunde langfristig realistischer ist.','I planned to practice an hour daily, but I have found that half an hour is more sustainable.'],
  ['对，能长期坚持，比一开始要求太高更重要。','Duì, néng chángqī jiānchí, bǐ yì kāishǐ yāoqiú tài gāo gèng zhòngyào.','Genau. Dranzubleiben ist wichtiger, als sich am Anfang zu viel vorzunehmen.','Exactly. Consistency matters more than setting the bar too high at first.'],
  '反而 marks an unexpected reversal. German sich etwas vornehmen means setting yourself a goal.',
  [['反而','stattdessen / überraschenderweise','contrary to expectation'],['坚持','dranbleiben','stick with it']]),
