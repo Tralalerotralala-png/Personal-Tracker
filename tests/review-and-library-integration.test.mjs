@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createStore} from '../js/data/store.js';
 import {createMemoryAdapter} from '../js/data/adapters.js';
-import {REQUESTED_MEDIA,ensureRequestedMedia} from '../js/data/library-starter.js';
+import {REQUESTED_MEDIA,ensureRequestedMedia,markRequestedMediaRemoved} from '../js/data/library-starter.js';
 import {blockedHost,blockedAddress,allowedUrl} from '../supabase/functions/feed-proxy/safe-target.js';
 
 const source=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
@@ -11,6 +11,8 @@ test('requested comic and animated TV series seed once, preserve existing media 
  const store=createStore({adapter:createMemoryAdapter()});
  const old={books:[{id:'pre-existing',title:'Another book',notes:'keep'}],films:[],albums:[{id:'album',title:'Existing record'}]};
  await store.setSetting('other_media_library_v1',old);
+ // Repair even when an older app wrongly recorded its one-time seed marker.
+ await store.setSetting('media_requested_additions_20261121',true);
  assert.equal(await ensureRequestedMedia(store),true);
  let data=await store.getSetting('other_media_library_v1');
  assert.equal(data.books.length,2);
@@ -21,6 +23,7 @@ test('requested comic and animated TV series seed once, preserve existing media 
  assert.equal(data.films[0].mediaType,'series');
  assert.equal(data.books[0].notes,'keep');
  assert.equal(await ensureRequestedMedia(store),false);
+ await markRequestedMediaRemoved(store,'books','Johnny the Homicidal Maniac');
  data.books=data.books.filter(x=>x.title!=='Johnny the Homicidal Maniac');
  await store.setSetting('other_media_library_v1',data);
  assert.equal(await ensureRequestedMedia(store),false);
