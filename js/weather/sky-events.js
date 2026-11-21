@@ -2,6 +2,7 @@
 // Eclipse dates: NASA https://science.nasa.gov/eclipses/future-eclipses/
 // Meteor shower peaks: American Meteor Society https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/
 import { moonPhase } from './moon-phase.js';
+import {pixelStackIconSvg} from '../ui/sprite-stack.js';
 import { loadAstronomy, calculatedZodiacEvents } from './celestial.js';
 const CALENDAR = [
  ['2026-11-04','Southern Taurids peak','Máximo de las Táuridas del Sur','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
@@ -51,7 +52,7 @@ export function skyEventIconSvg(kind) {
   : kind === 'lunar_eclipse'
   ? '<circle cx="12" cy="12" r="9" fill="#b77265"/><path d="M15 4a9 9 0 0 1 0 16" stroke="#653c58" stroke-width="5" fill="none"/>'
   : '<path d="M4 19L20 3M8 20l12-12" stroke="#e0c7ff" stroke-width="3"/><path d="M17 2h5v5" stroke="#ffe2a0" stroke-width="3" fill="none"/>';
- return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`;
+ return pixelStackIconSvg(`<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`);
 }
 
 // Shared across dashboard, forecast and wallpaper. Recalculate at most every
