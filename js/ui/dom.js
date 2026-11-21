@@ -90,7 +90,7 @@ export function daysSince(iso) {
 /** Cover buttons tilt toward the pointer and share their cover with the detail
  * view when the browser supports View Transitions. Keyboard and touch use the
  * same action; reduced-motion mode skips both the tilt and transition. */
-export function libraryCoverButton(art,title,open,host){
+export function libraryCoverButton(art,title,open,host,{transition=true}={}){
   const reduced=()=>document.documentElement.classList.contains('reduce-animations')||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const button=h('button',{class:'game-book',type:'button'},art,h('span',{},title));
   art.classList.add('library-cover-art');
@@ -107,7 +107,7 @@ export function libraryCoverButton(art,title,open,host){
     for(const key of ['--cover-rx','--cover-ry','--cover-rz'])button.style.removeProperty(key);
   });
   button.addEventListener('click',()=>{
-    if(reduced()||!document.startViewTransition||document.documentElement.classList.contains('library-cover-transition')){open();return;}
+    if(!transition||reduced()||!document.startViewTransition||document.documentElement.classList.contains('library-cover-transition')){open();return;}
     const root=document.documentElement;
     let target;
     art.style.viewTransitionName='tracker-library-cover';
