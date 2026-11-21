@@ -36,8 +36,18 @@ export async function writeLocalAudio(accountId,record) {
  const name='personal-tracker-local-music:'+accountId;
  const existing=await accountDbOp(name,'readonly',store=>store.get(record.id));
  if(existing) {
-  // Never overwrite a local track with a different one of the same identifier.
+  // Compare in bounded slices. Equal byte length alone does NOT mean equal
+  // content; silently treating those tracks as interchangeable loses data.
   if(existing.blob.size!==record.blob.size)throw Error('Conflicting local audio track: '+record.name);
+  for(let offset=0;offset<record.blob.size;offset+=1024*1024){
+   const [a,b]=await Promise.all([
+    existing.blob.slice(offset,offset+1024*1024).arrayBuffer(),
+    record.blob.slice(offset,offset+1024*1024).arrayBuffer()
+   ]);
+   const left=new Uint8Array(a),right=new Uint8Array(b);
+   if(left.length!==right.length||left.some((v,i)=>v!==right[i]))
+    throw Error('Conflicting local audio track: '+record.name);
+  }
   return false;
  }
  await accountDbOp(name,'readwrite',store=>store.add(record));
