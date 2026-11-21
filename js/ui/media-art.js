@@ -4,14 +4,8 @@ import { h } from './dom.js';
 import { hash32 } from './pixel-icon.js';
 import { renderLayeredSprite } from './sprite-stack.js';
 
-const SHAPES={
- games:['............','..AA....AA..','.AAA....AAA.','AAAAAAAAAAAA','AABBAAAABBAA','AAABAAAABAAA','.AAAA..AAAA.','..AAAAAAAA..','...AAAAAA...','............'],
- books:['...AAAAAAA..','..ABBBBBBA..','..ABAAAABA..','..ABBBBABA..','..ABAAAABA..','..ABBBBABA..','..ABAAAABA..','..ABBBBABA..','..AAAAAAAB..','...AAAAAAA..'],
- films:['..AAAAAAAA..','.ABBBBBBBBA.','.ABAAABBBBA.','.ABBBBBBBBA.','.ABBAAABBBA.','.ABBBBBBBBA.','.ABBBBBBBBA.','..AAAAAAAA..','....AAAA....','...AAAAAA...'],
- albums:['....AAAA....','..AABBBBAA..','.AABAAAABAA.','.ABABBBABA.','AABABBBABAA.','AABBBCCBBBAA','AABBBCCBBBAA','AABABBBABAA.','.ABABBBABA.','.AABAAAABAA.','..AABBBBAA..','....AAAA....'],
- comic:['..AAAAAAAA..','.ABBBBBBBA.','.ABAAABABA.','.ABBBBBBBA.','.ABABAAABA.','.ABBBBBBBA.','.ABAAABBBA.','.ABBBBBBBA.','.AAAAAAAAA.','..AAAAAAAA..'],
- series:['..AAAAAAAA..','.ABBBBBBBBA.','AABABAABABAA','AABBBBBBBBAA','AABABBBABBAA','AABBBBBBBBAA','.ABBBBBBBBA.','..AAAAAAAA..','....AAAA....','...AAAAAA...']
-};
+// Category-specific colours rather than title-hashed shades: book = navy
+// hardcover, TV = recognisable widescreen display, album = graphite vinyl.
 const PALETTES=[
  ['#5aa9a1','#d4eee0','#32665e'],
  ['#b88a62','#f0dcba','#76513c'],
@@ -20,17 +14,64 @@ const PALETTES=[
  ['#77a6c7','#e2efef','#476787'],
  ['#c28ca9','#f5e4ec','#80566e']
 ];
+const KIND_PALETTES={
+ games:['#384961','#acbcd0','#77a99e','#dfedf1'],
+ books:['#102743','#244b80','#6687b4','#eee8d8'],
+ comic:['#222b4e','#5d6598','#c78caa','#f0e4e5'],
+ films:['#203441','#3d8aad','#8bcde9','#ecf7fb'],
+ series:['#203441','#3d8aad','#8bcde9','#ecf7fb'],
+ albums:['#10151c','#303a48','#a18bb9','#d6e0e7']
+};
 const cache=new Map();
-export function mediaAccent(seed=''){
- return PALETTES[hash32(seed)%PALETTES.length][0];
+export function mediaAccent(seed=''){return PALETTES[hash32(seed)%PALETTES.length][0];}
+
+export function mediaPixelGrid(kind='books'){
+ const k=kind==='series'?'films':kind;
+ const width=18,height=15,grid=Array.from({length:height},()=>Array(width).fill(null));
+ const at=(x,y,color)=>{if(x>=0&&y>=0&&x<width&&y<height)grid[y][x]=color;};
+ const palette=KIND_PALETTES[k]||KIND_PALETTES.books;
+ if(k==='books'||k==='comic'){
+  // Upright hardback with navy cloth, two narrow spine strips and cream page edge.
+  for(let y=1;y<=13;y++)for(let x=3;x<=13;x++){
+   let shade=x>=12||y===13?3:x<=4||y===1?0:1;
+   if(x===5||y===12)shade=2;
+   if(y>=4&&y<=10&&x>=7&&x<=10&& (y===4||y===10||x===7||x===10))shade=2;
+   at(x,y,palette[shade]);
+  }
+ }else if(k==='films'){
+  // A real 16:9 wide screen with a bezel, neck and horizontal stand.
+  for(let y=2;y<=10;y++)for(let x=1;x<=16;x++){
+   const bezel=y===2||y===10||x===1||x===16;
+   const glint=x<=5&&y<=5&&!bezel;
+   at(x,y,palette[bezel?0:glint?2:1]);
+  }
+  for(let y=11;y<=12;y++)for(let x=8;x<=9;x++)at(x,y,palette[0]);
+  for(let x=5;x<=12;x++)at(x,13,palette[0]);
+  at(2,3,palette[3]);at(3,3,palette[2]);
+ }else if(k==='albums'){
+  // An unmistakable black vinyl record with grooves and a transparent spindle.
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+   const radius=Math.hypot(x-8.5,y-7);
+   if(radius>7||radius<1.15)continue;
+   const shade=radius<2.4?3:radius<3.6?2:radius<6.35?((x+y)%3===0?1:0):2;
+   at(x,y,palette[shade]);
+  }
+ }else{
+  // A readable controller rather than a generic stack of coloured cubes.
+  for(let y=5;y<=11;y++)for(let x=2;x<=15;x++){
+   if(y===5&&(x<=5||x>=12))continue;
+   if(y===11&&(x<=4||x>=13))continue;
+   at(x,y,palette[y===5||y===11?0:1]);
+  }
+  for(const [x,y] of [[5,7],[4,8],[5,9],[6,8],[12,7],[13,9]])at(x,y,palette[2]);
+  at(7,8,palette[3]);at(10,8,palette[3]);
+ }
+ return grid;
 }
 export function mediaIconSvg(kind='books',seed=kind){
- const key=kind+'|'+seed;
+ const key=kind;
  if(cache.has(key))return cache.get(key);
- const colors=PALETTES[hash32(seed)%PALETTES.length];
- const shape=SHAPES[kind]||SHAPES.books;
- const grid=shape.map(row=>[...row].map(ch=>ch==='.'?null:colors[ch.charCodeAt(0)-65]));
- const svg=renderLayeredSprite(grid,{depth:3,angle:0,hoverAngle:35,squash:1,spacing:1});
+ const svg=renderLayeredSprite(mediaPixelGrid(kind),{depth:3,angle:0,hoverAngle:35,squash:1,spacing:1});
  cache.set(key,svg);
  return svg;
 }
