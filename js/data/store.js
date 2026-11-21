@@ -168,6 +168,25 @@ export function createStore({
 
   const setSetting = (key, value) => upsert('settings', { key, value });
 
+  // Atomic, serialized read/modify/write for compound settings documents.
+  // Avoid replacing another editor's changes with an older UI snapshot.
+  async function updateSetting(key,mutate,fallback=null){
+    assertWritable();
+    if(typeof mutate!=='function')throw Error('A settings updater is required');
+    return serialize('settings',key,async()=>{
+      const existing=await adapter.get('settings',key);
+      const snapshot=structuredClone(existing&&!existing.deleted_at?existing.value:fallback);
+      const value=await mutate(snapshot);
+      if(value===undefined)throw Error('Settings updater must return a value');
+      const now=nextTimestamp(clock,existing?.updated_at);
+      const row=normalizeRow('settings',{...existing,key,value:structuredClone(value),
+        created_at:existing?.created_at??now,updated_at:now,deleted_at:null});
+      await writeLocal('settings',row,key);
+      emit({type:'change',tables:['settings'],ids:[key],source:'local'});
+      return structuredClone(row.value);
+    });
+  }
+
   // ---- backup / restore support ------------------------------------------
 
   // Write a row as-is (used by backup import). With touch:true the row gets a
@@ -236,6 +255,7 @@ export function createStore({
   const meta = {
     get: async (key) => (await adapter.get('meta', key))?.value,
     set: (key, value) => adapter.put('meta', { key, value }),
+    delete: (key) => adapter.del('meta',key),
   };
 
   return {
@@ -246,7 +266,7 @@ export function createStore({
     meta,
     subscribe,
     list, get, upsert, upsertWithMeta, remove, removeLocation, removeCategory,
-    getSetting, setSetting,
+    getSetting, setSetting, updateSetting,
     importRow, applyRestorePlan, resetCache, eraseDeviceCache,
   };
 }

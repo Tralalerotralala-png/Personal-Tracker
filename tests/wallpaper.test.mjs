@@ -352,7 +352,7 @@ test('keep-alive workflow: scheduled, uses secrets, and treats a 4xx answer as "
 });
 
 test('wallpaper folder is complete for Wallpaper Engine', () => {
-  for (const f of ['index.html', 'wallpaper.js', 'wallpaper.css', 'app.css', 'project.json', 'preview.jpg']) {
+  for (const f of ['index.html', 'wallpaper.js', 'wallpaper.css', 'app.css', 'project.json', JSON.parse(read('wallpaper/project.json')).preview]) {
     assert.ok(fs.existsSync(path.join(ROOT, 'wallpaper', f)), `wallpaper/${f} missing`);
   }
   const html = read('wallpaper/index.html');

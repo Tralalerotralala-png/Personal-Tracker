@@ -44,14 +44,14 @@ test('pharmacy presets reuse one sprite family and keep individual colors', () =
   const category = {id:'c0000000-0000-4000-8000-000000000007',name:'Pharmacy'};
   assert.ok(isPharmacyCategory(category));
   assert.ok(isPharmacyCategory({name:'Farmacia'}));
-  for (const name of ['Methotrexate','Montelukast','Loratadine']) {
+  for (const name of ['Example capsule','Sample pills','Example tablet']) {
     assert.equal(defaultMedicinePreset(name, category),'bottle-pill');
     assert.match(pharmacyIconSvg(name,category),/viewBox="0 0 56 56"/);
   }
-  assert.equal(defaultMedicinePreset('Oximetazoline',category),'spray');
-  assert.equal(defaultMedicinePreset('Oximetazolina',category),'spray');
+  assert.equal(defaultMedicinePreset('Nasal spray',category),'spray');
+  assert.equal(defaultMedicinePreset('Aerosol',category),'spray');
   assert.equal(defaultMedicinePreset('New medication',category),'bottle');
-  assert.notEqual(defaultMedicineColor('Montelukast'),defaultMedicineColor('Loratadine'));
+  assert.equal(defaultMedicineColor('Example capsule'),'#0e908d');
   const meta=trackMeta({icon_preset:'spray',icon_color:'#cf5798'});
   assert.equal(meta.icon_preset,'spray');
   assert.equal(meta.icon_color,'#cf5798');

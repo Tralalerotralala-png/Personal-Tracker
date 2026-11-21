@@ -4,7 +4,6 @@ import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGamesView } from './games.js';
-import { ensureRequestedMedia, markRequestedMediaRemoved } from '../data/library-starter.js';
 import { mediaIcon, mediaAccent, mediaCollectionToolbar } from './media-art.js';
 const KEY='other_media_library_v1';
 const KINDS=['books','films','albums'];
@@ -30,10 +29,53 @@ export function createMediaLibraryView({store,backups=null}) {
     ?[...new Set(val.shelvesByKind[kind].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,60)))]:[];
   return next;
  }
- async function refreshCollection(){await ensureRequestedMedia(store);const val=await store.getSetting(KEY);data=normalizeData(val);}
+ async function refreshCollection(){const val=await store.getSetting(KEY);data=normalizeData(val);}
  const shelfNames=kind=>[...new Set([...data.shelvesByKind[kind],...list(kind).map(x=>x.shelf||'Collection')])];
  async function load(){await refreshCollection();await games.mount();render();}
- const save=async()=>{await store.setSetting(KEY,data);};
+ // Read and update the latest settings value INSIDE the store's serialized write.
+ // This prevents an old screen snapshot overwriting a fresh rating, journal or shelf.
+ async function commit(mutator){
+  const next=await store.updateSetting(KEY,raw=>{
+   const draft=normalizeData(raw);
+   mutator(draft);
+   return draft;
+  },{books:[],films:[],albums:[]});
+  data=normalizeData(next);
+  return data;
+ }
+ const localPagesKey=id=>'media-inner-pages:v1:'+id;
+ const pagesFor=async id=>{
+  if(!id)return [];
+  const value=await store.meta.get(localPagesKey(id));
+  return Array.isArray(value)?value.filter(page=>typeof page?.src==='string'&&
+    /^data:image\/(?:webp|png|jpeg);base64,/.test(page.src)).slice(0,8):[];
+ };
+ async function convertInteriorImage(file){
+  if(!['image/jpeg','image/png','image/webp'].includes(file?.type)||file.size>8*1024*1024)
+   throw Error(language()==='es'?'Usa PNG, JPG o WebP de menos de 8 MB.':'Use PNG, JPG or WebP under 8 MB.');
+  return new Promise((resolve,reject)=>{
+   const blob=URL.createObjectURL(file),img=new Image();
+   const release=()=>URL.revokeObjectURL(blob);
+   img.onerror=()=>{release();reject(Error('Cannot read this image.'));};
+   img.onload=()=>{
+    try{
+     const scale=Math.min(1,1100/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+     const canvas=document.createElement('canvas');
+     canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+     canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+     const ctx=canvas.getContext('2d');
+     if(!ctx)throw Error('Image conversion unavailable.');
+     ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+     ctx.drawImage(img,0,0,canvas.width,canvas.height);
+     let src=canvas.toDataURL('image/webp',.76);
+     if(src.length>520000)src=canvas.toDataURL('image/jpeg',.68);
+     if(src.length>520000)throw Error('Image is too detailed; please use a smaller image.');
+     resolve({id:uuid(),src,caption:''});
+    }catch(e){reject(e);}finally{release();}
+   };
+   img.src=blob;
+  });
+ }
  function cover(row){
   const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
   const fallback=()=>h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},
@@ -67,36 +109,182 @@ export function createMediaLibraryView({store,backups=null}) {
    }},L().replay);
   return h('div',{class:'media-case-stage'},casing,replay);
  }
- function renderDetail(row){const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
+ function renderDetail(row){
+  const kind=active;
+  const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
   const journalPanel=h('div',{class:'game-journal'},h('h3',{},L().journal),journal,
-    h('button',{class:'btn small',onclick:async()=>{if(!journal.value.trim())return;row.journal=[{id:uuid(),date:new Date().toISOString(),text:clamp(journal.value.trim(),5000)},...(row.journal||[])];await save();show(row);}},L().entry),
-    ...(row.journal||[]).map(e=>h('p',{class:'game-journal-entry'},h('small',{},new Date(e.date).toLocaleDateString()),' ',e.text)));
-  return h('section',{class:'media-detail game-detail'},caseArt(row),h('div',{},h('h2',{},row.title),h('p',{},row.creator||'—'),h('p',{},`${L().status}: ${row.status||'—'}`),h('p',{},`${L().rating}: ${row.rating??'—'}`),h('p',{class:'media-notes'},row.notes||''),journalPanel,
-    h('div',{class:'inline-actions'},h('button',{class:'btn primary',onclick:()=>edit(row)},L().edit),h('button',{class:'btn danger',onclick:async()=>{if(!await confirmDialog({title:L().delete,message:row.title,confirmLabel:L().delete,danger:true}))return;await markRequestedMediaRemoved(store,active,row.title);data[active]=list(active).filter(x=>x.id!==row.id);await save();back();}},L().delete))));
+   h('button',{class:'btn small',type:'button',onclick:async()=>{
+    const note=journal.value.trim();if(!note)return;
+    try{
+     await commit(draft=>{
+      const saved=draft[kind].find(x=>x.id===row.id);
+      if(!saved)throw Error('Media entry was deleted on another screen.');
+      saved.journal=[{id:uuid(),date:new Date().toISOString(),text:clamp(note,5000)},...(saved.journal||[])];
+     });
+     show(data[kind].find(x=>x.id===row.id));
+    }catch(error){console.warn('Could not save media journal',error);toast(language()==='es'?'No se pudo guardar la nota.':'Could not save note.');}
+   }},L().entry),
+   ...(row.journal||[]).map(e=>h('p',{class:'game-journal-entry'},h('small',{},new Date(e.date).toLocaleDateString()),' ',e.text)));
+  const info=h('div',{class:'media-detail-info'},h('h2',{},row.title),h('p',{},row.creator||'—'),
+   h('p',{},`${L().status}: ${row.status||'—'}`),
+   h('p',{},`${L().rating}: ${row.rating??'—'}`),
+   h('p',{class:'media-notes'},row.notes||''),journalPanel);
+  if(kind==='books'){
+   const spread=h('div',{class:'media-inner-spread'});
+   const previous=h('button',{class:'btn small',type:'button'},language()==='es'?'Anterior':'Previous');
+   const next=h('button',{class:'btn small',type:'button'},language()==='es'?'Siguiente':'Next');
+   const counter=h('small',{class:'media-inner-counter'});
+   const gallery=h('section',{class:'media-interiors'},
+    h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
+    h('p',{class:'media-inner-privacy'},language()==='es'?
+     'Imágenes guardadas solo en este dispositivo. No se suben a la nube.':
+     'Images stay on this device; they are not uploaded to the cloud.'),
+    spread,h('div',{class:'media-interior-controls'},previous,counter,next));
+   let pages=[],index=0;
+   const draw=()=>{
+    const visible=pages.slice(index,index+2);
+    replace(spread,visible.length?visible.map((item,n)=>
+     h('figure',{class:'media-inner-page'},
+      h('img',{src:item.src,alt:item.caption||`${row.title}, page ${index+n+1}`,loading:'lazy'}),
+      item.caption?h('figcaption',{},item.caption):null)):
+     h('p',{class:'media-inner-empty'},language()==='es'?
+      'Añade imágenes desde Editar para verlas aquí de dos en dos.':
+      'Add your own images in Edit to view two pages side by side.'));
+    previous.disabled=index===0;next.disabled=index+2>=pages.length;
+    counter.textContent=pages.length?`${index+1}–${Math.min(index+2,pages.length)} / ${pages.length}`:'0 / 0';
+   };
+   previous.addEventListener('click',()=>{index=Math.max(0,index-2);draw();});
+   next.addEventListener('click',()=>{index=Math.min(Math.max(0,pages.length-1),index+2);draw();});
+   draw();
+   pagesFor(row.id).then(saved=>{pages=saved;draw();})
+    .catch(error=>console.warn('Could not load private book images',error));
+   info.append(gallery);
+  }
+  info.append(h('div',{class:'inline-actions'},
+   h('button',{class:'btn primary',type:'button',onclick:()=>edit(row)},L().edit),
+   h('button',{class:'btn danger',type:'button',onclick:async()=>{
+    if(!await confirmDialog({title:L().delete,message:row.title,confirmLabel:L().delete,danger:true}))return;
+    try{
+     await commit(draft=>{draft[kind]=draft[kind].filter(x=>x.id!==row.id);});
+     if(kind==='books')await store.meta.delete(localPagesKey(row.id));
+     dirty=false;page=null;render();
+    }catch(error){console.error('Could not delete media entry',error);toast(language()==='es'?'No se pudo eliminar.':'Could not delete entry.');}
+   }},L().delete)));
+  return h('section',{class:'media-detail game-detail'},caseArt(row),info);
  }
- function renderEditor(row){const field=(label,el)=>h('label',{class:'media-field'},h('span',{},label),el);
-   const title=h('input',{type:'text',maxlength:120,value:row?.title||''});const creator=h('input',{type:'text',maxlength:150,value:row?.creator||''});
-   const notes=h('textarea',{rows:8,maxlength:10000},row?.notes||'');
-   const coverUrl=h('input',{type:'url',value:row?.cover?.startsWith('https:')?row.cover:'',placeholder:'https://'});
-   const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});
-   const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:row?.rating??''});
-   const status=h('select',{},names[active].en.map((s,i)=>h('option',{value:s,selected:(row?.status||names[active].en[0])===s},names[active][language()][i])));
-   const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||data.shelvesByKind[active].at(-1)||'Collection'});
-   const choices=active==='books'?[['book','Book','Libro'],['comic','Comic book','Cómic']]:active==='films'?[['film','Film','Película'],['series','TV series','Serie de TV']]:[['vinyl','Vinyl record','Disco de vinilo'],['digital','Digital album','Álbum digital']];
-   const mediaType=h('select',{},choices.map(([value,en,es])=>h('option',{value,selected:(row?.mediaType||choices[0][0])===value},language()==='es'?es:en)));
-   const error=h('p',{class:'form-error'});
-   const form=h('div',{class:'form media-editor'},field(L().name,title),field(L().creator,creator),field(L().status,status),field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),field(L().rating,rating),field(L().cover,coverUrl),field(language()==='es'?'Subir portada':'Upload cover',upload),field(L().notes,notes),error);
-   form.addEventListener('input',()=>{dirty=true;});
-   const saveButton=h('button',{class:'btn primary',onclick:async()=>{if(!title.value.trim()){error.textContent=L().name+' required';return;}
-      let image=coverUrl.value.trim()||row?.cover||'';if(image&&!/^https:\/\//.test(image)&&!image.startsWith('data:image/')){error.textContent='HTTPS required';return;}
-      if(upload.files?.length){const f=upload.files[0];if(f.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(f.type)){error.textContent='PNG/JPEG/WebP, 120 KB max';return;}
-        image=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f);});}
-      const rec={id:row?.id||uuid(),title:clamp(title.value,120).trim(),creator:clamp(creator.value,150).trim(),status:status.value,mediaType:mediaType.value,shelf:shelf.value.trim()||'Collection',rating:rating.value?Number(rating.value):null,cover:image,notes:clamp(notes.value,10000),journal:row?.journal||[]};
-      const ix=list(active).findIndex(x=>x.id===rec.id);if(ix>=0)data[active][ix]=rec;else data[active].push(rec);
-      if(!shelfNames(active).includes(rec.shelf))data.shelvesByKind[active].push(rec.shelf);
-      try {await save();dirty=false;show(rec);toast(L().save);}catch{error.textContent='Could not save. Try a smaller cover.';}
-    }},L().save);
-   return h('div',{},form,saveButton);
+ function renderEditor(row){
+  const kind=active,draftId=row?.id||uuid();
+  const field=(label,control)=>h('label',{class:'media-field'},h('span',{},label),control);
+  const title=h('input',{type:'text',maxlength:120,value:row?.title||''});
+  const creator=h('input',{type:'text',maxlength:150,value:row?.creator||''});
+  const notes=h('textarea',{rows:8,maxlength:10000},row?.notes||'');
+  const coverUrl=h('input',{type:'url',value:row?.cover?.startsWith('https:')?row.cover:'',placeholder:'https://'});
+  const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});
+  const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:row?.rating??''});
+  const status=h('select',{},names[kind].en.map((name,i)=>
+   h('option',{value:name,selected:(row?.status||names[kind].en[0])===name},names[kind][language()][i])));
+  const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||data.shelvesByKind[kind].at(-1)||'Collection'});
+  const choices=kind==='books'?[['book','Book','Libro'],['comic','Comic book','Cómic']]:
+   kind==='films'?[['film','Film','Película'],['series','TV series','Serie de TV']]:
+   [['vinyl','Vinyl record','Disco de vinilo'],['digital','Digital album','Álbum digital']];
+  const mediaType=h('select',{},choices.map(([value,en,es])=>
+   h('option',{value,selected:(row?.mediaType||choices[0][0])===value},language()==='es'?es:en)));
+  const error=h('p',{class:'form-error',role:'alert'});
+  const fields=[field(L().name,title),field(L().creator,creator),field(L().status,status),
+   field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),
+   field(L().rating,rating),field(L().cover,coverUrl),
+   field(language()==='es'?'Subir portada':'Upload cover',upload)];
+  let interiorPages=[];
+  const ready=kind==='books'?pagesFor(row?.id).then(saved=>{interiorPages=saved;drawPages();}):
+    Promise.resolve();
+  const preview=h('div',{class:'media-interior-edit-grid'});
+  function drawPages(){
+   replace(preview,...interiorPages.map((item,index)=>
+    h('div',{class:'media-interior-edit-item'},
+     h('img',{src:item.src,alt:item.caption||`Page ${index+1}`}),
+     h('input',{type:'text',maxlength:100,value:item.caption||'',
+      placeholder:language()==='es'?'Descripción':'Caption','aria-label':`Page ${index+1} caption`,
+      oninput:event=>{item.caption=clamp(event.target.value,100);dirty=true;}}),
+     h('button',{class:'btn small',type:'button',onclick:()=>{
+      interiorPages.splice(index,1);dirty=true;drawPages();
+     }},language()==='es'?'Quitar':'Remove'))));
+  }
+  if(kind==='books'){
+   const interiorUpload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp',multiple:true,
+    'aria-label':language()==='es'?'Añadir páginas interiores':'Add interior pages',
+    onchange:async event=>{
+     // currentTarget is cleared after the first await; keep the input reference.
+     const chooser=event.currentTarget,chosen=[...chooser.files];
+     error.textContent='';
+     try{
+      await ready;
+      if(interiorPages.length+chosen.length>8)
+       throw Error(language()==='es'?'Máximo 8 imágenes.':'Maximum 8 interior images.');
+      const images=await Promise.all(chosen.map(convertInteriorImage));
+      interiorPages.push(...images);dirty=true;drawPages();
+     }catch(e){error.textContent=e.message||'Could not add pages.';}
+     finally{chooser.value='';}
+    }});
+   fields.push(h('section',{class:'media-interior-editor'},
+    h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
+    h('p',{class:'media-inner-privacy'},language()==='es'?
+      'Adjunta hasta 8 imágenes. Solo en este dispositivo; no se sincronizan.':
+      'Attach up to 8 images. Stored only on this device, not synced.'),
+    interiorUpload,preview));
+  }
+  fields.push(field(L().notes,notes),error);
+  const form=h('div',{class:'form media-editor'},...fields);
+  form.addEventListener('input',()=>{dirty=true;});
+  const saveButton=h('button',{class:'btn primary',type:'button',onclick:async()=>{
+   error.textContent='';
+   if(!title.value.trim()){error.textContent=L().name+' required';return;}
+   const rawRating=rating.value.trim();
+   const parsed=rawRating===''?null:Number(rawRating);
+   if(parsed!==null&&(!Number.isFinite(parsed)||parsed<0||parsed>10||
+       Math.abs(parsed*2-Math.round(parsed*2))>1e-8)){
+    error.textContent=language()==='es'?'Usa una calificación entre 0 y 10, en pasos de 0,5.':
+      'Enter a rating from 0 to 10 in steps of 0.5.';return;
+   }
+   let image=coverUrl.value.trim()||row?.cover||'';
+   if(image&&!/^https:\/\//.test(image)&&!image.startsWith('data:image/')){
+    error.textContent='HTTPS required';return;
+   }
+   saveButton.disabled=true;
+   try{
+    await ready;
+    if(upload.files?.length){
+     const file=upload.files[0];
+     if(file.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(file.type))
+      throw Error('PNG/JPEG/WebP, 120 KB max');
+     image=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);reader.onerror=reject;
+      reader.readAsDataURL(file);
+     });
+    }
+    const input={id:draftId,title:clamp(title.value,120).trim(),
+     creator:clamp(creator.value,150).trim(),status:status.value,mediaType:mediaType.value,
+     shelf:shelf.value.trim()||'Collection',rating:parsed,cover:image,
+     notes:clamp(notes.value,10000)};
+    await commit(draft=>{
+     const records=draft[kind],index=records.findIndex(item=>item.id===draftId);
+     if(index>=0)records[index]={...records[index],...input};
+     else records.push({...row,...input,journal:row?.journal||[]});
+     if(!draft.shelvesByKind[kind].includes(input.shelf))
+      draft.shelvesByKind[kind].push(input.shelf);
+    });
+    if(kind==='books')await store.meta.set(localPagesKey(draftId),interiorPages);
+    // Check what is actually persisted, rather than trusting an old UI object.
+    const saved=normalizeData(await store.getSetting(KEY))[kind].find(item=>item.id===draftId);
+    if(!saved||saved.rating!==parsed||saved.status!==input.status||
+       saved.title!==input.title)throw Error('Saved entry could not be verified.');
+    dirty=false;page={entry:saved,editing:false};render();toast(L().save);
+   }catch(e){
+    console.error('Could not persist media edits',e);
+    error.textContent=(language()==='es'?'No se guardó. ':'Not saved. ')+(e.message||'Try again.');
+   }finally{saveButton.disabled=false;}
+  }},L().save);
+  return h('div',{},form,saveButton);
  }
  function render(){
    const tabs=h('div',{class:'hub-tabs media-category-tabs','aria-label':L().library},
@@ -124,10 +312,13 @@ export function createMediaLibraryView({store,backups=null}) {
     onNewShelf:async()=>{
      const kind=active,name=prompt(L().newShelf)?.trim().slice(0,60);
      if(!name||shelfNames(kind).some(x=>x.toLocaleLowerCase()===name.toLocaleLowerCase()))return;
-     data.shelvesByKind[kind].push(name);
      query='';statusFilter='all';shelfMode=true;
-     try{await save();if(active===kind&&!page)render();}
-     catch(error){console.error('Could not save new media shelf',error);toast(language()==='es'?'No se pudo guardar el estante.':'Could not save shelf.');}
+     try{
+      await commit(draft=>{
+       if(!draft.shelvesByKind[kind].includes(name))draft.shelvesByKind[kind].push(name);
+      });
+      if(active===kind&&!page)render();
+     }catch(error){console.error('Could not save new media shelf',error);toast(language()==='es'?'No se pudo guardar el estante.':'Could not save shelf.');}
     },
     onAdd:()=>show(null,true)
    });

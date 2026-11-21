@@ -1,33 +1,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {createStore} from '../js/data/store.js';
 import {createMemoryAdapter} from '../js/data/adapters.js';
 import {REQUESTED_MEDIA,ensureRequestedMedia,markRequestedMediaRemoved} from '../js/data/library-starter.js';
 import {blockedHost,blockedAddress,allowedUrl} from '../supabase/functions/feed-proxy/safe-target.js';
 
 const source=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
-test('requested comic and animated TV series seed once, preserve existing media and never respawn after deletion',async()=>{
+test('public library has no personalized starter entries and retains account-only items',async()=>{
  const store=createStore({adapter:createMemoryAdapter()});
- const old={books:[{id:'pre-existing',title:'Another book',notes:'keep'}],films:[],albums:[{id:'album',title:'Existing record'}]};
- await store.setSetting('other_media_library_v1',old);
- // Repair even when an older app wrongly recorded its one-time seed marker.
- await store.setSetting('media_requested_additions_20261121',true);
- assert.equal(await ensureRequestedMedia(store),true);
- let data=await store.getSetting('other_media_library_v1');
- assert.equal(data.books.length,2);
- assert.equal(data.films.length,1);
- assert.equal(data.albums.length,1);
- assert.equal(data.books.find(x=>x.title===REQUESTED_MEDIA.books.title).mediaType,'comic');
- assert.equal(data.films[0].title,'Invader Zim');
- assert.equal(data.films[0].mediaType,'series');
- assert.equal(data.books[0].notes,'keep');
+ const existing={books:[{id:'b1',title:'Sample Book',notes:'keep'}],films:[],
+  albums:[{id:'a1',title:'Sample Album'}]};
+ await store.setSetting('other_media_library_v1',existing);
+ assert.deepEqual(REQUESTED_MEDIA,{});
  assert.equal(await ensureRequestedMedia(store),false);
- await markRequestedMediaRemoved(store,'books','Johnny the Homicidal Maniac');
- data.books=data.books.filter(x=>x.title!=='Johnny the Homicidal Maniac');
- await store.setSetting('other_media_library_v1',data);
- assert.equal(await ensureRequestedMedia(store),false);
- assert.equal((await store.getSetting('other_media_library_v1')).books.length,1);
+ assert.deepEqual(await store.getSetting('other_media_library_v1'),existing);
+ assert.equal(await markRequestedMediaRemoved(store,'books','Sample Book'),false);
+});
+test('public source contains no private credentials or user-specific media defaults',t=>{
+ const root=fileURLToPath(new URL('../',import.meta.url));
+ if(!existsSync(root+'/.git')){t.skip('Git checkout unavailable');return;}
+ const tracked=execFileSync('git',['ls-files','-z'],{cwd:root}).toString('utf8').split('\0').filter(Boolean);
+ const issues=[];
+ const sensitiveNames=/(?:^|\/)(?:\.env|[^/]+\.(?:pem|p12|pfx|sqlite|db))$/i;
+ const secretShapes=[
+  /sb_secret_[A-Za-z0-9_-]{16,}/,
+  /github_pat_[A-Za-z0-9_]{32,}/,
+  /gh[pousr]_[A-Za-z0-9]{28,}/,
+  /sk-(?:live|proj)-[A-Za-z0-9_-]{28,}/,
+  /-{5}BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE KEY-{5}/,
+  /eyJ[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/
+ ];
+ for(const path of tracked){
+  if(sensitiveNames.test(path)&&!path.startsWith('tests/fixtures/'))issues.push(path+': private filename');
+  if(!/\.(?:js|mjs|ts|json|py|yml|yaml|md|sql|env|html|txt|css)$/.test(path))continue;
+  const text=readFileSync(root+'/'+path,'utf8');
+  if(secretShapes.some(pattern=>pattern.test(text)))issues.push(path+': credential-shaped value');
+ }
+ assert.deepEqual(issues,[]);
+ assert.equal(Object.keys(REQUESTED_MEDIA).length,0,'No personal media should be seeded for forks');
 });
 test('feeds cannot target localhost, private or metadata IPs, credentials, or nonstandard ports',()=>{
  for(const host of ['localhost','router.local','metadata.internal','127.0.0.1','169.254.169.254','[::1]','127.0.0.1.nip.io.local'])
