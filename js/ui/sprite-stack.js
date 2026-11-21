@@ -90,3 +90,77 @@ export function renderLayeredSprite(grid,options={}){
   '<g class="sprite-stack-direction sprite-stack-direction-a">'+rects(a)+'</g>'+
   '<g class="sprite-stack-direction sprite-stack-direction-b">'+rects(b)+'</g></svg>';
 }
+
+
+// True orthographic input: TOP is [length][width], SIDE is [height][length],
+// FRONT and BACK are [height][width]. Transparent pixels are null. These
+// constraints are deliberately strict: inconsistent views must be corrected
+// rather than guessed from unknown AI sheet padding or perspective.
+export function slicesFromOrthographicViews(views){
+ const top=cleanGrid(views?.top),side=cleanGrid(views?.side);
+ const front=cleanGrid(views?.front),back=cleanGrid(views?.back);
+ if(!top.length||!side.length||!front.length||!back.length)
+  throw Error('Sprite stacking needs top, side, front and back pixel views.');
+ const width=top[0].length,length=top.length,height=front.length;
+ if(front[0].length!==width||back[0].length!==width||back.length!==height||
+    side.length!==height||side[0].length!==length)
+  throw Error('Orthographic sprite views must have matching widths, lengths and heights.');
+ const layers=[];
+ for(let z=0;z<height;z++){
+  const frontRow=front[height-z-1],backRow=back[height-z-1],
+    sideRow=side[height-z-1],cells=[];
+  for(let y=0;y<length;y++)for(let x=0;x<width;x++){
+   if(!top[y][x]||!sideRow[y]||!frontRow[x]||!backRow[width-x-1])continue;
+   const color=y===length-1?frontRow[x]:
+     y===0?backRow[width-x-1]:
+     x===0||x===width-1?sideRow[y]:top[y][x];
+   cells.push({x,y,color});
+  }
+  layers.push(cells);
+ }
+ return {width,length,layers};
+}
+function projectOrthographic({width,length,layers},{angle,squash,spacing}){
+ const angleRad=angle*Math.PI/180,c=Math.cos(angleRad),s=Math.sin(angleRad);
+ const pixels=new Map();
+ for(let z=0;z<layers.length;z++){
+  for(const {x,y,color} of layers[z]){
+   const dx=x-(width-1)/2,dy=y-(length-1)/2;
+   const sx=Math.round(dx*c-dy*s),
+     sy=Math.round((dx*s+dy*c)*squash)-Math.round(z*spacing);
+   pixels.set(sx+','+sy,color);
+  }
+ }
+ const finished=new Map();
+ for(const key of pixels.keys()){
+  const [x,y]=key.split(',').map(Number);
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+   const k=(x+dx)+','+(y+dy);
+   if(!pixels.has(k))finished.set(k,OUTLINE);
+  }
+ }
+ for(const [k,v] of pixels)finished.set(k,v);
+ return finished;
+}
+function svgFrames(frames,{slices,source}){
+ const positions=frames.flatMap(frame=>[...frame.pixels.keys()].map(k=>k.split(',').map(Number)));
+ if(!positions.length)return '';
+ const minX=Math.min(...positions.map(v=>v[0])),maxX=Math.max(...positions.map(v=>v[0]));
+ const minY=Math.min(...positions.map(v=>v[1])),maxY=Math.max(...positions.map(v=>v[1]));
+ const side=Math.max(maxX-minX+5,maxY-minY+5),
+   bx=Math.floor((minX+maxX-side)/2),by=Math.floor((minY+maxY-side)/2);
+ return '<svg class="sprite-stacked-asset" xmlns="http://www.w3.org/2000/svg" viewBox="'+bx+' '+by+' '+side+' '+side+
+   '" shape-rendering="crispEdges" aria-hidden="true" focusable="false" data-stack-slices="'+slices+
+   '" data-stack-source="'+source+'">'+
+   frames.map(({pixels},i)=>'<g class="sprite-stack-direction sprite-stack-direction-'+(i?'b':'a')+'">'+rects(pixels)+'</g>').join('')+'</svg>';
+}
+export function renderOrthographicSprite(views,options={}){
+ const slices=slicesFromOrthographicViews(views);
+ const squash=Math.max(.35,Math.min(1,Number(options.squash)||.75)),
+  spacing=Math.max(.5,Math.min(2,Number(options.spacing)||1));
+ const angle=Number.isFinite(options.angle)?options.angle:-42,
+  hoverAngle=Number.isFinite(options.hoverAngle)?options.hoverAngle:42;
+ return svgFrames([angle,hoverAngle].map(a=>({
+  pixels:projectOrthographic(slices,{angle:a,squash,spacing}),
+ })),{slices:slices.layers.length,source:'four-views'});
+}
