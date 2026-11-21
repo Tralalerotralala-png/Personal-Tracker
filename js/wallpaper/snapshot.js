@@ -84,6 +84,9 @@ export function loadCachedSnapshot(fingerprint, storage = globalThis.localStorag
   } catch { return null; }
 }
 
+export function clearCachedSnapshot(storage = globalThis.localStorage) {
+  try { storage.removeItem(CACHE_KEY); } catch { /* unavailable */ }
+}
 export function saveCachedSnapshot(fingerprint, snapshot, storage = globalThis.localStorage) {
   try { storage.setItem(CACHE_KEY, JSON.stringify({ fingerprint, snapshot, savedAt: new Date().toISOString() })); } catch { /* storage full or unavailable */ }
 }
