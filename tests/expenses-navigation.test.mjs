@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {weatherIconSvg,glyphSvg} from '../js/ui/pixel-icon.js';
-import { normalizeTransaction, summarizeTransactions, calculateBill, exportTransactionsCsv, importTransactionsCsv, parseCsv } from '../js/ui/expenses.js';
+import { normalizeTransaction, summarizeTransactions, calculateBill, exportTransactionsCsv, importTransactionsCsv, parseCsv, uniqueTransactionsForImport } from '../js/ui/expenses.js';
 const code = path => readFileSync(new URL(`../${path}`, import.meta.url),'utf8');
 test('Personal Hub and Expenses are real main-area routes',()=>{
   const app=code('js/app.js');
@@ -46,4 +46,30 @@ test('expense chart is a detailed full color icon',()=>{
  const svg=glyphSvg('expenses');
  assert.match(svg,/viewBox="0 0 24 24"/);
  assert.ok(new Set([...svg.matchAll(/fill="(#[0-9a-f]+)"/g)].map(m=>m[1])).size>=10);
+});
+
+
+test('finance CSV import excludes duplicates within one file and already-saved entries',()=>{
+ const batch=importTransactionsCsv([
+  'date,type,title,amount,currency,category,account,notes,repeat',
+  '2026-11-20,expense,Same,19.25,MXN,Food,Card,Lunch,none',
+  '2026-11-20,expense,Same,19.25,MXN,Food,Card,Lunch,none',
+  '2026-11-20,expense,Same,19.25,MXN,Food,Cash,Lunch,none',
+  '2026-11-20,expense,Same,19.25,MXN,Food,Card,Dinner,none',
+ ].join('\\n'));
+ const newRows=uniqueTransactionsForImport(batch,[]);
+ assert.equal(newRows.length,3,'Duplicate within a single upload must only import once');
+ assert.deepEqual(newRows.map(x=>x.account),['Card','Cash','Card']);
+ const againstExisting=uniqueTransactionsForImport(batch,[newRows[0]]);
+ assert.equal(againstExisting.length,2);
+ assert.equal(uniqueTransactionsForImport(batch,newRows).length,0);
+});
+
+test('transaction CSV dedupe preserves distinct notes, repeat plans and delimiter characters',()=>{
+ const common={due:'2026-11-20',type:'expense',title:'Food | dinner',amount:12.5,
+  currency:'MXN',category:'Groceries',account:'Card',body:'Lunch',repeat:'none'};
+ const rows=[common,{...common,body:'Dinner'},{...common,repeat:'weekly'},
+  {...common,category:'Groceries | shared'}];
+ assert.equal(uniqueTransactionsForImport(rows).length,4);
+ assert.equal(uniqueTransactionsForImport([common,common],[]).length,1);
 });
