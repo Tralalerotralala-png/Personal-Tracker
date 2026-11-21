@@ -872,7 +872,7 @@ html[data-layout-width="compact"] main{max-width:1100px}
 
 /* Compact weather icons and currency conversion widget. */
 .w-stats{grid-template-columns:repeat(3,minmax(0,1fr));height:auto;min-height:64px}
-.w-forecast-cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;width:100%;min-height:0}
+.w-forecast-cards{display:grid;gap:7px;width:100%;min-height:0}
 .w-forecast-day{min-width:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;padding:9px 3px;background:var(--panel-2);border:1px solid var(--edge);text-align:center}
 .w-forecast-day.today{border-color:var(--accent)}.w-forecast-label{font-size:.8em;color:var(--ink-dim)}
 .w-forecast-icon{width:30px;height:30px;color:var(--accent);display:flex;align-items:center;justify-content:center}
@@ -890,7 +890,7 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .journal-editor-head,.journal-editor-actions{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .journal-inline-editor .form{display:grid;gap:10px;width:min(100%,900px);margin-inline:auto}
 .journal-inline-editor textarea{min-height:190px;width:100%;resize:vertical}
-@media(max-width:700px){.w-forecast-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.w-forecast-day{padding:7px 2px}}
+@media(max-width:700px){.w-forecast-day{padding:7px 2px}}
 
 /* Compact unified weather / clock / ground view. */
 .w-analog-clock { width: 66px; height: 66px; flex: 0 0 66px; image-rendering: pixelated; }
@@ -1428,7 +1428,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .widget .w-mud-dashboard .w-mud-now { min-height:0; }
 .widget .w-mud-dashboard .w-forecast-cards {
   display:grid;
-  grid-template-columns:repeat(6,minmax(0,1fr));
   grid-template-rows:minmax(0,1fr);
   justify-content:center;
   align-items:stretch;
@@ -1959,7 +1958,7 @@ svg:has(>.sprite-stack-face){overflow:visible;}
 .widget-body :is(button,input,select,textarea){min-width:0;max-width:100%;}
 .widget-body :is(.w-title,.w-meta,.w-note,.w-weather-place,.w-mud-place){overflow-wrap:anywhere;}
 .widget .w-mud-dashboard,.widget .w-mud-dashboard .w-mud-bottom,.widget .w-mud-dashboard .w-mud-compact{height:auto;min-height:0;overflow:visible;grid-template-rows:auto auto;}
-.widget .w-mud-dashboard .w-forecast-cards{height:auto;min-height:0;overflow:visible;grid-template-columns:repeat(auto-fit,minmax(min(100%,78px),1fr));grid-auto-rows:minmax(100px,auto);grid-template-rows:none;}
+.widget .w-mud-dashboard .w-forecast-cards{height:auto;min-height:0;overflow:visible;grid-auto-rows:minmax(100px,auto);grid-template-rows:none;}
 .widget .w-mud-dashboard .w-forecast-day{height:auto;min-height:100px;overflow:visible;}
 .widget .w-mud-dashboard .w-forecast-condition,.widget .w-mud-dashboard .w-clock-date{display:block;}
 .widget .w-mud-dashboard .w-forecast-day .mud-bar{display:flex;}
@@ -2319,14 +2318,14 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
    The wallpaper uses noninteractive divs with the same geometry. */
 button.w-forecast-day{appearance:none;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;}
 button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px;}
-/* Forecast columns fill the desktop; incomplete last rows stay centered on narrow widgets. */
-.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(var(--forecast-day-count,7),minmax(0,1fr));}
+/* Auto-fit collapses unused tracks: 1–7 forecast days always fill the wide card. */
+.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,78px),1fr));}
 @container widget (max-width:650px){
  .widget.wd-mud .w-forecast-cards{
   display:flex;flex-wrap:wrap;justify-content:center;align-content:start;
   --forecast-wrap-gap:4px;column-gap:var(--forecast-wrap-gap);row-gap:var(--forecast-wrap-gap);
  }
- .widget.wd-mud .w-forecast-day{flex:0 0 calc((100% - 3 * var(--forecast-wrap-gap))/4);}
+ .widget.wd-mud .w-forecast-day{flex:1 1 calc((100% - 3 * var(--forecast-wrap-gap))/4);}
 }
 @container widget (max-width:330px){
  .widget.wd-mud .w-forecast-day{flex-basis:calc((100% - 2 * var(--forecast-wrap-gap))/3);}
