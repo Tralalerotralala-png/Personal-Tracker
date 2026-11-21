@@ -353,15 +353,15 @@ async function renderGlobalSearch() {
     ...items.map(x => ({ type: t('Pack'), title: x.name, detail: x.notes || '', target: 'inventory', itemId: x.id })),
     ...events.map(x => ({ type: t('Calendar'), title: x.title, detail: x.notes || '', target: 'calendar', eventId: x.id, dateKey: startParts(x).key })),
     ...places.map(x => ({ type: t('Places'), title: x.name, detail: x.notes || '', target: 'inventory' })),
-    ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', hub: true })),
-    ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', hub: true })),
-    ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', target: 'expenses' })),
+    ...hub.task.map(x => ({ type: t('Task'), title: x.title, detail: x.body || '', deepLink:{target:'hub',kind:'task',id:x.id} })),
+    ...hub.note.map(x => ({ type: t('Note'), title: x.title, detail: x.body || '', deepLink:{target:'hub',kind:'note',id:x.id} })),
+    ...hub.expense.map(x => ({ type: t('Expense'), title: x.title, detail: x.category || '', deepLink:{target:'expenses',kind:'expense',id:x.id} })),
     ...(Array.isArray(gameLibrary?.games)?gameLibrary.games:[]).map(x=>({
-      type:languageLabel('Game','Juego'),title:x.title,detail:[x.platform,x.notes,x.status].filter(Boolean).join(' '),target:'games'
+      type:languageLabel('Game','Juego'),title:x.title,detail:[x.platform,x.notes,x.status].filter(Boolean).join(' '),deepLink:{target:'games',kind:'game',id:x.id}
     })),
     ...['books','films','albums'].flatMap(kind=>(Array.isArray(otherMedia?.[kind])?otherMedia[kind]:[]).map(x=>({
       type:languageLabel(kind==='books'?'Book':kind==='films'?'Film':'Album',kind==='books'?'Libro':kind==='films'?'Película':'Álbum'),
-      title:x.title,detail:[x.creator,x.notes,x.status].filter(Boolean).join(' '),target:'games'
+      title:x.title,detail:[x.creator,x.notes,x.status].filter(Boolean).join(' '),deepLink:{target:'games',kind,id:x.id}
     }))),
   ];
   const found = entries.filter(x => searchFold(`${x.title || ''} ${x.detail} ${x.type}`).includes(query)).slice(0, 12);
@@ -379,6 +379,14 @@ async function renderGlobalSearch() {
       }));
       if(location.hash==='#calendar')void calendar.show();
       else location.hash='#calendar';
+    }else if(entry.deepLink){
+      // The existing view owns its editor and loads records itself. Queue a
+      // validated id-based selection without copying any private row into a
+      // global object or URL. Also handle searches within the current route.
+      window.dispatchEvent(new CustomEvent('tracker-search-open',{detail:entry.deepLink}));
+      const target='#'+entry.deepLink.target;
+      if(location.hash===target)void VIEWS[entry.deepLink.target].show?.();
+      else location.hash=target;
     }else if (entry.hub) openPersonalHub({ store });
     else location.hash = `#${entry.target}`;
   } }, h('span', {}, entry.title || entry.type), h('small', {}, entry.type))) : [h('p', { class: 'hint' }, t('No matching results.'))]));
