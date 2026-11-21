@@ -9,6 +9,17 @@ import { clone } from './util.js';
 const keyOf = (store, value) =>
   store === 'outbox' || store === 'meta' ? value.key : value[TABLES[store].pk];
 
+// Preserve a losing offline edit before applying a newer server row. The same
+// record shape is exported by Settings > Export conflicting edits. Keep this
+// separate from the push-conflict path, because a user may edit a record while
+// a long-running pull is still in flight.
+const remoteConflict=(table,id,local)=> {
+  const savedAt=new Date().toISOString();
+  const key='sync-conflict:'+table+':'+id+':'+Date.now()+':'+Math.random().toString(36).slice(2);
+  return {key,value:{table,id,local,savedAt,
+    reason:'Server replaced a pending local edit during download'}};
+};
+
 // In-memory adapter: used by the tests, and as a fallback when IndexedDB is
 // unavailable (e.g. some private-browsing modes). Data is lost on reload.
 export function createMemoryAdapter() {
@@ -45,11 +56,15 @@ export function createMemoryAdapter() {
       s('outbox').delete(key);return true;
     },
     async applyRemoteRow(table,row) {
-      const id=keyOf(table,row),current=s(table).get(id);
+      const id=keyOf(table,row),current=s(table).get(id),key=table+':'+id;
       if(current && current.updated_at>row.updated_at)return false;
       const same=current&&current.updated_at===row.updated_at&&current.synced_at===row.synced_at;
+      if(current&&s('outbox').has(key)&&!same){
+        const copy=remoteConflict(table,id,current);
+        s('meta').set(copy.key,clone(copy));
+      }
       if(!same)s(table).set(id,clone(row));
-      s('outbox').delete(table+':'+id);
+      s('outbox').delete(key);
       return !same;
     },
   };
@@ -109,14 +124,24 @@ export async function openIdbAdapter(dbName) {
         tx.objectStore('outbox').delete(key);done(true);
       };
     }),
-    applyRemoteRow:(table,row)=>atomic([table,'outbox'],(tx,done)=>{
-      const id=keyOf(table,row),req=tx.objectStore(table).get(id);
+    applyRemoteRow:(table,row)=>atomic([table,'outbox','meta'],(tx,done)=>{
+      const id=keyOf(table,row),key=table+':'+id;
+      const req=tx.objectStore(table).get(id);
       req.onsuccess=()=>{
         const current=req.result;
         if(current&&current.updated_at>row.updated_at){done(false);return;}
         const same=current&&current.updated_at===row.updated_at&&current.synced_at===row.synced_at;
-        if(!same)tx.objectStore(table).put(row);
-        tx.objectStore('outbox').delete(table+':'+id);done(!same);
+        // Read the pending marker in the SAME transaction as the replacement.
+        // If the user edited mid-sync, keep a recoverable copy instead of
+        // deleting the only record of the unsynced edit.
+        const marker=tx.objectStore('outbox').get(key);
+        marker.onsuccess=()=>{
+          if(current&&marker.result&&!same)
+            tx.objectStore('meta').put(remoteConflict(table,id,current));
+          if(!same)tx.objectStore(table).put(row);
+          tx.objectStore('outbox').delete(key);
+          done(!same);
+        };
       };
     }),
     getAll: (name) => run(name, 'readonly', (s) => s.getAll()),
