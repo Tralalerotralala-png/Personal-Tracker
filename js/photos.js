@@ -8,6 +8,7 @@
 // Other devices fetch it through a short-lived signed link and cache it too.
 
 const MAX_DIM = 800;
+const MAX_PHOTO_BYTES = 1024 * 1024; // Matches the private Supabase Storage bucket
 const BUCKET = 'item-photos';
 
 // Pure: the size to scale a w x h image down to so its longest side is <= max.
@@ -50,13 +51,27 @@ export async function downscaleImage(file, { max = MAX_DIM } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  canvas.getContext('2d').drawImage(bmp, 0, 0, width, height);
+  const ctx=canvas.getContext('2d');
+  if(!ctx)throw new Error('Could not prepare this photo on your device.');
+  ctx.drawImage(bmp, 0, 0, width, height);
   bmp.close?.();
   // Safari quietly returns PNG when asked for WebP; PNGs of photos are far
   // too big for the 1 MB bucket limit, so fall back to JPEG.
   let blob = await canvasToBlob(canvas, 'image/webp', 0.8);
   if (!blob || blob.type !== 'image/webp') blob = await canvasToBlob(canvas, 'image/jpeg', 0.82);
   if (!blob) throw new Error('Could not compress that image.');
+  if(blob.size>MAX_PHOTO_BYTES){
+    // Busy/photographic images sometimes remain larger than Storage allows
+    // even at 800 px. Try stronger compression before giving up.
+    for(const [type,quality] of [['image/webp',0.62],['image/jpeg',0.68],['image/jpeg',0.46]]){
+      const smaller=await canvasToBlob(canvas,type,quality);
+      if(smaller&&['image/webp','image/jpeg'].includes(smaller.type)&&smaller.size<blob.size)
+        blob=smaller;
+      if(blob.size<=MAX_PHOTO_BYTES)break;
+    }
+  }
+  if(blob.size>MAX_PHOTO_BYTES)
+    throw new Error('This photo is too large after compression. Choose a smaller image.');
   return blob;
 }
 
