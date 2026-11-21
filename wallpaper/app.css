@@ -2324,3 +2324,59 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
  dialog.sheet:not(.small) .day-hourly-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
  dialog.sheet:not(.small) .day-hourly-svg svg{min-height:64px;}
 }
+
+
+/* B2 daily dialogues: compact, spoken two-turn practice. Show the first
+   utterance in the dashboard and reveal the response and pragmatic notes on
+   demand; retain the original per-character beginner UI for archived days. */
+.phrase-b2-panel{display:grid;align-content:start;gap:9px;min-width:0}
+.phrase-b2-panel .phrase-heading{margin-bottom:0;align-items:center}
+.phrase-b2-context{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;min-width:0}
+.phrase-b2-context strong{font-size:.94rem;font-weight:600;color:var(--ink)}
+.phrase-b2-context small{font-size:.72rem;color:var(--ink-dim)}
+.phrase-b2-pattern{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;
+ border-left:3px solid var(--accent);background:var(--panel-2);padding:6px 9px;
+ min-width:0;line-height:1.35}
+.phrase-b2-pattern small,.phrase-b2-language>small,.phrase-b2-expressions>small{
+ font-size:.64rem;letter-spacing:.075em;color:var(--ink-dim)}
+.phrase-b2-pattern span{font-size:.78rem;color:var(--accent);overflow-wrap:anywhere}
+.phrase-b2-turn-head{display:flex;align-items:baseline;justify-content:space-between;
+ flex-wrap:wrap;gap:4px 8px;border-bottom:1px solid var(--edge);padding-bottom:3px}
+.phrase-b2-turn-head>b{font-size:.76rem;color:var(--ink);font-weight:600}
+.phrase-b2-turn-head>small{font-size:.67rem;color:var(--ink-dim)}
+.phrase-b2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px}
+.phrase-b2-language{min-width:0}
+.phrase-b2-language .phrase-b2-utterance{font-size:.99rem;line-height:1.45;
+ margin:4px 0 0;overflow-wrap:anywhere;white-space:normal}
+.phrase-b2-language[lang="zh-Hans"] .phrase-b2-utterance{font-size:1.09rem;line-height:1.52}
+.phrase-b2-language .phrase-pronunciation{font-size:.72rem;line-height:1.4;margin:4px 0 0}
+.phrase-b2-english{margin:0;color:var(--ink-dim);font-size:.79rem;line-height:1.4;font-style:italic}
+.phrase-b2-toggle{justify-self:start;margin-top:2px;min-height:30px}
+.phrase-b2-answer{display:grid;gap:8px;padding-top:11px;border-top:1px solid var(--edge)}
+.phrase-b2-answer[hidden]{display:none}
+.phrase-b2-tip{display:grid;gap:4px;padding:8px;border:1px solid var(--edge);background:var(--panel-2)}
+.phrase-b2-tip strong{font-size:.76rem;color:var(--accent)}
+.phrase-b2-tip p{margin:0;font-size:.78rem;line-height:1.5}
+.phrase-b2-expressions{display:grid;gap:5px}
+.phrase-b2-vocab{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1fr) minmax(0,1fr);
+ gap:5px 10px;align-items:start;border-bottom:1px dotted var(--edge);padding:4px 0;
+ font-size:.76rem;line-height:1.35;overflow-wrap:anywhere}
+.phrase-b2-vocab small{color:var(--ink-dim);font-size:.72rem}
+@media(max-width:650px){.phrase-b2-grid{grid-template-columns:minmax(0,1fr)}}
+.widget.wd-phrase .phrase-b2-panel{padding:8px 10px;gap:6px}
+.widget.wd-phrase .phrase-b2-context strong{font-size:.83rem}
+.widget.wd-phrase .phrase-b2-pattern{padding:3px 6px;gap:4px 7px}
+.widget.wd-phrase .phrase-b2-pattern span{font-size:.71rem}
+.widget.wd-phrase .phrase-b2-language .phrase-b2-utterance{font-size:.84rem;line-height:1.3}
+.widget.wd-phrase .phrase-b2-language[lang="zh-Hans"] .phrase-b2-utterance{font-size:.94rem}
+.widget.wd-phrase .phrase-b2-language .phrase-pronunciation{font-size:.68rem;line-height:1.3}
+.widget.wd-phrase .phrase-b2-english{font-size:.71rem}
+.widget.wd-phrase .phrase-b2-turn-head{padding-bottom:1px}
+.widget.wd-phrase .phrase-b2-answer{padding-top:6px}
+@container (max-width:440px){.widget.wd-phrase .phrase-b2-grid{grid-template-columns:1fr}}
+@container (max-width:300px){
+ .widget.wd-phrase .phrase-b2-context small{display:none}
+ .widget.wd-phrase .phrase-b2-pattern small{display:none}
+ .widget.wd-phrase .phrase-b2-language .phrase-pronunciation{font-size:.63rem}
+}
+.phrase-history-row .phrase-history-topic{font-weight:600}
