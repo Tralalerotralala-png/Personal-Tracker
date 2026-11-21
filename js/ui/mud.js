@@ -1,6 +1,7 @@
 // The Mud tab: today's answer first, then five observed days, today, and five
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
+import {dayHourlyPlaceholder} from './day-hourly.js';
 import { t, language } from './language.js';
 import { isNightAtLocation, moonPhaseSvg } from '../weather/moon-phase.js';
 import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, skyEventInformation } from '../weather/sky-events.js';
@@ -44,6 +45,7 @@ export function openDayDetail(row, weather) {
       h('div', { class: 'detail-head' }, mudChip(row), h('span', { class: 'detail-wx', html: glyphSvg(g.glyph) }), h('span', {}, localizedWeather(g.text))),
       mudBar(row),
       h('p', { class: 'prose' }, `${localizedMudWhy(row.why)}.`),
+      dayHourlyPlaceholder(row.date,weather),
       h('p', { class: 'hint' }, row.phase === 'past' ? 'Observed: weather that already happened.' : row.phase === 'today' ? 'Today: part observed, part forecast.' : 'Forecast: expected weather, which can change.'),
       h('h3', { class: 'detail-h' }, 'How the score was built'),
       h('table', { class: 'detail-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Factor'), h('th', {}, 'Score'), h('th', {}, 'Adds'))), h('tbody', {}, factors)),
@@ -127,8 +129,8 @@ export function createMudView({ store, weather }) {
     const temp = current?.temperature_2m;
     const number = (value, unit = '') => typeof value === 'number' ? `${Math.round(value)}${unit}` : '—';
     const stat = (label, value) => h('div', { class: 'wx-stat' }, h('span', { class: 'wx-stat-label' }, label), h('strong', {}, value));
-    const days = [today, ...future].slice(0, 6);
-    return h('section', { class: 'wx-panel', 'aria-label': 'Weather conditions and six day outlook' },
+    const days = [today, ...future].slice(0, 7);
+    return h('section', { class: 'wx-panel', 'aria-label': 'Weather conditions and seven day outlook' },
       h('div', { class: 'wx-heading' }, h('h3', {}, t('Weather')), h('span', { class: 'hint' }, current ? 'Current conditions' : 'Daily forecast')),
       h('div', { class: 'wx-hero' },
         h('div', { class: `wx-scene wx-${kind}`, 'aria-hidden': 'true' },
@@ -161,7 +163,7 @@ export function createMudView({ store, weather }) {
         language()==='es'
           ? ' · El estado del suelo es un cálculo meteorológico, no una medición directa. La calificación indica los datos disponibles, no una precisión comprobada.'
           : ' · Ground conditions are modeled from weather, not measured with a sensor. The rating reflects available inputs, not a verified accuracy percentage.'),
-      h('h4', { class: 'wx-outlook-title' }, t('Weather and ground — next six days')),
+      h('h4', { class: 'wx-outlook-title' }, language()==='es'?'Clima y suelo — próximos siete días':'Weather and ground — next seven days'),
       h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
         return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather), title: 'View weather and ground details' },
