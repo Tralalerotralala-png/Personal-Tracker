@@ -207,8 +207,8 @@ export function createMudView({ store, weather }) {
         const es=language()==='es';
         const info=kind==='solar_eclipse'||kind==='lunar_eclipse'
           ? (es?'La visibilidad y el horario dependen de tu ubicación. Consulta el mapa antes de planear una observación.':'Visibility and timing depend on your location. Check the visibility map before planning to watch.')
-          : kind==='moon'?(es?'La fecha de la fase lunar es aproximada.':'The moon phase date is approximate.')
-          : (es?'Fecha aproximada del máximo. El horario y las condiciones del cielo pueden variar.':'Approximate peak date. Timing and sky conditions depend on your location.');
+          : kind==='moon'?(es?'Fase lunar':'Lunar phase')
+          : (es?'Máximo de la lluvia de meteoros':'Meteor-shower peak');
         const details=skyEventInformation(event,language());
         return h('details',{class:'wx-sky-card'},
           h('summary',{},h('span',{class:'wx-event-symbol',html:kind==='moon'?moonPhaseSvg(new Date(event.date+'T12:00:00Z')):skyEventIconSvg(kind)}),
