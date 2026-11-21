@@ -55,7 +55,7 @@ const proxyHeaders = auth ? async () => {
   return session ? { Authorization: `Bearer ${session.access_token}`, apikey: ctx.config.SUPABASE_ANON_KEY } : {};
 } : undefined;
 const feed = createFeedService({ store, proxyHeaders });
-const proxySuggestion = ctx.config?.SUPABASE_URL && !/YOUR-/i.test(ctx.config.SUPABASE_URL)
+const proxySuggestion = ctx.config?.ENABLE_FEED_PROXY === true && ctx.config?.SUPABASE_URL && !/YOUR-/i.test(ctx.config.SUPABASE_URL)
   ? `${ctx.config.SUPABASE_URL.replace(/\/$/, '')}/functions/v1/feed-proxy?url={url}` : null;
 
 // ---- display settings ------------------------------------------------------------
