@@ -1,6 +1,7 @@
 // Backup / restore as one JSON file. Photos are not included (they live in
 // Supabase Storage; the rows only hold their paths).
 import { TABLE_NAMES, TABLES, normalizeRow } from './schema.js';
+import {nonLegacyJournalRow} from './purge-journal.js';
 
 export const BACKUP_APP = 'personal-tracker';
 export const BACKUP_VERSION = 1;
@@ -8,7 +9,7 @@ export const BACKUP_VERSION = 1;
 export async function exportAll(store) {
   const tables = {};
   for (const t of TABLE_NAMES) {
-    tables[t] = (await store.list(t,{includeDeleted:true})).map((row) => {
+    tables[t] = (await store.list(t,{includeDeleted:true})).filter(row=>nonLegacyJournalRow(t,row)).map((row) => {
       const { synced_at, ...rest } = row; // server-only stamp
       return rest;
     });
@@ -37,6 +38,7 @@ export function inspectBackup(data,{mode='merge'}={}){
     const seen=new Set();tables[table]=[];
     if(rows.length>100000)throw new Error('Backup table too large: '+table);
     for(const row of rows){
+      if(!nonLegacyJournalRow(table,row))continue;
       const id=row?.[TABLES[table].pk];
       if(typeof id!=='string'||!id.length){errors.push(table+'/(missing id): invalid primary key');continue;}
       if(seen.has(id))throw new Error('Duplicate backup record: '+table+'/'+id);
