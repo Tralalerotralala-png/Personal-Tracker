@@ -94,15 +94,15 @@ test('new selection waits for a prior in-flight item write before winning',()=>m
  const {store,photos}=fixture();
  await store.upsert('items',{id:ITEM,name:'Photos',photo_path:ORIGINAL});
  const started=deferred(),release=deferred();
- const originalUpsert=store.upsert.bind(store);
+ const originalUpsert=store.upsertWithMeta.bind(store);
  let blocked=false;
- store.upsert=async(table,input)=>{
+ store.upsertWithMeta=async(table,input,changes)=>{
   if(table==='items'&&input.photo_path!==ORIGINAL&&!blocked){
    blocked=true;
    started.resolve();
    await release.promise;
   }
-  return originalUpsert(table,input);
+  return originalUpsert(table,input,changes);
  };
  const first=photos.setPhoto(ITEM,{name:'first'});
  await started.promise;
@@ -119,13 +119,13 @@ test('removing during an in-flight photo commit wins after it finishes',()=>mock
  const {store,photos}=fixture();
  await store.upsert('items',{id:ITEM,name:'Photos',photo_path:ORIGINAL});
  const started=deferred(),release=deferred();
- const originalUpsert=store.upsert.bind(store);
+ const originalUpsert=store.upsertWithMeta.bind(store);
  let blocked=false;
- store.upsert=async(table,input)=>{
+ store.upsertWithMeta=async(table,input,changes)=>{
   if(table==='items'&&input.photo_path&&input.photo_path!==ORIGINAL&&!blocked){
    blocked=true;started.resolve();await release.promise;
   }
-  return originalUpsert(table,input);
+  return originalUpsert(table,input,changes);
  };
  const saving=photos.setPhoto(ITEM,{name:'first'});
  await started.promise;
