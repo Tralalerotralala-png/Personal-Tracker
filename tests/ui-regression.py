@@ -467,23 +467,62 @@ for width,height in [(390,844),(1280,900)]:
         shelf=page.locator(".media-library-view .game-shelf",has=page.locator("h3",has_text="Example comics shelf"))
         shelf.wait_for(state="visible",timeout=10000)
         assert shelf.locator(".media-empty-shelf").count()==1
-        book_card=page.locator(".media-library-view .game-book",has_text="Johnny the Homicidal Maniac")
-        book_card.wait_for(state="visible",timeout=10000)
-        book_card.click()
-        assert page.locator(".media-case-books .media-page-flip").count()==2
+        # No personal media is seeded on a fresh account.
+        assert page.locator(".media-library-view .game-book").count()==0
+        page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
+        page.locator(".media-editor input[type=text]").first.fill("Sample Illustrated Book")
+        page.locator(".media-editor input[type=number]").fill("7.5")
+        page.locator(".media-editor select").nth(1).select_option("comic")
+        # Two harmless canvas-made page images. They stay in local metadata.
+        page.locator(".media-interior-editor input[type=file]").evaluate("""async el=>{
+          const canvas=document.createElement('canvas');canvas.width=12;canvas.height=12;
+          const ctx=canvas.getContext('2d');
+          ctx.fillStyle='#e8e1d3';ctx.fillRect(0,0,12,12);
+          ctx.fillStyle='#1e304c';ctx.fillRect(3,2,6,8);
+          const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+          const transfer=new DataTransfer();
+          transfer.items.add(new File([blob],'example-left.png',{type:'image/png'}));
+          transfer.items.add(new File([blob],'example-right.png',{type:'image/png'}));
+          el.files=transfer.files;
+          el.dispatchEvent(new Event('change',{bubbles:true}));
+        }""")
+        page.locator(".media-interior-edit-item").first.wait_for(state="visible",timeout=10000)
+        assert page.locator(".media-interior-edit-item").count()==2
+        page.locator(".media-editor + .btn.primary").click()
+        page.locator(".media-case-books .media-page-flip").first.wait_for(state="visible",timeout=10000)
         assert page.locator(".media-case-books .media-case-disc").count()==0
         assert "mediaBookCover" in page.locator(".media-case-books .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        page.locator(".media-inner-page img").first.wait_for(state="visible",timeout=10000)
+        assert page.locator(".media-inner-page img").count()==2
+        assert "7.5" in page.locator(".media-detail-info").inner_text()
         page.locator(".media-case-stage .media-replay").click()
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
+        page.locator(".media-library-view .game-book",has_text="Sample Illustrated Book").click()
+        page.locator(".media-inner-page img").first.wait_for(state="visible",timeout=10000)
+        assert page.locator(".media-inner-page img").count()==2
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
-        series_card=page.locator(".media-library-view .game-book",has_text="Invader Zim")
-        series_card.wait_for(state="visible",timeout=10000)
-        series_card.click()
-        assert page.locator(".media-case-films .media-case-disc").count()==1
-        assert page.locator(".media-case-films .media-case-disc").evaluate(
-            "(el)=>getComputedStyle(el,'::before').content")!='"none"'
+        page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
+        page.locator(".media-editor input[type=text]").first.fill("Example TV Series")
+        page.locator(".media-editor input[type=number]").fill("4.0")
+        page.locator(".media-editor select").nth(1).select_option("series")
+        page.locator(".media-editor + .btn.primary").click()
+        page.locator(".media-case-films .media-case-disc").first.wait_for(state="visible",timeout=10000)
         assert "mediaOpticalDiscReveal" in page.locator(".media-case-films .media-case-disc").evaluate("(el)=>getComputedStyle(el).animationName")
         assert "mediaDvdCoverReveal" in page.locator(".media-case-films .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        page.locator(".media-detail-info button",has_text="Edit").click()
+        page.locator(".media-editor input[type=number]").fill("8.5")
+        page.locator(".media-editor select").first.select_option("Watched")
+        page.locator(".media-editor + .btn.primary").click()
+        page.locator(".media-detail-info").wait_for(state="visible",timeout=10000)
+        assert "Rating: 8.5" in page.locator(".media-detail-info").inner_text()
+        assert "Status: Watched" in page.locator(".media-detail-info").inner_text()
+        # A category switch forces a local-store refresh. The edit must survive.
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
+        page.locator(".media-library-view .game-book",has_text="Example TV Series").click()
+        assert "Rating: 8.5" in page.locator(".media-detail-info").inner_text()
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         media_search=page.locator(".media-library-view .media-search-filters input")
