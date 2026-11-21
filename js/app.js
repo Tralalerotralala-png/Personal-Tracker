@@ -523,25 +523,37 @@ replace(root, h('a', { class: 'skip-link', href: '#main', onclick: e => { e.prev
   main,nav,audioPlayer.el);
 startTranslations(document.body);
 
-const mounted = new Set();
+const mountPromises = new Map();
+let navigationVersion = 0;
 async function route() {
-  const wanted = location.hash.replace(/^#\/?/, '');
-  const key = VIEWS[wanted] ? wanted : 'overview'; // unknown hashes (e.g. sign-in tokens) are ignored, not rewritten
-  for (const [k, view] of Object.entries(VIEWS)) view.el.hidden = k !== key;
+  const version = ++navigationVersion;
+  const wanted = location.hash.replace(/^#\\/?/, '');
+  const key = VIEWS[wanted] ? wanted : 'overview';
+  for (const [k, view] of Object.entries(VIEWS)) {
+    view.el.hidden = k !== key;
+    // Lock sensitive views immediately when leaving, not after another tab's
+    // asynchronous first mount finishes.
+    if (k !== key) view.hide?.();
+  }
   navButtons.forEach((a) => { const on = a.dataset.route === key; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-  // The phone bottom bar scrolls horizontally; reveal the active section.
   if(matchMedia('(max-width: 899px)').matches)
     requestAnimationFrame(()=>nav.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}));
-  const firstMount=!mounted.has(key);
-  if(firstMount){mounted.add(key);await VIEWS[key].mount();}
-  for(const [k,view] of Object.entries(VIEWS))if(k!==key)view.hide?.();
-  // Several views do all their loading and drawing in mount(). Repeating
-  // show() immediately doubled IndexedDB reads, network refreshes and DOM
-  // work (and could reopen a just-created sheet). Views that need show() for
-  // deep-link handling still receive it on first mount.
-  if(!firstMount||(
-    VIEWS[key].showAfterMount!==false&&VIEWS[key].mount!==VIEWS[key].show
-  )) VIEWS[key].show?.();
+  const firstMount = !mountPromises.has(key);
+  if(firstMount) mountPromises.set(key,Promise.resolve().then(()=>VIEWS[key].mount()));
+  const promise=mountPromises.get(key);
+  try { await promise; }
+  catch (error) {
+    // A failed first mount must be retryable instead of leaving a permanently
+    // mounted-but-broken tab on subsequent navigation.
+    if(mountPromises.get(key)===promise)mountPromises.delete(key);
+    if(version===navigationVersion)toast('Could not load this section: '+String(error?.message||error));
+    return;
+  }
+  // Only the most recent navigation may run its completion callbacks.
+  if(version!==navigationVersion)return;
+  if(!firstMount||(VIEWS[key].showAfterMount!==false&&VIEWS[key].mount!==VIEWS[key].show))
+    await VIEWS[key].show?.();
+  if(version!==navigationVersion)return;
   document.title = `${t(NAV.find((n) => n[0] === key)[1])} - Personal Tracker`;
 }
 window.addEventListener('hashchange', route);
