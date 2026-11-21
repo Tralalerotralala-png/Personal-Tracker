@@ -2423,7 +2423,7 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 }
 
 /* B2 translations and contextual word-by-word / phrase-chunk meanings.
-   Compact widgets show one localized meaning, with the full bilingual view
+   Compact widgets and detail sheets show only the selected interface language
    and touch-accessible gloss buttons in the details sheet. */
 .phrase-b2-actions{display:flex;flex-wrap:wrap;gap:6px 9px;align-items:center}
 .phrase-b2-literal{display:grid;gap:7px;min-width:0;
@@ -2435,9 +2435,13 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 .phrase-b2-literal-column{display:grid;align-content:start;gap:5px;min-width:0}
 .phrase-b2-literal-column>small{font-size:.65rem;color:var(--ink-dim);letter-spacing:.04em}
 .phrase-b2-literal-chips{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
-.phrase-b2-gloss-chip{display:inline-flex;min-height:27px;align-items:center;
+.phrase-b2-gloss-chip{display:inline-flex;flex-direction:column;gap:2px;
+ min-height:38px;align-items:flex-start;justify-content:center;
  color:var(--ink);background:var(--panel);border:1px solid var(--edge);
- padding:3px 6px;font-size:.78rem;line-height:1.25;cursor:pointer;text-align:left}
+ padding:4px 7px;font-size:.78rem;line-height:1.25;cursor:pointer;text-align:left}
+.phrase-b2-chip-pinyin{display:block;font-size:.67rem;line-height:1.2;
+ color:var(--ink-dim);font-weight:400;white-space:normal}
+.phrase-b2-gloss-chip:is(:hover,:focus-visible) .phrase-b2-chip-pinyin{color:var(--accent)}
 .phrase-b2-gloss-chip:hover,.phrase-b2-gloss-chip:focus-visible{
  outline:1px solid var(--accent);color:var(--accent);border-color:var(--accent)}
 .phrase-b2-literal-note{padding:5px 7px;color:var(--ink);
