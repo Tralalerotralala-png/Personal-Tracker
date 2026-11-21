@@ -76,6 +76,28 @@ export function createPhotos({ store, client }) {
   const cleanupPrefix='photo-cleanup:';
   const CLEANUP_GRACE_MS=7*24*60*60*1000;
 
+  // Image decoding and IndexedDB writes are asynchronous. Without ordering,
+  // an older slow selection could overwrite a later image or resurrect one
+  // the user just removed. Version user intents synchronously, then serialize
+  // commits per item so the last invoked action wins.
+  const photoActionVersions=new Map(),photoCommits=new Map();
+  function nextPhotoAction(itemId){
+    const version=(photoActionVersions.get(itemId)||0)+1;
+    photoActionVersions.set(itemId,version);
+    return version;
+  }
+  function commitPhotoAction(itemId,version,operation){
+    const previous=photoCommits.get(itemId)||Promise.resolve();
+    const current=previous.catch(()=>{}).then(()=>
+      photoActionVersions.get(itemId)===version?operation():null);
+    photoCommits.set(itemId,current);
+    current.then(
+      ()=>{if(photoCommits.get(itemId)===current)photoCommits.delete(itemId);},
+      ()=>{if(photoCommits.get(itemId)===current)photoCommits.delete(itemId);}
+    );
+    return current;
+  }
+
   // Removing remote objects before the item row is acknowledged by Supabase
   // can destroy the only photo referenced by another still-offline device.
   // Give old photos a recovery window and keep the cleanup intent device-local.
@@ -182,37 +204,48 @@ export function createPhotos({ store, client }) {
   }
 
   async function setPhoto(itemId, file) {
-    const item = await store.get('items', itemId);
-    if (!item) throw new Error('Save the item before adding a photo.');
+    const version=nextPhotoAction(itemId);
+    // Fail early for nonexistent items before doing expensive image decoding.
+    if(!await store.get('items',itemId))
+      throw new Error('Save the item before adding a photo.');
     const blob = await downscaleImage(file);
     const dataUrl = await blobToDataUrl(blob);
-    const previous = item.photo_path && !item.photo_path.startsWith('local/') ? item.photo_path : null;
+    return commitPhotoAction(itemId,version,async()=>{
+      // Re-read after queued mutations: an earlier selection may have
+      // finished while this image was decoding.
+      const item=await store.get('items',itemId);
+      if(!item)throw new Error('Save the item before adding a photo.');
+      const previous = item.photo_path && !item.photo_path.startsWith('local/') ? item.photo_path : null;
 
-    let path;
-    if (!client) {
-      path = `local/${itemId}`;
-    } else {
-      const uid = await userId();
-      if (!uid) throw new Error('Sign in first so the photo can be stored.');
-      path = photoPath(uid, itemId, blob.type);
-      await store.meta.set(queueKey(itemId), { path, replaces: previous });
-    }
-    await store.meta.set(cacheKey(itemId), { path, dataUrl });
-    memory.set(`${itemId}|${path}`, dataUrl);
-    await store.upsert('items', { ...item, photo_path: path });
-    flushQueue();
-    return path;
+      let path;
+      if (!client) {
+        path = `local/${itemId}`;
+      } else {
+        const uid = await userId();
+        if (!uid) throw new Error('Sign in first so the photo can be stored.');
+        path = photoPath(uid, itemId, blob.type);
+        await store.meta.set(queueKey(itemId), { path, replaces: previous });
+      }
+      await store.meta.set(cacheKey(itemId), { path, dataUrl });
+      memory.set(`${itemId}|${path}`, dataUrl);
+      await store.upsert('items', { ...item, photo_path: path });
+      flushQueue();
+      return path;
+    });
   }
 
   async function removePhoto(itemId) {
-    const item = await store.get('items', itemId);
-    if (!item?.photo_path) return;
-    const old = item.photo_path;
-    await store.upsert('items', { ...item, photo_path: null });
-    await store.adapter.del('meta', cacheKey(itemId));
-    await store.adapter.del('meta', queueKey(itemId));
-    if (client && !old.startsWith('local/'))
-      await queueOldPhotoCleanup(itemId,old);
+    const version=nextPhotoAction(itemId);
+    return commitPhotoAction(itemId,version,async()=>{
+      const item = await store.get('items', itemId);
+      if (!item?.photo_path) return;
+      const old = item.photo_path;
+      await store.upsert('items', { ...item, photo_path: null });
+      await store.adapter.del('meta', cacheKey(itemId));
+      await store.adapter.del('meta', queueKey(itemId));
+      if (client && !old.startsWith('local/'))
+        await queueOldPhotoCleanup(itemId,old);
+    });
   }
 
   // Export the exact cached or signed private photo; never substitute another
