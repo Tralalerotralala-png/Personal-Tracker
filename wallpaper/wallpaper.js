@@ -1682,7 +1682,7 @@ function uvMeter(value, { stale = false, peak = false } = {}) {
   const es = language() === 'es';
   const label = peak ? (es ? 'UV máximo' : 'Peak UV') : (es ? 'Índice UV' : 'UV index');
   if (!Number.isFinite(value) || value < 0) {
-    return h('span', { class: 'uv-meter' }, label + (es ? ' · Sin datos' : ' · Unavailable'));
+    return null; // Missing UV data should not create a misleading placeholder.
   }
   const score = Math.round(value);
   const band = [3, 6, 8, 11].filter(threshold => score >= threshold).length;
@@ -1699,7 +1699,7 @@ Object.assign(__exports, { dayShort, dayLong, dayMonth, mudClass, mudBar, locali
 __define("js/ui/pixel-icon.js", function (__require, __exports) {
 "use strict";
 const { moonPhaseSvg } = __require("js/weather/moon-phase.js");
-const { renderLayeredSprite } = __require("js/ui/sprite-stack.js");
+const { renderLayeredSprite, pixelStackIconSvg } = __require("js/ui/sprite-stack.js");
 // Pixel art generated in code: a unique little sprite per item (from its id),
 // and the small glyphs used in the navigation. Pure functions, no DOM.
 
@@ -2187,7 +2187,7 @@ function weatherIconSvg(code, { night = false, date = new Date() } = {}) {
       }
     }
   }
-  return '<svg class="sprite-weather-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>';
+  return pixelStackIconSvg('<svg class="sprite-weather-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+content+'</svg>');
 }
 
 /** Compact monochrome weather art shares the detailed weather silhouettes.
@@ -2431,7 +2431,25 @@ function renderOrthographicSprite(views,options={}){
   pixels:projectOrthographic(slices,{angle:a,squash,spacing}),
  })),{slices:slices.layers.length,source:'four-views'});
 }
-Object.assign(__exports, { renderLayeredSprite, slicesFromOrthographicViews, renderOrthographicSprite });
+
+
+// Small symbolic icons have no four-view geometry. Preserve their exact
+// weather/celestial/symbol artwork while giving each a shared integer-pixel
+// shallow extrusion, rather than inaccurately claiming full 3D voxels.
+// Inventory props continue to use the actual layered renderer above.
+// Generated app SVG only; never accept outside markup or strings from users.
+function pixelStackIconSvg(svg,{layers=2}={}){
+ const match=/^<svg\b([^>]*)>([\s\S]*)<\/svg>$/.exec(svg||'');
+ if(!match)return svg;
+ const count=Math.max(1,Math.min(3,Math.trunc(layers)||2));
+ const root=match[1],face=match[2];
+ const back=Array.from({length:count},(_,i)=>
+  '<g class="sprite-stack-echo sprite-stack-echo-'+(count-i)+
+  '" aria-hidden="true">'+face+'</g>').join('');
+ return '<svg'+root+' data-pixel-stack="'+(count+1)+'">'+
+  back+'<g class="sprite-stack-foreground">'+face+'</g></svg>';
+}
+Object.assign(__exports, { renderLayeredSprite, slicesFromOrthographicViews, renderOrthographicSprite, pixelStackIconSvg });
 });
 __define("js/wallpaper/config.js", function (__require, __exports) {
 "use strict";
@@ -3135,6 +3153,7 @@ Object.assign(__exports, { SKY_MODES, localClockMinutes, dateKeyAt, clockFromIso
 __define("js/weather/moon-phase.js", function (__require, __exports) {
 "use strict";
 // Mean synodic month approximation; displayed phase, not a precise astronomical ephemeris.
+const { pixelStackIconSvg } = __require("js/ui/sprite-stack.js");
 const SYNODIC = 29.530588853;
 const REFERENCE_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
 function moonPhase(date = new Date()) {
@@ -3195,7 +3214,7 @@ function moonPhaseSvg(date = new Date()) {
       x=end;
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><g data-part="earthshine">${dark.join('')}</g><g data-part="illuminated">${light.join('')}</g></svg>`;
+  return pixelStackIconSvg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><g data-part="earthshine">${dark.join('')}</g><g data-part="illuminated">${light.join('')}</g></svg>`);
 }
 function isNightAtLocation(current, date = new Date()) {
   if (current?.is_day === 0) return true;
@@ -3369,7 +3388,7 @@ function computeMud(days, { params: rawParams, weights: rawWeights, soilAvailabl
 }
 
 // The five days before today, today, and the five days after: exactly 11 rows.
-function displayWindow(results, todayDate, before = 5, after = 5) {
+function displayWindow(results, todayDate, before = 5, after = 6) {
   const t = results.findIndex((r) => r.date === todayDate);
   if (t < 0) return [];
   return results.slice(Math.max(0, t - before), t + after + 1).map((r) => {
@@ -3464,9 +3483,9 @@ const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 // Ten days of history gives the first displayed day (5 days back) a few days of
-// "what fell before" to remember. Six forecast days = today plus five ahead.
+// "what fell before" to remember. Seven forecast days = today plus six ahead.
 const PAST_DAYS = 34;
-const FORECAST_DAYS = 6;
+const FORECAST_DAYS = 7;
 
 const DAILY_VARS = [
   'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'rain_sum',
@@ -3490,7 +3509,7 @@ function buildForecastUrl({ lat, lon }, kind) {
     forecast_days: String(FORECAST_DAYS),
   });
   if (kind === 'soil') p.set('hourly', SOIL_VARS.join(','));
-  else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
+  else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code,uv_index');
   else {
     p.set('daily', DAILY_VARS.join(','));
     p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover,uv_index');
@@ -3568,6 +3587,7 @@ function parseHourly(json) {
     time, probability: typeof data.precipitation_probability?.[i] === 'number' ? data.precipitation_probability[i] : null,
     precipitation: typeof data.precipitation?.[i] === 'number' ? data.precipitation[i] : null,
     weather_code: data.weather_code?.[i] ?? null,
+    uv_index: Number.isFinite(data.uv_index?.[i]) ? data.uv_index[i] : null,
   })) : [];
 }
 
@@ -3824,6 +3844,7 @@ __define("js/weather/sky-events.js", function (__require, __exports) {
 // Eclipse dates: NASA https://science.nasa.gov/eclipses/future-eclipses/
 // Meteor shower peaks: American Meteor Society https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/
 const { moonPhase } = __require("js/weather/moon-phase.js");
+const { pixelStackIconSvg } = __require("js/ui/sprite-stack.js");
 const { loadAstronomy, calculatedZodiacEvents } = __require("js/weather/celestial.js");
 const CALENDAR = [
  ['2026-11-04','Southern Taurids peak','Máximo de las Táuridas del Sur','https://www.amsmeteors.org/meteor-showers/meteor-shower-calendar/'],
@@ -3873,7 +3894,7 @@ function skyEventIconSvg(kind) {
   : kind === 'lunar_eclipse'
   ? '<circle cx="12" cy="12" r="9" fill="#b77265"/><path d="M15 4a9 9 0 0 1 0 16" stroke="#653c58" stroke-width="5" fill="none"/>'
   : '<path d="M4 19L20 3M8 20l12-12" stroke="#e0c7ff" stroke-width="3"/><path d="M17 2h5v5" stroke="#ffe2a0" stroke-width="3" fill="none"/>';
- return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`;
+ return pixelStackIconSvg(`<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${core}</svg>`);
 }
 
 // Shared across dashboard, forecast and wallpaper. Recalculate at most every
@@ -3945,8 +3966,8 @@ function skyEventInformation(event,lang='en'){
   return {
    what:pick(`The ${body} crosses into another 30° sector of the tropical zodiac. These equal sectors mark positions along the ecliptic, not the physical borders of constellations.`,
              `El ${body} entra en otro sector de 30° del zodiaco tropical. Son divisiones de la eclíptica, no fronteras reales de las constelaciones.`),
-   meaning:pick(`In astrology, this sign is associated with ${theme}. You could use the date as a prompt for reflection; it does not predict or cause personal events.`,
-                `En astrología, este signo se asocia con ${theme}. Puede servir como invitación a reflexionar; no predice ni provoca sucesos personales.`),
+   meaning:pick(`In astrology, this sign is associated with ${theme}. This can be a useful theme for reflection.`,
+                `En astrología, este signo se asocia con ${theme}. Puede servir para reflexionar.`),
   };
  }
  if(kind==='zodiac-retrograde'||kind==='zodiac-direct'){
@@ -3959,11 +3980,11 @@ function skyEventInformation(event,lang='en'){
      ?'Desde la Tierra, el planeta parece detenerse y retroceder por el movimiento relativo de las órbitas. No ha invertido su órbita.'
      :'Desde la Tierra, el planeta parece detener su movimiento retrógrado aparente y retomar su dirección habitual.'),
    meaning:pick(retro
-     ?'Traditionally linked with reviewing plans or slowing down. It is a symbolic interpretation, not a scientific warning.'
-     :'Traditionally linked with renewed momentum or resuming plans. This is symbolic, not a scientific forecast.',
+     ?'Traditionally associated with reviewing plans, checking details, and slowing down.'
+     :'Traditionally associated with renewed momentum and restarting delayed plans.',
      retro
-     ?'Se asocia tradicionalmente con revisar planes o ir más despacio. Es una interpretación simbólica, no una advertencia científica.'
-     :'Se asocia tradicionalmente con retomar planes o avanzar. Es simbólico, no una predicción científica.'),
+     ?'Tradicionalmente asociado con revisar planes y prestar atención a los detalles.'
+     :'Tradicionalmente asociado con retomar planes y recuperar el impulso.'),
   };
  }
  if(kind==='zodiac-phase'||kind==='moon'){
@@ -3976,37 +3997,37 @@ function skyEventInformation(event,lang='en'){
      ?'La Luna llena ocurre cuando la Luna está en dirección opuesta al Sol vista desde la Tierra; su cara visible aparece iluminada.'
      :'La Luna nueva ocurre cuando la Luna está cerca de la dirección del Sol y su cara visible se ve oscura.'),
    meaning:pick(full
-     ?'Often used as a symbolic moment for taking stock or finishing a project. There is no evidence this phase decides personal outcomes.'
-     :'Often used symbolically for intentions or starting something. The phase itself does not determine personal outcomes.',
+     ?'A traditional moment for reflection, completing projects, and celebrating milestones.'
+     :'A traditional moment for setting intentions and beginning new projects.',
      full
-     ?'Puede servir simbólicamente para hacer balance o cerrar una etapa. La fase no determina resultados personales.'
-     :'Puede servir simbólicamente para marcar un comienzo. La fase no determina resultados personales.'),
+     ?'Tradicionalmente un momento para hacer balance, completar proyectos y celebrar logros.'
+     :'Tradicionalmente un momento para definir intenciones y comenzar proyectos.'),
   };
  }
  const title=String(event?.en||'');
  if(/solar eclipse/i.test(title))return {
   what:pick('The Moon passes between Earth and the Sun, partly or completely blocking the Sun from particular locations. Visibility depends on the path.',
             'La Luna pasa entre la Tierra y el Sol y lo cubre en parte o por completo desde ciertas zonas. La visibilidad depende de la trayectoria.'),
-  meaning:pick('A notable skywatching occasion, not an omen. Never look directly at the Sun without proper eclipse protection.',
-               'Es una ocasión especial para observar el cielo, no un presagio. Nunca mires directamente al Sol sin protección adecuada para eclipses.')
+  meaning:pick('A striking celestial alignment. Use certified eclipse glasses or an indirect viewing method to watch the Sun safely.',
+               'Una alineación celeste espectacular. Usa lentes certificados o un método de proyección indirecta para observar el Sol.')
  };
  if(/lunar eclipse/i.test(title))return {
   what:pick('Earth blocks some sunlight from reaching the Moon. A penumbral eclipse creates a subtle shading rather than a dark bite.',
             'La Tierra bloquea parte de la luz solar que llega a la Luna. En un eclipse penumbral, el oscurecimiento es sutil.'),
-  meaning:pick('A chance to observe the Earth–Sun–Moon alignment. It does not predict events in our lives.',
-               'Permite observar la alineación Tierra-Sol-Luna; no predice sucesos de nuestras vidas.')
+  meaning:pick('A chance to observe a striking alignment of Earth, Moon and Sun.',
+               'Una ocasión para observar la alineación entre la Tierra, la Luna y el Sol.')
  };
  if(/peak/i.test(title))return {
   what:pick('A meteor shower is near its expected maximum as Earth crosses a trail of comet or asteroid debris. Local weather and darkness affect visibility.',
             'Una lluvia de meteoros se acerca a su máximo cuando la Tierra cruza restos de un cometa o asteroide. Influyen el clima y la oscuridad.'),
-  meaning:pick('It may be a good time to look for meteors away from city lights; an announced peak does not guarantee a local sighting.',
-               'Puede ser buen momento para observar meteoros lejos de las luces urbanas; el máximo no garantiza verlos.')
+  meaning:pick('It may be a good time to look for meteors away from city lights; the hours after midnight are often useful for viewing.',
+               'Puede ser buen momento para observar meteoros lejos de las luces urbanas; las horas posteriores a medianoche suelen ser buenas para observarlos.')
  };
  return {
   what:pick('A calculated or scheduled sky event. The date may vary by time zone and local visibility.',
             'Un evento celeste calculado o previsto. La fecha puede variar por zona horaria y visibilidad local.'),
-  meaning:pick('Use it as a reminder to observe the sky, not as a personal prediction.',
-               'Úsalo para observar el cielo, no como una predicción personal.')
+  meaning:pick('A useful date to add to your skywatching calendar.',
+               'Una fecha útil para tu calendario de observación.')
  };
 }
 
@@ -4222,19 +4243,35 @@ Object.assign(__exports, { WIDGET_DEFS, WIDGET_IDS, PROFILES });
 });
 __define("js/widgets/fit.js", function (__require, __exports) {
 "use strict";
-// Shared dashboard agenda bounds and no-scroll sizing utilities.
-// A day only belongs to the Coming Up widget if there is an actual modelled
-// wetness score for that exact date. The full calendar remains unrestricted.
-function forecastAgendaDays(rows=[],today){
+// Coming Up covers seven local calendar dates. A weather-model row wins;
+// when a cached/partial response does not reach the end of the window, carry
+// forward the last valid wetness index. Carried rows are visibly ESTIMATED,
+// not fabricated observations or live weather/UV measurements.
+const nextDate=(date,offset)=>{
+ const d=new Date(date+'T12:00:00Z');
+ d.setUTCDate(d.getUTCDate()+offset);
+ return d.toISOString().slice(0,10);
+};
+function forecastAgendaDays(rows=[],today,days=7){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(today||'')||!Array.isArray(rows))return [];
  const unique=new Map();
  for(const row of rows){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(row?.date||'')||row.date<today||
-     row.phase==='past'||!Number.isFinite(row.index)||row.index<0||row.index>100||
-     !['Dry','Tacky','Muddy','Swamp'].includes(row.label))continue;
+    row.phase==='past'||!Number.isFinite(row.index)||row.index<0||row.index>100||
+    !['Dry','Tacky','Muddy','Swamp'].includes(row.label))continue;
   unique.set(row.date,row);
  }
- return [...unique.values()].sort((a,b)=>a.date.localeCompare(b.date));
+ const out=[];let previous=null;
+ for(let offset=0;offset<Math.max(1,Math.min(7,days));offset++){
+  const date=nextDate(today,offset),actual=unique.get(date);
+  if(actual){out.push(actual);previous=actual;continue;}
+  if(!previous)continue;
+  const carried={...previous,date,phase:'projected',estimated:true,
+    raw:{weather_code:null,uvMax:null},
+    why:'Ground wetness carried forward from the previous forecast day'};
+  out.push(carried);previous=carried;
+ }
+ return out;
 }
 
 // Compact widgets should show complete rows and an explicit expansion button,
@@ -4610,8 +4647,7 @@ function openCalendarSelection(detail) {
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
 function mountCalendar(el, { store, weather }) {
-  // Respect the actual six-day weather horizon: events outside a day with
-  // a reliable wetness meter belong to Calendar, not this short forecast tile.
+  // Seven-day horizon: actual wetness model where available, otherwise a clearly labelled carried-forward estimate.
   const fit=observeWidgetFit(el,()=>{
     const result=fitWidgetRows(el,{
       rowSelector:'.w-cal-day',
@@ -4627,8 +4663,9 @@ function mountCalendar(el, { store, weather }) {
     const events=await store.list('events');
     const from=todayKeyLocal();
     const state=weather.getState(),available=forecastAgendaDays(state.rows,from);
-    const uv=h('div',{class:'w-cal-uv','data-widget-static':'true'},
-      uvMeter(state.current?.uv_index,{stale:state.status==='stale'}));
+    const uvScore=state.current?.uv_index;
+    const uv=Number.isFinite(uvScore)&&uvScore>=0
+      ?h('div',{class:'w-cal-uv','data-widget-static':'true'},uvMeter(uvScore,{stale:state.status==='stale'})):null;
     if(!available.length){
       replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
         note(language()==='es'
@@ -4658,13 +4695,15 @@ function mountCalendar(el, { store, weather }) {
               onclick:()=>openCalendarSelection({dateKey:key})},
               h('b',{},key===from?t('Today'):dayShort(key)),h('span',{},dayMonth(key))),
             h('button',{type:'button',class:'w-agenda-ground',
-              title:`${localizedMudLabel(dm.label)} ${dm.index}/100`,
+              title:`${localizedMudLabel(dm.label)} ${dm.index}/100${dm.estimated?' · Estimated from previous day':''}`,
               'aria-label':`${localizedMudLabel(dm.label)} ${dm.index}/100. ${dayTitle}`,
               onclick:()=>openCalendarSelection({dateKey:key})},
               h('span',{class:'w-agenda-weather','aria-hidden':'true',
                 html:weatherIconSvg(dm.raw?.weather_code,{date:new Date(key+'T12:00:00')})}),
               mudBar(dm)),
-            h('span',{class:'w-agenda-uv'},peak)),
+            dm.estimated?h('small',{class:'w-cal-estimated',title:'Carried forward from previous day'},
+              language()==='es'?'Estim.':'Est.'):null,
+            peak?h('span',{class:'w-agenda-uv'},peak):null),
           ...shown.map(o=>h('button',{type:'button',class:'w-ev w-event-link',
             title:`${language()==='es'?'Abrir evento':'Open event'}: ${o.event.title}`,
             'aria-label':`${language()==='es'?'Abrir evento':'Open event'} ${o.event.title} · ${dayTitle}`,
