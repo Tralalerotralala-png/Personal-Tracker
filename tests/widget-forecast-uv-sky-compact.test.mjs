@@ -56,7 +56,7 @@ test('celestial widgets explain events on-page, not by linking to the calculatio
  const calc=readFileSync(new URL('../js/weather/celestial.js',import.meta.url),'utf8');
  const calendar=readFileSync(new URL('../js/ui/calendar.js',import.meta.url),'utf8');
  assert.match(widget,/forecastAgendaDays\(state\.rows,from\)/);
- assert.match(widget,/uvMeter\(state\.current\?\.uv_index/);
+ assert.match(widget,/uvMeter\(uvScore/);
  assert.match(widget,/uvMeter\(dm\.raw\?\.uvMax/);
  assert.match(calendar,/uvMeter\(dm\.raw\?\.uvMax/);
  assert.match(calendar,/uvMeter\(weather\.getState\(\)\.current\?\.uv_index/);
