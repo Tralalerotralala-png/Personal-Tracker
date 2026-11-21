@@ -54,7 +54,7 @@ export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
  let session=null, timeout=null, sheet=null, failures=0, blockedUntil=0;
  let activeDraftTimer=null, activeDraftFlush=null, editorDirty=false, pendingCapture=null, openCaptureEditor=null;
- let writeChain=Promise.resolve(),editorOpen=false,refreshRequested=false,refreshing=false,selectedType='dreams';
+ let writeChain=Promise.resolve(),pendingJournalWrites=0,editorOpen=false,refreshRequested=false,refreshing=false,selectedType='dreams';
  const dialogs=new Set();
  const L=()=>labels[language()];
  const clear=()=>{session=null;clearTimeout(timeout);clearTimeout(activeDraftTimer);timeout=null;activeDraftTimer=null;activeDraftFlush=null;editorDirty=false;editorOpen=false;refreshRequested=false;};
@@ -139,9 +139,10 @@ export function createDreamDiaryView({store}) {
   const current=session,snapshot=structuredClone(current.data);
   // Encrypt and commit only the changed entries or drafts. Each row has its
   // own cloud identity, so edits to two unrelated Logs never overwrite.
+  pendingJournalWrites+=1;
   writeChain=writeChain.catch(()=>{}).then(()=>saveJournalV3(store,current,snapshot));
-  await writeChain;
-  if(session===current)touch();
+  try{await writeChain;if(session===current)touch();}
+  finally{pendingJournalWrites-=1;}
  }
  function reloadWhenSafe(){
   if(!session)return;
@@ -373,7 +374,7 @@ export function createDreamDiaryView({store}) {
   if(e.type==='change'&&e.source==='sync'&&e.tables?.includes('settings')&&session)
    reloadWhenSafe();
  });
- window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});
+ window.addEventListener('beforeunload', e=>{if(editorDirty||pendingJournalWrites){e.preventDefault();e.returnValue='';}});
  window.addEventListener('tracker-private-capture',e=>{const type=e.detail?.type;if(!['dreams','sleep','moods','habits','vault'].includes(type))return;pendingCapture=type;if(session&&openCaptureEditor){pendingCapture=null;openCaptureEditor(type);}else if(!el.hidden)openLocked();});
  landing();
  return {el,mount:async()=>{if(!session&&!pendingCapture)landing();},show:()=>{if(!session){if(pendingCapture)openLocked();else landing();}},hide:()=>{if(session)lock();}};
