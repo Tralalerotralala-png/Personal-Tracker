@@ -2315,6 +2315,10 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 }
 :root[data-sprite-style="flat"] svg[data-pixel-stack] .sprite-stack-echo{display:none!important;}
 
+/* Every weather forecast card is keyboard- and touch-accessible in the app.
+   The wallpaper uses noninteractive divs with the same geometry. */
+button.w-forecast-day{appearance:none;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;}
+button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px;}
 /* Forecast columns fill the desktop; incomplete last rows stay centered on narrow widgets. */
 .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(var(--forecast-day-count,7),minmax(0,1fr));}
 @container widget (max-width:650px){
