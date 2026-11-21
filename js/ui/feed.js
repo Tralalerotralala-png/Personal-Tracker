@@ -24,7 +24,14 @@ export function createFeedView({ store, feed, proxySuggestion }) {
   const ui = { source: null, onlyMatches: false, reading: 'all' };
   let readIndex={};
   const setReading=async(item,patch)=>{await updateReading(store,item,patch);readIndex=await readingIndex(store);render(feed.getState());};
-  store.subscribe(e=>{if(e.type==='change'&&e.tables?.includes('settings'))readingIndex(store).then(next=>{readIndex=next;render(feed.getState());}).catch(()=>{});});
+  let destroyed=false,readingVersion=0;
+  const unsubscribeStore=store.subscribe(e=>{
+    if(destroyed||e.type!=='change'||!e.tables?.includes('settings'))return;
+    const revision=++readingVersion;
+    readingIndex(store).then(next=>{
+      if(!destroyed&&revision===readingVersion){readIndex=next;render(feed.getState());}
+    }).catch(error=>console.warn('Could not refresh feed reading state',error));
+  });
 
   function render(state) {
     const sourcesWithProblems = state.sources.filter((s) => s.state === 'error' || s.state === 'stale');
@@ -93,11 +100,12 @@ export function createFeedView({ store, feed, proxySuggestion }) {
     replace(el, head, banner, chips, list);
   }
 
-  feed.subscribe(render);
+  const unsubscribeFeed=feed.subscribe(state=>{if(!destroyed)render(state);});
   return {
     el,
     async mount() { readIndex=await readingIndex(store);render(feed.getState());feed.refresh(); },
-    async show() { readIndex=await readingIndex(store);render(feed.getState()); },
+    async show() { readIndex=await readingIndex(store);if(!destroyed)render(feed.getState()); },
+    destroy(){destroyed=true;++readingVersion;unsubscribeStore?.();unsubscribeFeed?.();},
   };
 }
 
