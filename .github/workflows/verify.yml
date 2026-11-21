@@ -168,17 +168,17 @@ jobs:
             PROCEDURE=auth.tracker_ci_uuid_eq_text
           );
           SQL
+          # The historical migration's compatibility operator must be in
+          # the migration session's search path, not only in the auth schema.
+          # Set it on this disposable role before running the migrator.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -c 'ALTER ROLE tracker_test SET search_path TO auth, public'
           docker run --rm --network host --env-file tests/fixtures/gotrue-ci.env \
             supabase/auth:v2.176.0 gotrue migrate
           # This compatibility operator is only needed by an old one-off
           # migration. Drop it so it cannot alter runtime comparison rules.
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
             -c 'DROP OPERATOR auth.=(uuid,text); DROP FUNCTION auth.tracker_ci_uuid_eq_text(uuid,text)'
-          # GoTrue queries identities and users without schema qualifiers. The
-          # vanilla Postgres role defaults to public; unlike Supabase's managed
-          # roles it needs an explicit auth-first search_path for its sessions.
-          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
-            -c 'ALTER ROLE tracker_test SET search_path TO auth, public'
           docker run -d --network host --name tracker-gotrue-test \
             --env-file tests/fixtures/gotrue-ci.env supabase/auth:v2.176.0
           for i in $(seq 1 45); do
