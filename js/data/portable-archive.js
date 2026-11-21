@@ -216,6 +216,22 @@ export async function restorePortableArchive({store,client,archive,inspected=nul
  const {manifest,index}=result;
  if(manifest.accountId!==(store.accountId||null))
   throw Error('This archive belongs to another account or storage mode. Import only into the matching account.');
+ // In local-only mode every replacement photo uses the SAME path (local/id).
+ // A merge can correctly keep a newer item row yet still overwrite its photo
+ // cache with an older TAR's bytes. Decide which cached photos to preserve
+ // before the merge changes any row timestamps.
+ const preserveLocalPhotos=new Set();
+ const backupItems=new Map((manifest.backup.tables.items||[]).map(row=>[row.id,row]));
+ for(const asset of manifest.assets){
+  if(asset.kind!=='photos'||!asset.sourcePath?.startsWith('local/'))continue;
+  const live=await store.get('items',asset.id),archived=backupItems.get(asset.id);
+  if(!live||!archived||live.photo_path!==asset.sourcePath)continue;
+  if(live.updated_at>=(archived.updated_at??'')){
+   const cached=await store.meta.get('photo:'+asset.id);
+   if(cached?.path===asset.sourcePath&&typeof cached.dataUrl==='string')
+    preserveLocalPhotos.add(asset.id);
+  }
+ }
  // All file contents and structured records were validated before any writes.
  const uploaded=[];
  let committed=false;
@@ -246,7 +262,7 @@ export async function restorePortableArchive({store,client,archive,inspected=nul
     // A newer local item can win the structured merge. Do not write a stale
     // image into its local cache if its current photo path has since changed.
     const current=await store.get('items',asset.id);
-    if(current?.photo_path!==asset.sourcePath)continue;
+    if(current?.photo_path!==asset.sourcePath||preserveLocalPhotos.has(asset.id))continue;
     await store.meta.set('photo:'+asset.id,{path:asset.sourcePath,
       dataUrl:await blobToDataUrl(index.get(asset.path).blob)});restored++;
    }else if(asset.kind==='audio'){

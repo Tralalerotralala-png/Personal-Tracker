@@ -157,3 +157,56 @@ test('previously removed legacy game saves do not prevent complete local export'
  assert.equal(portable.manifest.mediaCoverage.games,true);
  assert.equal(portable.manifest.assets.length,0);
 });
+
+test('merging a stale TAR never overwrites a newer local photo with its reused path',async()=>{
+ const path='local/'+PHOTO;
+ const old=backup();
+ old.tables.items.push({id:PHOTO,name:'Old archived item',photo_path:path,
+   updated_at:'2025-01-01T00:00:00.000Z'});
+ const {blob}=await createPortableTar({backup:old,assets:[{
+   kind:'photos',id:PHOTO,path:'media/photos/'+PHOTO+'.bin',
+   sourcePath:path,blob:new Blob(['old-image'],{type:'image/png'})
+ }]});
+ const store=createStore({adapter:createMemoryAdapter()});
+ await store.upsert('items',{id:PHOTO,name:'Newer live item',photo_path:path});
+ const live=await store.get('items',PHOTO);
+ assert.ok(live.updated_at>'2025-01-01T00:00:00.000Z');
+ const newest='data:image/png;base64,bmV3LWltYWdl';
+ await store.meta.set('photo:'+PHOTO,{path,dataUrl:newest});
+ const result=await restorePortableArchive({store,archive:blob});
+ assert.equal((await store.get('items',PHOTO)).name,'Newer live item');
+ assert.deepEqual(await store.meta.get('photo:'+PHOTO),{path,dataUrl:newest});
+ assert.equal(result.restored,0);
+});
+
+test('newer TAR item is not incorrectly skipped when a local photo has no matching cache',async()=>{
+ const path='local/'+PHOTO;
+ const incoming=backup();
+ incoming.tables.items.push({id:PHOTO,name:'Photo from TAR',photo_path:path,
+   updated_at:'2030-01-01T00:00:00.000Z'});
+ const {blob}=await createPortableTar({backup:incoming,assets:[{
+   kind:'photos',id:PHOTO,path:'media/photos/'+PHOTO+'.bin',
+   sourcePath:path,blob:new Blob(['new archive photo'],{type:'image/png'})
+ }]});
+ const store=createStore({adapter:createMemoryAdapter()});
+ await store.upsert('items',{id:PHOTO,name:'Old local item',photo_path:path});
+ const previous=globalThis.FileReader;
+ // Minimal browser FileReader shim to inspect the restored photo byte content
+ // in the Node test without any network or actual browser installation.
+ class Reader {
+   readAsDataURL(value){
+    value.arrayBuffer().then(data=>{
+     this.result='data:'+value.type+';base64,'+Buffer.from(data).toString('base64');
+     this.onload?.();
+    },err=>{this.error=err;this.onerror?.();});
+   }
+ }
+ globalThis.FileReader=Reader;
+ try{
+  const result=await restorePortableArchive({store,archive:blob});
+  assert.equal(result.restored,1);
+  const saved=await store.meta.get('photo:'+PHOTO);
+  assert.equal(saved.path,path);
+  assert.ok(saved.dataUrl.includes(Buffer.from('new archive photo').toString('base64')));
+ }finally{globalThis.FileReader=previous;}
+});
