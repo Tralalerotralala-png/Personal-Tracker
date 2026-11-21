@@ -299,8 +299,8 @@ test('failed cloud index acknowledgment never claims upload success or destroys 
  assert.equal(objects.has(entryRows[0].value.path),true,'Never delete the successful Storage copy');
 });
 
-test('local metadata failure keeps the private uploaded file instead of deleting it',async()=>{
- const {client,objects,adapter}=fixture();
+test('local metadata failure recovers the uploaded save into the cloud index',async()=>{
+ const {client,objects,adapter,cloudSettings}=fixture();
  const underlying=createStore({adapter});
  const failing={...underlying,setSetting:async(key,value)=>{
    if(key.startsWith('game_backup_entry_v2:'))throw Error('Quota exceeded');
@@ -309,10 +309,28 @@ test('local metadata failure keeps the private uploaded file instead of deleting
  await assert.rejects(
   createGameBackupService({client,store:failing}).upload(
    GAME,new File(['recoverable bytes'],'unique.sav')),
-  /local indexing failed/
+  /cloud index were stored, but the device cache could not save/
  );
- assert.equal(objects.size,1,'Owner can recover the uploaded Storage object by its path');
+ assert.equal(objects.size,1,'Uploaded Storage bytes must be preserved');
  assert.deepEqual((await underlying.list('settings')).filter(x=>x.key.startsWith('game_backup_entry_v2:')),[]);
+ const [row]=[...cloudSettings].filter(([key])=>key.startsWith('game_backup_entry_v2:'));
+ assert.ok(row,'Direct cloud fallback must retain independent save metadata');
+ assert.equal(objects.has(row[1].path),true);
+});
+
+test('if both local and cloud metadata fail, private Storage bytes remain for manual recovery',async()=>{
+ const {client,objects,adapter}=fixture();
+ const underlying=createStore({adapter});
+ const failing={...underlying,setSetting:async()=>{throw Error('Quota exceeded');}};
+ client.from=()=>({upsert:()=>({select:async()=>({
+  data:null,error:{message:'Cloud unavailable'}
+ })})});
+ await assert.rejects(
+  createGameBackupService({client,store:failing}).upload(
+   GAME,new File(['recoverable bytes'],'unique.sav')),
+  /uploaded to private Storage at .*but indexing could not be confirmed/
+ );
+ assert.equal(objects.size,1,'Never destroy the only uploaded copy on index failure');
 });
 
 test('cloud index upsert cannot acknowledge mismatched uploaded metadata',async()=>{
