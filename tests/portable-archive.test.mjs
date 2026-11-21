@@ -210,3 +210,36 @@ test('newer TAR item is not incorrectly skipped when a local photo has no matchi
   assert.ok(saved.dataUrl.includes(Buffer.from('new archive photo').toString('base64')));
  }finally{globalThis.FileReader=previous;}
 });
+
+
+test('TAR preflight rejects nonzero data after archive end markers',async()=>{
+ const {blob}=await createPortableTar({backup:backup()});
+ // Extra zero-filled record-aligned TAR volume padding is legal.
+ const padded=new Blob([blob,new Uint8Array(1024)]);
+ assert.equal((await inspectPortableTar(padded)).index.size,1);
+ // Undeclared content after the end marker must not be ignored.
+ await assert.rejects(
+  inspectPortableTar(new Blob([blob,new Uint8Array(512).fill(65)])),
+  /Unexpected data after TAR end marker/
+ );
+ // Reject incomplete final blocks even when the first two end blocks remain.
+ await assert.rejects(
+  inspectPortableTar(new Blob([blob,new Uint8Array(7)])),
+  /Misaligned TAR ending/
+ );
+});
+
+test('TAR preflight rejects bytes hidden in the alignment padding of a media entry',async()=>{
+ const b=backup();
+ const {blob}=await createPortableTar({backup:b,assets:[{
+  kind:'audio',id:AUDIO,path:'media/audio/'+AUDIO+'.bin',
+  blob:new Blob(['abc'],{type:'audio/mpeg'}),name:'short.mp3'
+ }]});
+ const parsed=await inspectPortableTar(blob);
+ const headerStart=512+Math.ceil(parsed.index.get('manifest.json').size/512)*512;
+ const raw=new Uint8Array(await blob.arrayBuffer());
+ const mediaPaddingStart=headerStart+512+3;
+ assert.equal(raw[mediaPaddingStart],0);
+ raw[mediaPaddingStart]=42;
+ await assert.rejects(inspectPortableTar(new Blob([raw])),/Nonzero TAR file padding/);
+});
