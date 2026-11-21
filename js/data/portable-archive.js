@@ -90,8 +90,14 @@ export async function createPortableTar({backup,assets=[],accountId=null,coverag
    name:cleanTitle(asset.name,250),addedAt:asset.addedAt||null,size:asset.blob.size,chunks:hashes});
   files.push(asset);
  }
+ // Media checksums alone do not detect an accidentally changed but still
+ // valid JSON record. Hash the canonical structured backup independently.
+ // Keep version 1 readable: old archives simply lack this newer field.
+ const structuredHash=await sha256Chunk(new Blob([JSON.stringify(backup)]));
  const manifest={app:PORTABLE_APP,version:PORTABLE_VERSION,accountId,backup,assets:specs,
-  createdAt:new Date().toISOString(),integrity:'SHA-256 per 1 MiB chunk',mediaIncluded:assets.length>0,mediaCoverage:coverage};
+  structuredHash,createdAt:new Date().toISOString(),
+  integrity:'SHA-256 structured records and per 1 MiB media chunk',
+  mediaIncluded:assets.length>0,mediaCoverage:coverage};
  const manifestBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
  if(manifestBlob.size>50*1024*1024)throw Error('Portable manifest exceeds 50 MB');
  const parts=[...tarPart('manifest.json',manifestBlob)];
@@ -113,6 +119,13 @@ export async function inspectPortableTar(archive) {
  if(manifest.assets.length!==index.size-1)throw Error('Archive files do not match the manifest');
  if(manifest.accountId!==null&&(typeof manifest.accountId!=='string'||!/^[0-9a-f-]{30,50}$/i.test(manifest.accountId)))
   throw Error('Invalid owner account stamp');
+ if(manifest.structuredHash!==undefined) {
+  if(typeof manifest.structuredHash!=='string'||!/^[a-f0-9]{64}$/.test(manifest.structuredHash))
+   throw Error('Invalid structured backup checksum');
+  const actual=await sha256Chunk(new Blob([JSON.stringify(manifest.backup)]));
+  if(actual!==manifest.structuredHash)
+   throw Error('Corrupt structured backup checksum');
+ }
  const inspected=inspectBackup(manifest.backup,{mode:'replace'});
  if(inspected.errors.length)throw Error('Invalid structured records in archive: '+inspected.errors[0]);
  const itemById=new Map((inspected.tables.items||[]).map(item=>[item.id,item]));
@@ -160,6 +173,22 @@ export async function exportPortableArchive({store,photos,gameBackups,include={p
    assets.push({path:'media/photos/'+item.id+'.bin',kind:'photos',id:item.id,
     sourcePath:item.photo_path,blob,mime:blob.type});
   }
+ }
+ if(include.games&&!gameBackups){
+  // Local-only installations have no private cloud game-backup service.
+  // A settings JSON imported from a cloud account may still list real save
+  // objects. Refuse to label such an export "complete" if we cannot fetch
+  // their actual file bytes.
+  const settings=backup.tables.settings||[];
+  const removed=new Set(settings.filter(r=>r.key?.startsWith('game_backup_removed_v2:')
+    &&r.value?.deleted===true).map(r=>r.value.id));
+  const newEntries=settings.some(r=>r.key?.startsWith('game_backup_entry_v2:')
+    &&!r.deleted_at&&r.value?.path&&!removed.has(r.value.id));
+  const oldEntries=settings.find(r=>r.key==='game_backup_index_v1')?.value;
+  const activeOld=Array.isArray(oldEntries)
+    &&oldEntries.some(r=>r?.id&&r?.path&&!removed.has(r.id));
+  if(newEntries||activeOld)
+   throw Error('Cannot export referenced game saves without signed-in private backup storage. Export them from the cloud account that owns the files.');
  }
  if(include.games&&gameBackups){
   for(const entry of await gameBackups.listAll()){
