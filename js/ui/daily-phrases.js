@@ -4,6 +4,17 @@ import { h, replace, openSheet } from './dom.js';
 import { language } from './language.js';
 import { B2_DIALOGUES } from './daily-dialogues.js';
 let dialoguePanelSequence=0;
+// Historical short lessons had English only. Keep their original date
+// selection and character glosses while restoring a Spanish translation.
+const BEGINNER_ES=[
+ 'Buenos días','Muchas gracias','Me gusta el té','Hoy hace buen tiempo',
+ 'Estoy estudiando','Nos vemos mañana','Estoy feliz','Por favor, más despacio',
+ 'Quiero tomar agua','¿Qué día es hoy?','Me gusta la música','Buenas noches',
+ '¿Cómo estás?','Estoy bien','Adiós','Lo siento','No hay problema',
+ 'No lo sé','¿Está bien?','Te quiero','Pasa, por favor',
+ 'Tengo hambre','Estoy cansado','¿Qué hora es?','Quiero ir a casa',
+ 'Buena suerte','¿Dónde estás?','Tengo tiempo','¿Qué te gusta?','Quiero dormir'
+];
 export const LESSONS = [
  {zh:'早上好',py:'zǎoshang hǎo',en:'Good morning',de:'Guten Morgen',ipa:'ˈɡuːtn̩ ˈmɔʁɡn̩',chars:['early / morning','up / on','good'],charPy:['zǎo','shang','hǎo'],words:['good (greeting form)','morning']},
  {zh:'谢谢你',py:'xièxie nǐ',en:'Thank you',de:'Danke schön',ipa:'ˈdaŋkə ʃøːn',chars:['thank','thank (repeated)','you'],charPy:['xiè','xie','nǐ'],words:['thanks','nicely / kindly']},
@@ -37,6 +48,9 @@ export const LESSONS = [
  {zh:'我想睡觉',py:'wǒ xiǎng shuìjiào',en:'I want to sleep',de:'Ich möchte schlafen',ipa:'ɪç ˈmœçtə ˈʃlaːfn̩',chars:['I / me','want / think','sleep','sleep / awakening'],charPy:['wǒ','xiǎng','shuì','jiào'],words:['I','would like','to sleep']},
 
 ];
+// Keep object identity for historical lessons and tests.
+if(BEGINNER_ES.length!==LESSONS.length)throw Error('Beginner Spanish translations are incomplete.');
+LESSONS.forEach((lesson,i)=>{lesson.es=BEGINNER_ES[i];});
 // Calendar-day keys deliberately use the device's local date, not UTC midnight.
 export const PHRASE_ARCHIVE_START = '2026-11-03';
 export const PHRASE_EXPANSION_DATE = '2026-11-04';
