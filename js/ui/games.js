@@ -3,17 +3,17 @@
 import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
-import { mediaIcon } from './media-art.js';
+import { mediaIcon, mediaCollectionToolbar } from './media-art.js';
 import { createGameBackupPanel } from './game-backup-panel.js';
 const KEY='game_library_v1';
 const TEXT={en:{title:'Game Library',add:'Add game',empty:'Your shelves are empty. Add a game to begin.',shelf:'Shelf',notes:'Notes',status:'Status',platform:'Platform',cover:'Cover URL (HTTPS)',upload:'Or upload a cover (up to 120 KB)',save:'Save',delete:'Delete',lookup:'Look up cover',grid:'Cover grid',wood:'Bookshelves',edit:'Edit',rating:'Rating (optional)',newShelf:'New shelf',name:'Title',cancel:'Cancel'},es:{title:'Biblioteca de juegos',add:'Agregar juego',empty:'Tus estantes están vacíos. Agrega un juego para empezar.',shelf:'Estante',notes:'Notas',status:'Estado',platform:'Plataforma',cover:'URL de portada (HTTPS)',upload:'O subir portada (máximo 120 KB)',save:'Guardar',delete:'Eliminar',lookup:'Buscar portada',grid:'Cuadrícula',wood:'Estantes',edit:'Editar',rating:'Calificación (opcional)',newShelf:'Nuevo estante',name:'Título',cancel:'Cancelar'}};
 const baseShelves=['Favorites','Playing','Backlog','Completed'];
 export function createGamesView({store,backups=null}){
- const el=h('div',{class:'view games-view'});let state={games:[],shelves:baseShelves,mode:'shelf'};let page=null;let sideMode=false;let dirty=false;let query='',gameFilter='all';
+ const el=h('div',{class:'view games-view'});let state={games:[],shelves:baseShelves,customShelves:[],mode:'shelf'};let page=null;let sideMode=false;let dirty=false;let query='',gameFilter='all';
  const L=()=>TEXT[language()];
  const clean=(s,n=3000)=>String(s??'').trim().slice(0,n);
  const safeUrl=s=>/^https:\/\/[^\s]+$/i.test(s||'')?s:'';
- async function load(){page=null;const saved=await store.getSetting(KEY);if(saved&&typeof saved==='object')state={games:Array.isArray(saved.games)?saved.games:[],shelves:Array.isArray(saved.shelves)?saved.shelves:baseShelves,mode:saved.mode==='grid'?'grid':'shelf'};render();}
+ async function load(){page=null;const saved=await store.getSetting(KEY);if(saved&&typeof saved==='object')state={...saved,games:Array.isArray(saved.games)?saved.games:[],shelves:Array.isArray(saved.shelves)?saved.shelves:baseShelves,customShelves:Array.isArray(saved.customShelves)?saved.customShelves:[],mode:saved.mode==='grid'?'grid':'shelf'};render();}
  async function save(){await store.setSetting(KEY,state);render();}
  function cover(game){const src=game.cover?.startsWith('data:image/')||safeUrl(game.cover)?game.cover:'';return src?h('img',{src,alt:game.title,loading:'lazy',referrerpolicy:'no-referrer'}):h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},mediaIcon('games',game.title));}
  function goBack(){if(dirty&&!confirm('Discard unsaved changes?'))return;dirty=false;page=null;sideMode=false;render();}
@@ -65,18 +65,24 @@ export function createGamesView({store,backups=null}){
 
  }
  function render(){if(page){page.render();return;}el.classList.remove('game-side-mode');
- const header=h('div',{class:'media-collection-toolbar'},
-   h('div',{class:'media-collection-title'},mediaIcon('games'),
-     h('div',{},h('h2',{},L().title),h('small',{},state.games.length+' '+(language()==='es'?'títulos':'titles')))),
-   h('div',{class:'media-collection-actions'},
-     h('button',{class:'btn small',type:'button',onclick:()=>{state.mode=state.mode==='grid'?'shelf':'grid';void save();}},state.mode==='grid'?L().wood:L().grid),
-     h('button',{class:'btn small',type:'button',onclick:async()=>{const name=prompt(L().newShelf);if(name?.trim()&&!state.shelves.includes(name.trim())){state.shelves.push(clean(name,60));await save();}}},L().newShelf),
-     h('button',{class:'btn primary',type:'button',onclick:()=>editor()},L().add)));
+ const header=mediaCollectionToolbar({
+  kind:'games',title:L().title,count:state.games.length,
+  viewLabel:state.mode==='grid'?L().wood:L().grid,
+  newShelfLabel:L().newShelf,addLabel:L().add,
+  onToggle:()=>{state.mode=state.mode==='grid'?'shelf':'grid';void save();},
+  onNewShelf:async()=>{
+   const name=prompt(L().newShelf)?.trim().slice(0,60);
+   if(!name||state.shelves.some(s=>s.toLocaleLowerCase()===name.toLocaleLowerCase()))return;
+   state.shelves.push(name);state.customShelves=[...new Set([...(state.customShelves||[]),name])];
+   state.mode='shelf';await save();
+  },
+  onAdd:()=>editor()
+ });
  const results=h('div',{class:'game-filter-results'});
  function updateResults(){
   const found=state.games.filter(g=>(gameFilter==='all'||g.status===gameFilter)&&(!query||`${g.title} ${g.platform} ${g.notes||''} ${g.shelf}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
-  const sections=state.shelves.map(name=>{const games=found.filter(g=>g.shelf===name);if(!games.length)return null;return h('section',{class:'game-shelf'},h('div',{class:'game-shelf-head'},mediaIcon('games',name),h('h3',{},name),h('small',{},String(games.length))),h('div',{class:'game-cover-grid'},games.map(g=>libraryCoverButton(cover(g),g.title,()=>detail(g),el))),h('div',{class:'game-wood'}));});
-  replace(results,found.length?h('div',{class:`game-shelves ${state.mode==='grid'?'game-library-grid':''}`},sections):
+  const sections=state.shelves.map(name=>{const games=found.filter(g=>g.shelf===name);if(!games.length&&(!state.customShelves?.includes(name)||query||gameFilter!=='all'))return null;return h('section',{class:'game-shelf'},h('div',{class:'game-shelf-head'},mediaIcon('games',name),h('h3',{},name),h('small',{},String(games.length))),h('div',{class:'game-cover-grid'},games.length?games.map(g=>libraryCoverButton(cover(g),g.title,()=>detail(g),el)):h('p',{class:'media-empty-shelf'},language()==='es'?'Estante vacío':'Empty shelf')),h('div',{class:'game-wood'}));});
+  replace(results,(found.length||(!query&&gameFilter==='all'&&state.customShelves?.length))?h('div',{class:`game-shelves ${state.mode==='grid'?'game-library-grid':''}`},sections):
     h('div',{class:'media-empty-state'},mediaIcon('games'),
       h('h3',{},state.games.length?(language()==='es'?'Sin resultados':'No matching games'):(language()==='es'?'Empieza tu colección':'Start your game collection')),
       h('p',{},state.games.length?(language()==='es'?'Prueba otro filtro.':'Try another filter.'):L().empty),

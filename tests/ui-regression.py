@@ -436,14 +436,25 @@ for width,height in [(390,844),(1280,900)]:
         game_toolbar.wait_for(state="visible",timeout=10000)
         game_bounds=game_toolbar.bounding_box()
         assert game_toolbar.locator(".media-collection-actions button").count()==3
+        game_action_names=[x.strip() for x in game_toolbar.locator(".media-collection-actions button").all_inner_texts()]
+        assert game_action_names==["Cover grid","New shelf","Add game"],game_action_names
         assert game_toolbar.locator(".media-pixel-icon svg.sprite-stacked-asset").count()>=1
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         books_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
         books_toolbar.wait_for(state="visible",timeout=10000)
         books_bounds=books_toolbar.bounding_box()
-        assert books_toolbar.locator(".media-collection-actions button").count()==2
+        assert books_toolbar.locator(".media-collection-actions button").count()==3
         assert abs(game_bounds["x"]-books_bounds["x"])<=4,(game_bounds,books_bounds)
         assert abs(game_bounds["width"]-books_bounds["width"])<=4,(game_bounds,books_bounds)
+        def action_names(toolbar):
+            return [s.strip() for s in toolbar.locator(".media-collection-actions button").all_inner_texts()]
+        assert game_action_names[:2]==action_names(books_toolbar)[:2],(game_action_names,action_names(books_toolbar))
+        assert action_names(books_toolbar)==["Cover grid","New shelf","Add Books"],action_names(books_toolbar)
+        page.once("dialog",lambda dialog: dialog.accept("Example comics shelf"))
+        books_toolbar.locator("button",has_text="New shelf").click()
+        shelf=page.locator(".media-library-view .game-shelf",has=page.locator("h3",has_text="Example comics shelf"))
+        shelf.wait_for(state="visible",timeout=10000)
+        assert shelf.locator(".media-empty-shelf").count()==1
         book_card=page.locator(".media-library-view .game-book",has_text="Johnny the Homicidal Maniac")
         book_card.wait_for(state="visible",timeout=10000)
         book_card.click()
@@ -457,6 +468,8 @@ for width,height in [(390,844),(1280,900)]:
         series_card.wait_for(state="visible",timeout=10000)
         series_card.click()
         assert page.locator(".media-case-films .media-case-disc").count()==1
+        assert "mediaOpticalDiscReveal" in page.locator(".media-case-films .media-case-disc").evaluate("(el)=>getComputedStyle(el).animationName")
+        assert "mediaDvdCoverReveal" in page.locator(".media-case-films .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         media_search=page.locator(".media-library-view .media-search-filters input")
@@ -464,6 +477,12 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-library-view .media-search-filters select").select_option("Finished")
         page.locator(".media-library-view .hub-tabs button",has_text="Albums").click()
         assert page.locator(".media-library-view .media-search-filters input").input_value()==""
+        albums_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
+        albums_toolbar.wait_for(state="visible",timeout=10000)
+        album_bounds=albums_toolbar.bounding_box()
+        assert abs(game_bounds["x"]-album_bounds["x"])<=4,(game_bounds,album_bounds)
+        assert abs(game_bounds["width"]-album_bounds["width"])<=4,(game_bounds,album_bounds)
+        assert action_names(albums_toolbar)==["Cover grid","New shelf","Add Albums"],action_names(albums_toolbar)
         assert page.locator(".media-library-view .media-search-filters select").input_value()=="all"
         page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
         page.locator(".media-editor input[type=text]").first.fill("Example Album")
@@ -472,6 +491,12 @@ for width,height in [(390,844),(1280,900)]:
         assert page.locator(".media-case-albums .media-vinyl-record").count()==1
         assert page.locator(".media-case-albums .media-case-disc").count()==0
         assert "mediaSleeveReveal" in page.locator(".media-case-albums .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        assert "mediaVinylReveal" in page.locator(".media-case-albums .media-vinyl-record").evaluate("(el)=>getComputedStyle(el).animationName")
+        # On wide screens the optical medium stays in its own column, away from text.
+        if page.viewport_size["width"]>850:
+            art=page.locator(".media-case-stage").bounding_box()
+            text=page.locator(".media-detail > div:last-child").bounding_box()
+            assert art["x"]+art["width"]<=text["x"]+4,(art,text)
         page.locator(".media-case-stage .media-replay").click()
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.evaluate("location.hash='#overview'")

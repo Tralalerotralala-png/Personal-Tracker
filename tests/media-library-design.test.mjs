@@ -47,24 +47,36 @@ test('pixel-stacked catalogue artwork is deterministic, safely generated and cat
  assert.doesNotMatch(mediaIconSvg('comic','<img onerror=alert(1)>'),/<img|onerror|script/i);
 });
 
-test('all categories share one toolbar structure and media cases have distinct opening effects',()=>{
+test('all categories use the exact same three-action component and category shelf persistence',()=>{
  const media=read('js/ui/media-library.js'),games=read('js/ui/games.js');
- const dom=read('js/ui/dom.js'),css=read('css/app.css');
+ const helper=read('js/ui/media-art.js'),dom=read('js/ui/dom.js'),css=read('css/app.css');
  for(const file of [media,games]){
-  assert.match(file,/class:'media-collection-toolbar'/);
-  assert.match(file,/class:'media-collection-title'/);
-  assert.match(file,/class:'media-collection-actions'/);
+  assert.match(file,/mediaCollectionToolbar\(\{/);
+  assert.match(file,/newShelfLabel:/);
+  assert.match(file,/onNewShelf:/);
+  assert.match(file,/onToggle:/);
+  assert.match(file,/onAdd:/);
  }
+ assert.equal((helper.match(/class:'media-collection-toolbar'/g)||[]).length,1);
+ assert.equal((helper.match(/class:'media-collection-actions'/g)||[]).length,1);
+ assert.match(helper,/action\(viewLabel,onToggle\)/);
+ assert.match(helper,/action\(newShelfLabel,onNewShelf\)/);
+ assert.match(helper,/action\(addLabel,onAdd,true\)/);
+ assert.match(media,/shelvesByKind/);
+ assert.match(media,/data\.shelvesByKind\[kind\]\.push\(name\)/);
+ assert.match(games,/customShelves/);
  assert.match(media,/transition:false/);
  assert.match(dom,/\{transition=true\}=\{\}/);
  assert.match(dom,/!transition\|\|reduced\(\)/);
  assert.match(media,/media-case-/);
  assert.match(media,/media-vinyl-record/);
  assert.match(media,/media-comic-panel/);
- assert.match(media,/mediaIcon\(active/);
  assert.match(css,/@keyframes mediaBookCover/);
  assert.match(css,/@keyframes mediaVinylReveal/);
- assert.match(css,/\.media-empty-state/);
+ assert.match(css,/@keyframes mediaDvdCoverReveal/);
+ assert.match(css,/@keyframes mediaOpticalDiscReveal/);
+ assert.doesNotMatch(css,/@keyframes pt(?:CaseOpen|BookOpen|DiscSlide|GameDiscSlide)/);
+ assert.match(css,/\.media-empty-shelf/);
  assert.match(css,/\.media-category-tabs/);
  assert.match(css,/prefers-reduced-motion:reduce/);
  assert.equal(css,read('wallpaper/app.css'));
