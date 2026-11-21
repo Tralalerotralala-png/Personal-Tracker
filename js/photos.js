@@ -95,7 +95,11 @@ export function createPhotos({ store, client }) {
       if (error) throw error;
       const blob = await (await fetch(data.signedUrl)).blob();
       const dataUrl = await blobToDataUrl(blob);
-      await store.meta.set(cacheKey(item.id), { path: item.photo_path, dataUrl });
+      // The fetch may outlive a user-selected replacement image. Check both
+      // the current item path and cached photo path in ONE adapter transaction
+      // so an old download cannot overwrite the newer offline-only bytes.
+      if(!await store.adapter.cachePhotoIfCurrent(item.id,item.photo_path,dataUrl))
+        return null;
       memory.set(mk, dataUrl);
       return dataUrl;
     } catch {
