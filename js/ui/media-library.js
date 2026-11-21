@@ -172,29 +172,118 @@ export function createMediaLibraryView({store,backups=null}) {
    }},L().delete)));
   return h('section',{class:'media-detail game-detail'},caseArt(row),info);
  }
- function renderEditor(row){const field=(label,el)=>h('label',{class:'media-field'},h('span',{},label),el);
-   const title=h('input',{type:'text',maxlength:120,value:row?.title||''});const creator=h('input',{type:'text',maxlength:150,value:row?.creator||''});
-   const notes=h('textarea',{rows:8,maxlength:10000},row?.notes||'');
-   const coverUrl=h('input',{type:'url',value:row?.cover?.startsWith('https:')?row.cover:'',placeholder:'https://'});
-   const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});
-   const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:row?.rating??''});
-   const status=h('select',{},names[active].en.map((s,i)=>h('option',{value:s,selected:(row?.status||names[active].en[0])===s},names[active][language()][i])));
-   const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||data.shelvesByKind[active].at(-1)||'Collection'});
-   const choices=active==='books'?[['book','Book','Libro'],['comic','Comic book','Cómic']]:active==='films'?[['film','Film','Película'],['series','TV series','Serie de TV']]:[['vinyl','Vinyl record','Disco de vinilo'],['digital','Digital album','Álbum digital']];
-   const mediaType=h('select',{},choices.map(([value,en,es])=>h('option',{value,selected:(row?.mediaType||choices[0][0])===value},language()==='es'?es:en)));
-   const error=h('p',{class:'form-error'});
-   const form=h('div',{class:'form media-editor'},field(L().name,title),field(L().creator,creator),field(L().status,status),field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),field(L().rating,rating),field(L().cover,coverUrl),field(language()==='es'?'Subir portada':'Upload cover',upload),field(L().notes,notes),error);
-   form.addEventListener('input',()=>{dirty=true;});
-   const saveButton=h('button',{class:'btn primary',onclick:async()=>{if(!title.value.trim()){error.textContent=L().name+' required';return;}
-      let image=coverUrl.value.trim()||row?.cover||'';if(image&&!/^https:\/\//.test(image)&&!image.startsWith('data:image/')){error.textContent='HTTPS required';return;}
-      if(upload.files?.length){const f=upload.files[0];if(f.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(f.type)){error.textContent='PNG/JPEG/WebP, 120 KB max';return;}
-        image=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f);});}
-      const rec={id:row?.id||uuid(),title:clamp(title.value,120).trim(),creator:clamp(creator.value,150).trim(),status:status.value,mediaType:mediaType.value,shelf:shelf.value.trim()||'Collection',rating:rating.value?Number(rating.value):null,cover:image,notes:clamp(notes.value,10000),journal:row?.journal||[]};
-      const ix=list(active).findIndex(x=>x.id===rec.id);if(ix>=0)data[active][ix]=rec;else data[active].push(rec);
-      if(!shelfNames(active).includes(rec.shelf))data.shelvesByKind[active].push(rec.shelf);
-      try {await save();dirty=false;show(rec);toast(L().save);}catch{error.textContent='Could not save. Try a smaller cover.';}
-    }},L().save);
-   return h('div',{},form,saveButton);
+ function renderEditor(row){
+  const kind=active,draftId=row?.id||uuid();
+  const field=(label,control)=>h('label',{class:'media-field'},h('span',{},label),control);
+  const title=h('input',{type:'text',maxlength:120,value:row?.title||''});
+  const creator=h('input',{type:'text',maxlength:150,value:row?.creator||''});
+  const notes=h('textarea',{rows:8,maxlength:10000},row?.notes||'');
+  const coverUrl=h('input',{type:'url',value:row?.cover?.startsWith('https:')?row.cover:'',placeholder:'https://'});
+  const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});
+  const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:row?.rating??''});
+  const status=h('select',{},names[kind].en.map((name,i)=>
+   h('option',{value:name,selected:(row?.status||names[kind].en[0])===name},names[kind][language()][i])));
+  const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||data.shelvesByKind[kind].at(-1)||'Collection'});
+  const choices=kind==='books'?[['book','Book','Libro'],['comic','Comic book','Cómic']]:
+   kind==='films'?[['film','Film','Película'],['series','TV series','Serie de TV']]:
+   [['vinyl','Vinyl record','Disco de vinilo'],['digital','Digital album','Álbum digital']];
+  const mediaType=h('select',{},choices.map(([value,en,es])=>
+   h('option',{value,selected:(row?.mediaType||choices[0][0])===value},language()==='es'?es:en)));
+  const error=h('p',{class:'form-error',role:'alert'});
+  const fields=[field(L().name,title),field(L().creator,creator),field(L().status,status),
+   field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),
+   field(L().rating,rating),field(L().cover,coverUrl),
+   field(language()==='es'?'Subir portada':'Upload cover',upload)];
+  let interiorPages=[];
+  const ready=kind==='books'?pagesFor(row?.id).then(saved=>{interiorPages=saved;drawPages();}):
+    Promise.resolve();
+  const preview=h('div',{class:'media-interior-edit-grid'});
+  function drawPages(){
+   replace(preview,...interiorPages.map((item,index)=>
+    h('div',{class:'media-interior-edit-item'},
+     h('img',{src:item.src,alt:item.caption||`Page ${index+1}`}),
+     h('input',{type:'text',maxlength:100,value:item.caption||'',
+      placeholder:language()==='es'?'Descripción':'Caption','aria-label':`Page ${index+1} caption`,
+      oninput:event=>{item.caption=clamp(event.target.value,100);dirty=true;}}),
+     h('button',{class:'btn small',type:'button',onclick:()=>{
+      interiorPages.splice(index,1);dirty=true;drawPages();
+     }},language()==='es'?'Quitar':'Remove'))));
+  }
+  if(kind==='books'){
+   const interiorUpload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp',multiple:true,
+    'aria-label':language()==='es'?'Añadir páginas interiores':'Add interior pages',
+    onchange:async event=>{
+     error.textContent='';
+     try{
+      await ready;
+      const chosen=[...event.currentTarget.files];
+      if(interiorPages.length+chosen.length>8)
+       throw Error(language()==='es'?'Máximo 8 imágenes.':'Maximum 8 interior images.');
+      const images=await Promise.all(chosen.map(convertInteriorImage));
+      interiorPages.push(...images);dirty=true;drawPages();
+     }catch(e){error.textContent=e.message||'Could not add pages.';}
+     finally{event.currentTarget.value='';}
+    }});
+   fields.push(h('section',{class:'media-interior-editor'},
+    h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
+    h('p',{class:'media-inner-privacy'},language()==='es'?
+      'Adjunta hasta 8 imágenes. Solo en este dispositivo; no se sincronizan.':
+      'Attach up to 8 images. Stored only on this device, not synced.'),
+    interiorUpload,preview));
+  }
+  fields.push(field(L().notes,notes),error);
+  const form=h('div',{class:'form media-editor'},...fields);
+  form.addEventListener('input',()=>{dirty=true;});
+  const saveButton=h('button',{class:'btn primary',type:'button',onclick:async()=>{
+   error.textContent='';
+   if(!title.value.trim()){error.textContent=L().name+' required';return;}
+   const rawRating=rating.value.trim();
+   const parsed=rawRating===''?null:Number(rawRating);
+   if(parsed!==null&&(!Number.isFinite(parsed)||parsed<0||parsed>10||
+       Math.abs(parsed*2-Math.round(parsed*2))>1e-8)){
+    error.textContent=language()==='es'?'Usa una calificación entre 0 y 10, en pasos de 0,5.':
+      'Enter a rating from 0 to 10 in steps of 0.5.';return;
+   }
+   let image=coverUrl.value.trim()||row?.cover||'';
+   if(image&&!/^https:\/\//.test(image)&&!image.startsWith('data:image/')){
+    error.textContent='HTTPS required';return;
+   }
+   saveButton.disabled=true;
+   try{
+    await ready;
+    if(upload.files?.length){
+     const file=upload.files[0];
+     if(file.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(file.type))
+      throw Error('PNG/JPEG/WebP, 120 KB max');
+     image=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);reader.onerror=reject;
+      reader.readAsDataURL(file);
+     });
+    }
+    const input={id:draftId,title:clamp(title.value,120).trim(),
+     creator:clamp(creator.value,150).trim(),status:status.value,mediaType:mediaType.value,
+     shelf:shelf.value.trim()||'Collection',rating:parsed,cover:image,
+     notes:clamp(notes.value,10000)};
+    await commit(draft=>{
+     const records=draft[kind],index=records.findIndex(item=>item.id===draftId);
+     if(index>=0)records[index]={...records[index],...input};
+     else records.push({...row,...input,journal:row?.journal||[]});
+     if(!draft.shelvesByKind[kind].includes(input.shelf))
+      draft.shelvesByKind[kind].push(input.shelf);
+    });
+    if(kind==='books')await store.meta.set(localPagesKey(draftId),interiorPages);
+    // Check what is actually persisted, rather than trusting an old UI object.
+    const saved=normalizeData(await store.getSetting(KEY))[kind].find(item=>item.id===draftId);
+    if(!saved||saved.rating!==parsed||saved.status!==input.status||
+       saved.title!==input.title)throw Error('Saved entry could not be verified.');
+    dirty=false;page={entry:saved,editing:false};render();toast(L().save);
+   }catch(e){
+    console.error('Could not persist media edits',e);
+    error.textContent=(language()==='es'?'No se guardó. ':'Not saved. ')+(e.message||'Try again.');
+   }finally{saveButton.disabled=false;}
+  }},L().save);
+  return h('div',{},form,saveButton);
  }
  function render(){
    const tabs=h('div',{class:'hub-tabs media-category-tabs','aria-label':L().library},
@@ -222,10 +311,13 @@ export function createMediaLibraryView({store,backups=null}) {
     onNewShelf:async()=>{
      const kind=active,name=prompt(L().newShelf)?.trim().slice(0,60);
      if(!name||shelfNames(kind).some(x=>x.toLocaleLowerCase()===name.toLocaleLowerCase()))return;
-     data.shelvesByKind[kind].push(name);
      query='';statusFilter='all';shelfMode=true;
-     try{await save();if(active===kind&&!page)render();}
-     catch(error){console.error('Could not save new media shelf',error);toast(language()==='es'?'No se pudo guardar el estante.':'Could not save shelf.');}
+     try{
+      await commit(draft=>{
+       if(!draft.shelvesByKind[kind].includes(name))draft.shelvesByKind[kind].push(name);
+      });
+      if(active===kind&&!page)render();
+     }catch(error){console.error('Could not save new media shelf',error);toast(language()==='es'?'No se pudo guardar el estante.':'Could not save shelf.');}
     },
     onAdd:()=>show(null,true)
    });
