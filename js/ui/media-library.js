@@ -88,8 +88,11 @@ export function createMediaLibraryView({store,backups=null}) {
      'aria-pressed':String(active===k),onclick:async()=>{
        if(dirty&&!confirm('Discard unsaved changes?'))return;
        dirty=false;page=null;active=k;query='';statusFilter='all';
-       if(k!=='games')await refreshCollection();
        render();
+       if(k!=='games'){
+        try {await refreshCollection();if(active===k&&!page)render();}
+        catch(error){console.warn('Could not refresh media library',error);}
+       }
      }},mediaIcon(k),h('span',{},L()[k]))));
    const top=h('div',{class:'panel-head media-library-header'},h('h2',{},L().library),tabs);
    if(active==='games'){games.el.hidden=false;replace(el,top,games.el);return;}
