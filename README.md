@@ -10,6 +10,8 @@ The code is public, but my personal data isn't part of the repository. If you wa
 
 The full instructions are in [SETUP.md](SETUP.md). Start with `config.example.js` if you're connecting your own Supabase project, run `supabase/schema.sql` for the database, and run `supabase/game-backups.sql` if you want private file backups. Check that Row Level Security and Storage access policies are enabled before putting personal information online. Never publish a Supabase secret or service-role key, private backup, or password. Use a unique 12–128-character passphrase for the new encrypted Logs journal; four-digit PINs are supported only by the archived old format and are not strong enough to protect highly sensitive secrets.
 
+Inventory objects now support pixel-perfect horizontal sprite stacking with two pre-baked viewing angles, based on SpriteCook's written sprite-stacking technique. The complete catalog and unnamed item sprites use the new renderer, while the 24px navigation and weather symbols stay clearly recognizable. **Settings → Appearance → Sprite style** switches between layered objects and original flat icons. The existing one-view assets use approximate extrusions; exact 3D reconstruction requires four matching orthographic views. See [the sprite-stacking guide](docs/sprite-stacking.md).
+
 The app uses plain HTML, CSS, and JavaScript modules. No build step is needed to serve the website. For local testing, run `python -m http.server 8080` from the repository folder and open `http://localhost:8080`. Run `node --test` to check the JavaScript tests. The separate Wallpaper Engine files can be rebuilt with `node scripts/build-wallpaper.mjs`.
 
 ## Stabilization and security
