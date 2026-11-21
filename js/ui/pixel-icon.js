@@ -488,7 +488,7 @@ export function compactWeatherSvg(code,options={}) {
 
 // Dedicated 32px navigation art; old compact glyph APIs remain stable for
 // inline weather/status indicators. All icons share outline, depth and light.
-export const PACK_SHAPES=['classic','rucksack','satchel','tactical'];
+export const PACK_SHAPES=['classic','rucksack','satchel','tactical','rolltop','messenger'];
 export const PACK_COLORS=['#d84d54','#d39b4e','#509e85','#5c8fd1','#9d79c8','#9a9ba5'];
 export function packAppearance(value={}){
  return {shape:PACK_SHAPES.includes(value?.shape)?value.shape:'classic',color:/^#[0-9a-f]{6}$/i.test(value?.color||'')?value.color.toLowerCase():PACK_COLORS[0]};
@@ -506,18 +506,19 @@ export function navGlyphSvg(name,appearance={}){
  const cells=Array.from({length:32},()=>Array(32).fill(null));
  const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)if(i>=0&&i<32&&j>=0&&j<32)cells[j][i]=c;};
  const shape=(x,y,w,h,c)=>{rect(x+2,y,w-4,h,c);rect(x,y+2,w,h-4,c);};
- const pack=packAppearance(appearance),pal=({board:'#d6ad70',weather:'#e5b75f',calendar:'#9cabd9',feed:'#b4c3a0',moon:'#b1a0db',games:'#70bab9',hub:'#cf9ecb',gear:'#a8b0c4'})[name]||pack.color;
+ const pack=packAppearance(appearance),pal=appearance?.color&&/^#[0-9a-f]{6}$/i.test(appearance.color)?appearance.color:({board:'#d6ad70',weather:'#e5b75f',calendar:'#9cabd9',feed:'#b4c3a0',moon:'#b1a0db',games:'#70bab9',hub:'#cf9ecb',gear:'#a8b0c4'})[name]||pack.color;
  const dark='#202338',edge=tone(pal,-.44),mid=pal,light=tone(pal,.38),highlight=tone(pal,.68),shade=tone(pal,-.22),metal='#d9cba8';
  if(name==='pack'){
   // straps behind fabric; distinct silhouettes and pockets for each style.
-  if(pack.shape==='satchel'){
+  if(pack.shape==='satchel'||pack.shape==='messenger'){
    shape(5,10,23,18,dark);shape(7,11,19,15,mid);rect(5,5,4,11,edge);rect(8,4,16,3,light);rect(24,5,3,12,edge);rect(7,13,19,7,light);rect(7,20,19,2,edge);rect(14,18,5,5,metal);rect(15,19,3,3,edge);rect(9,24,15,1,shade);
+   if(pack.shape==='messenger'){rect(6,5,3,8,metal);rect(8,3,16,3,edge);rect(24,5,3,11,metal);rect(8,13,18,4,shade);rect(15,16,4,4,metal);}
   }else{
-   const wide=pack.shape==='tactical',tall=pack.shape==='rucksack',x=wide?5:7,w=wide?23:19,y=tall?4:7,h=tall?24:21;
+   const wide=pack.shape==='tactical',tall=pack.shape==='rucksack'||pack.shape==='rolltop',x=wide?5:7,w=wide?23:19,y=tall?4:7,h=tall?24:21;
    shape(x-3,y+5,5,h-7,edge);shape(x+w-1,y+5,5,h-7,edge);
    shape(11,2,11,7,dark);rect(13,4,7,3,light);rect(14,5,5,2,null);
    shape(x,y,w,h,dark);shape(x+2,y+2,w-4,h-4,mid);rect(x+3,y+3,w-6,2,light);rect(x+2,y+4,2,h-8,light);rect(x+w-4,y+5,2,h-9,shade);
-   if(tall){shape(x+2,y+2,w-4,7,shade);rect(x+3,y+3,w-6,2,light);rect(x+3,y+10,w-6,2,edge);}
+   if(tall){shape(x+2,y+2,w-4,7,shade);rect(x+3,y+3,w-6,2,light);rect(x+3,y+10,w-6,2,edge);if(pack.shape==='rolltop'){rect(x+3,4,w-6,3,light);rect(x+3,7,w-6,2,edge);rect(x+5,3,w-10,1,metal);}}
    shape(x+3,y+12,w-6,7,edge);shape(x+4,y+13,w-8,5,mid);rect(x+5,y+13,w-10,1,light);
    rect(x+5,y+15,w-10,1,shade);rect(x+5,y+16,2,2,metal);
    if(wide){for(const off of [4,8]){rect(x+3,y+off,w-6,2,edge);rect(x+4,y+off,w-8,1,shade);}rect(x+8,y+5,5,3,metal);}
