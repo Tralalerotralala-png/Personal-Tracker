@@ -2119,3 +2119,7 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
   outline-offset: 2px;
 }
 #main:focus { outline: none; }
+
+/* Accessible preview for custom navigation sprites. */
+.nav-icon-preview{display:flex;align-items:center;justify-content:center;min-height:104px;padding:12px;border:1px solid var(--edge);border-radius:9px;background:var(--panel);}
+.nav-icon-preview svg{width:76px;height:76px;image-rendering:pixelated;}
