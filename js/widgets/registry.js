@@ -139,8 +139,7 @@ function openCalendarSelection(detail) {
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
 function mountCalendar(el, { store, weather }) {
-  // Respect the actual six-day weather horizon: events outside a day with
-  // a reliable wetness meter belong to Calendar, not this short forecast tile.
+  // Seven-day horizon: actual wetness model where available, otherwise a clearly labelled carried-forward estimate.
   const fit=observeWidgetFit(el,()=>{
     const result=fitWidgetRows(el,{
       rowSelector:'.w-cal-day',
@@ -156,8 +155,9 @@ function mountCalendar(el, { store, weather }) {
     const events=await store.list('events');
     const from=todayKeyLocal();
     const state=weather.getState(),available=forecastAgendaDays(state.rows,from);
-    const uv=h('div',{class:'w-cal-uv','data-widget-static':'true'},
-      uvMeter(state.current?.uv_index,{stale:state.status==='stale'}));
+    const uvScore=state.current?.uv_index;
+    const uv=Number.isFinite(uvScore)&&uvScore>=0
+      ?h('div',{class:'w-cal-uv','data-widget-static':'true'},uvMeter(uvScore,{stale:state.status==='stale'})):null;
     if(!available.length){
       replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
         note(language()==='es'
@@ -187,13 +187,15 @@ function mountCalendar(el, { store, weather }) {
               onclick:()=>openCalendarSelection({dateKey:key})},
               h('b',{},key===from?t('Today'):dayShort(key)),h('span',{},dayMonth(key))),
             h('button',{type:'button',class:'w-agenda-ground',
-              title:`${localizedMudLabel(dm.label)} ${dm.index}/100`,
+              title:`${localizedMudLabel(dm.label)} ${dm.index}/100${dm.estimated?' · Estimated from previous day':''}`,
               'aria-label':`${localizedMudLabel(dm.label)} ${dm.index}/100. ${dayTitle}`,
               onclick:()=>openCalendarSelection({dateKey:key})},
               h('span',{class:'w-agenda-weather','aria-hidden':'true',
                 html:weatherIconSvg(dm.raw?.weather_code,{date:new Date(key+'T12:00:00')})}),
               mudBar(dm)),
-            h('span',{class:'w-agenda-uv'},peak)),
+            dm.estimated?h('small',{class:'w-cal-estimated',title:'Carried forward from previous day'},
+              language()==='es'?'Estim.':'Est.'):null,
+            peak?h('span',{class:'w-agenda-uv'},peak):null),
           ...shown.map(o=>h('button',{type:'button',class:'w-ev w-event-link',
             title:`${language()==='es'?'Abrir evento':'Open event'}: ${o.event.title}`,
             'aria-label':`${language()==='es'?'Abrir evento':'Open event'} ${o.event.title} · ${dayTitle}`,
