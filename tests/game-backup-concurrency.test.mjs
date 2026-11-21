@@ -54,7 +54,10 @@ test('legacy array backups remain visible and deletable without rewriting newer 
   assert.deepEqual(new Set((await service.listAll()).map(x=>x.id)),new Set([old.id,fresh.id]));
   await service.remove(old);
   assert.deepEqual((await service.listAll()).map(x=>x.id),[fresh.id]);
-  assert.deepEqual(await store.getSetting('game_backup_index_v1'),[]);
+  // The old shared record is intentionally NEVER rewritten. Its removed ID
+  // is hidden by a separately synced tombstone and cannot resurrect on pull.
+  assert.deepEqual(await store.getSetting('game_backup_index_v1'),[old]);
+  assert.equal((await store.get('settings','game_backup_removed_v2:'+old.id)).value.deleted,true);
   assert.equal((await store.get('settings','game_backup_entry_v2:'+fresh.id)).value.path,fresh.path);
 });
 
@@ -83,4 +86,48 @@ test('separate offline device caches converge after syncing independent backup r
   const expected=new Set([first.id,second.id]);
   assert.deepEqual(new Set((await a.listAll()).map(x=>x.id)),expected);
   assert.deepEqual(new Set((await b.listAll()).map(x=>x.id)),expected);
+});
+
+test('a legacy delete survives another device syncing its original shared index',async()=>{
+  const {client,objects}=fixture();
+  const original={id:'legacy-a',gameId:GAME,path:UID+'/'+GAME+'/legacy-a.bin',
+    name:'original.sav',size:7,hash:'legacy',createdAt:'2025-01-01T00:00:00Z'};
+  const preserved={id:'legacy-b',gameId:GAME,path:UID+'/'+GAME+'/legacy-b.bin',
+    name:'second.sav',size:7,hash:'legacy',createdAt:'2025-02-01T00:00:00Z'};
+  const oldIndex=[original,preserved];
+  const deviceA=createMemoryAdapter(),deviceB=createMemoryAdapter();
+  const storeA=createStore({adapter:deviceA}),storeB=createStore({adapter:deviceB});
+  await storeA.setSetting('game_backup_index_v1',oldIndex);
+  await storeB.setSetting('game_backup_index_v1',oldIndex);
+  objects.set(original.path,new File(['a bytes'],'a.sav'));
+  objects.set(preserved.path,new File(['b bytes'],'b.sav'));
+  const a=createGameBackupService({client,store:storeA});
+  const b=createGameBackupService({client,store:storeB});
+  await a.remove(original);
+  assert.deepEqual(await storeA.getSetting('game_backup_index_v1'),oldIndex);
+  assert.deepEqual((await a.list(GAME)).map(x=>x.id),[preserved.id]);
+  assert.deepEqual((await b.list(GAME)).map(x=>x.id),[preserved.id,original.id].sort((x,y)=>(x===preserved.id?-1:1)));
+  // A stale device can still pull its original v1 record. It must not undo the
+  // independently keyed deletion marker after syncing.
+  for(const row of await storeB.list('settings'))await deviceA.put('settings',row);
+  for(const row of await storeA.list('settings'))await deviceB.put('settings',row);
+  assert.deepEqual((await a.listAll()).map(x=>x.id),[preserved.id]);
+  assert.deepEqual((await b.listAll()).map(x=>x.id),[preserved.id]);
+  assert.equal(objects.has(original.path),false);
+  assert.equal(objects.has(preserved.path),true);
+});
+
+test('new backup metadata cannot resurrect when its deletion marker arrives first',async()=>{
+  const {client}=fixture(),adapterA=createMemoryAdapter(),adapterB=createMemoryAdapter();
+  const aStore=createStore({adapter:adapterA}),bStore=createStore({adapter:adapterB});
+  const a=createGameBackupService({client,store:aStore});
+  const b=createGameBackupService({client,store:bStore});
+  const rec=await a.upload(GAME,new File(['bytes'],'slot.sav'));
+  const oldRow=await aStore.get('settings','game_backup_entry_v2:'+rec.id);
+  await a.remove(rec);
+  const removal=await aStore.get('settings','game_backup_removed_v2:'+rec.id);
+  // Deliver the late entry after the deletion marker.
+  await adapterB.put('settings',removal);
+  await adapterB.put('settings',oldRow);
+  assert.deepEqual(await b.listAll(),[]);
 });

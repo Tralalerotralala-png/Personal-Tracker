@@ -7,6 +7,7 @@ export const GAME_BACKUP_BUCKET = 'game-backups';
 export const GAME_BACKUP_LIMIT = 25 * 1024 * 1024; // reliable simple uploads on phones
 const META_KEY = 'game_backup_index_v1'; // Legacy index: read only for existing records.
 const ENTRY_PREFIX = 'game_backup_entry_v2:'; // One independently synced setting per backup.
+const REMOVED_PREFIX = 'game_backup_removed_v2:'; // Independent deletion marker, including legacy backups.
 const cleanFilename = name => String(name ?? '').split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g,'').slice(0,160);
 export function validateBackupFile(file) {
   if (!file || !file.name || !Number.isFinite(file.size) || file.size <= 0) throw new Error('Choose a non-empty backup file.');
@@ -42,7 +43,7 @@ export function createGameBackupService({client, store}) {
     // different records without overwriting each other's metadata index.
     const [legacy, records] = await Promise.all([
       store.getSetting(META_KEY, []),
-      store.list('settings', {where: row => row.key.startsWith(ENTRY_PREFIX)}),
+      store.list('settings', {where: row => row.key.startsWith(ENTRY_PREFIX) || row.key.startsWith(REMOVED_PREFIX)}),
     ]);
     const valid = record => record && typeof record.id === 'string'
       && typeof record.path === 'string' && typeof record.gameId === 'string';
@@ -50,13 +51,18 @@ export function createGameBackupService({client, store}) {
     for (const rec of Array.isArray(legacy) ? legacy : []) {
       if (valid(rec)) byId.set(rec.id, rec);
     }
+    const removed=new Set();
     for (const row of records) {
       const rec = row.value;
       // Require metadata to match its key; a malformed row cannot impersonate
       // another backup or shadow its legacy entry.
       if (valid(rec) && row.key === ENTRY_PREFIX + rec.id) byId.set(rec.id, rec);
+      if (rec?.deleted===true && typeof rec.id==='string' &&
+          row.key === REMOVED_PREFIX + rec.id) removed.add(rec.id);
     }
-    return [...byId.values()];
+    // A deletion on one device must win over copies of the old shared index
+    // still held or subsequently synchronized by another device.
+    return [...byId.values()].filter(rec=>!removed.has(rec.id));
   }
   async function list(gameId) {
     return (await listAll()).filter(x => x.gameId === gameId).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
@@ -103,14 +109,12 @@ export function createGameBackupService({client, store}) {
     if (!entry?.path?.startsWith(`${uid}/`)) throw new Error('This backup is not owned by your account.');
     const {error}=await client.storage.from(GAME_BACKUP_BUCKET).remove([entry.path]);
     if(error)throw new Error(`Could not delete backup: ${error.message}`);
-    // New backups have independent metadata; deleting one cannot overwrite another.
+    // Never rewrite the legacy shared index. A concurrent update from another
+    // device could be lost by a read-modify-write of the whole array. Instead,
+    // a per-ID deletion marker masks the old index on every synced device.
+    await store.setSetting(REMOVED_PREFIX + entry.id,
+      {id:entry.id,path:entry.path,deleted:true,deletedAt:new Date().toISOString()});
     await store.remove('settings', ENTRY_PREFIX + entry.id);
-    // Older backups still live inside the v1 shared index. Only touch that
-    // record when deleting one of those legacy entries.
-    const legacy = await store.getSetting(META_KEY, []);
-    if (Array.isArray(legacy) && legacy.some(x => x?.id === entry.id)) {
-      await store.setSetting(META_KEY, legacy.filter(x => x?.id !== entry.id));
-    }
   }
   return {userId,list,listAll,checkReady,upload,download,remove,storageUsed:async()=> (await listAll()).reduce((s,x)=>s+(Number(x.size)||0),0)};
 }
