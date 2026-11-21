@@ -141,71 +141,73 @@ function b2Meaning(turn,{es}){
   h('strong',{},es?'ES · ':'EN · '),es?turn.es:turn.en);
 }
 function createB2Dialogue({lesson,date,onHistory,expanded=false}){
- const es=language()==='es',prompt=lesson,reply=lesson.reply;
+ // A concise daily focus: the reply averages about 18 Hanzi vs. 24 in the setup.
+ const es=language()==='es',prompt=lesson.reply,reply=lesson;
+ const title=es?lesson.topicEs:lesson.topic;
  const replyId='phrase-b2-reply-'+(++dialoguePanelSequence);
  const response=h('div',{class:'phrase-b2-answer',hidden:!expanded,id:replyId},
-  h('div',{class:'phrase-b2-turn-head'},h('b',{},'B · '+(es?'Respuesta':'Response'))),
+  h('div',{class:'phrase-b2-turn-head'},h('b',{},es?'Contexto · frase anterior':'Context · earlier line')),
   h('div',{class:'phrase-b2-grid'},
    h('div',{class:'phrase-b2-language',lang:'zh-Hans'},h('small',{},es?'MANDARÍN':'MANDARIN'),
     h('p',{class:'phrase-b2-utterance'},reply.zh),
     h('p',{class:'phrase-pronunciation',lang:'zh-Latn-pinyin'},reply.py)),
    h('div',{class:'phrase-b2-language',lang:'de'},h('small',{},es?'ALEMÁN':'GERMAN'),
     h('p',{class:'phrase-b2-utterance'},reply.de))),
-  b2Meaning(reply,{es,all:true}),
-  createB2Literal(lesson,'b',es),
+  b2Meaning(reply,{es}),
+  createB2Literal(lesson,'a',es),
+  h('div',{class:'phrase-b2-pattern'},h('small',{},es?'PATRÓN DE CONVERSACIÓN':'SPEECH PATTERN'),
+   h('span',{},lesson.pattern)),
   h('div',{class:'phrase-b2-tip'},
    h('strong',{},es?'Por qué funciona':'Why it works'),
    h('p',{},es?lesson.whyEs:lesson.why)),
   h('div',{class:'phrase-b2-expressions'},
    h('small',{},es?'EXPRESIONES ÚTILES':'USEFUL EXPRESSIONS'),
-   ...lesson.expressions.map(([zh,de,en])=>
+   ...lesson.expressions.map(([zh,de,en],i)=>
     h('div',{class:'phrase-b2-vocab'},h('span',{lang:'zh-Hans'},zh),
-     h('span',{lang:'de'},de),h('small',{lang:'en'},en)))));
+     h('span',{lang:'de'},de),h('small',{lang:es?'es':'en'},es?lesson.expressionEs[i]:en)))));
  const toggle=h('button',{class:'btn small phrase-b2-toggle',type:'button',
   'aria-expanded':String(expanded),'aria-controls':replyId,
   onclick:()=>{
    // A compact dashboard widget opens a complete sheet rather than pushing
    // future content below the widget boundary.
    if(toggle.closest('.widget.wd-phrase')){
-    openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:true})});
+    openSheet({title,body:createB2Dialogue({lesson,date,onHistory:null,expanded:true})});
     return;
    }
    const opening=response.hidden;
    response.hidden=!opening;
    toggle.setAttribute('aria-expanded',String(opening));
    toggle.textContent=opening
-    ?(es?'Ocultar respuesta':'Hide response')
-    :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown');
-  }},expanded?(es?'Ocultar respuesta':'Hide response')
-   :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown'));
+    ?(es?'Ocultar contexto':'Hide context')
+    :(es?'Ver contexto y explicación':'Reveal context & breakdown');
+  }},expanded?(es?'Ocultar contexto':'Hide context')
+   :(es?'Ver contexto y explicación':'Reveal context & breakdown'));
  const seeWords=h('button',{class:'btn small phrase-b2-words-button',type:'button',
   onclick:()=>{
    if(seeWords.closest('.widget.wd-phrase')){
-    openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:false})});
+    openSheet({title,body:createB2Dialogue({lesson,date,onHistory:null,expanded:false})});
    }else{
     const panel=seeWords.closest('.phrase-b2-panel')?.querySelector('.phrase-b2-literal');
     if(panel){panel.scrollIntoView?.({block:'nearest',behavior:'auto'});
       panel.querySelector('button')?.focus();}
    }
   }},es?'Significado literal':'Word-by-word meaning');
- return h('section',{class:'phrase-panel phrase-b2-panel','aria-label':es?'Diálogo del día B2':'B2 daily dialogue'},
+ return h('section',{class:'phrase-panel phrase-b2-panel','aria-label':es?'Frase del día B2':'B2 phrase of the day'},
   h('div',{class:'phrase-heading'},
    h('span',{class:'phrase-day'},phraseDateKey(date)+' · B2'),
    onHistory?h('button',{class:'btn small',type:'button',onclick:onHistory},es?'Historial':'History'):null),
   h('div',{class:'phrase-b2-context'},
-   h('strong',{},lesson.topic),h('small',{},lesson.setting)),
-  h('div',{class:'phrase-b2-pattern'},h('small',{},es?'PATRÓN DE CONVERSACIÓN':'SPEECH PATTERN'),
-   h('span',{},lesson.pattern)),
-  h('div',{class:'phrase-b2-turn-head'},h('b',{},'A · '+(es?'Situación':'Scenario')),
-   h('small',{},es?'Piensa cómo responderías':'Think of your reply')),
+   h('strong',{},title),h('small',{},es?lesson.settingEs:lesson.setting)),
+  h('div',{class:'phrase-b2-turn-head'},h('b',{},es?'Frase de hoy':'Today’s phrase'),
+   h('small',{},es?'Respuesta breve':'Short response')),
   h('div',{class:'phrase-b2-grid'},
    h('div',{class:'phrase-b2-language',lang:'zh-Hans'},h('small',{},es?'MANDARÍN':'MANDARIN'),
     h('p',{class:'phrase-b2-utterance'},prompt.zh),
     h('p',{class:'phrase-pronunciation',lang:'zh-Latn-pinyin'},prompt.py)),
    h('div',{class:'phrase-b2-language',lang:'de'},h('small',{},es?'ALEMÁN':'GERMAN'),
     h('p',{class:'phrase-b2-utterance'},prompt.de))),
-  b2Meaning(prompt,{es,all:false}),
-  createB2Literal(lesson,'a',es),
+  b2Meaning(prompt,{es}),
+  createB2Literal(lesson,'b',es),
   h('div',{class:'phrase-b2-actions'},seeWords,toggle),
   response);
 }
@@ -237,16 +239,18 @@ export function openPhraseHistory() {
   replace(detail,createPhraseOfDay({date}));
  }
  datePicker.addEventListener('change',()=>showKey(datePicker.value));
- const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>
-  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},
+ const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>{
+  const focus=lesson.level==='B2'?lesson.reply:lesson;
+  const topic=lesson.level==='B2'?(es?lesson.topicEs:lesson.topic):null;
+  return h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},
    h('time',{datetime:date},date),
    h('span',{class:'phrase-history-target'},
-    lesson.level==='B2'?h('strong',{class:'phrase-history-topic'},'B2 · '+lesson.topic):null,
-    h('span',{lang:'zh-Hans'},lesson.zh),
-    h('span',{lang:'de'},lesson.de)),
+    topic?h('strong',{class:'phrase-history-topic'},'B2 · '+topic):null,
+    h('span',{lang:'zh-Hans'},focus.zh),
+    h('span',{lang:'de'},focus.de)),
    h('span',{class:'phrase-history-meaning'},
-    h('span',{lang:es?'es':'en'},(es?'ES · ':'EN · ')+(es?lesson.es:lesson.en)),
-    h('small',{lang:es?'en':'es'},(es?'EN · ':'ES · ')+(es?lesson.en:lesson.es))))));
+    h('span',{lang:es?'es':'en'},(es?'ES · ':'EN · ')+(es?focus.es:focus.en))));
+ }));
  const body=h('div',{class:'phrase-archive'},h('p',{class:'hint'},es?'Todas las frases desde el lanzamiento, incluso los días en que no abriste la aplicación.':'Every dated lesson since launch, including days when the app was closed.'),
   h('label',{class:'phrase-date-picker'},es?'Ver fecha':'Jump to date',datePicker),detail,
   h('h3',{},es?'Días anteriores':'Previous days'),history.length?recent:h('p',{class:'hint'},es?'El historial empieza mañana.':'Previous lessons will appear tomorrow.'));
