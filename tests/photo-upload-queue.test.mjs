@@ -60,3 +60,40 @@ test('compare-and-delete refuses a stale photo marker and removes exact matches 
  assert.equal(await adapter.get('meta','photoq:'+ITEM),undefined);
  assert.equal(await adapter.deleteMetaIfPath('photoq:'+ITEM,NEW),false);
 });
+
+test('a retry during photo selection must retain the new marker until item update commits',async()=>{
+ const adapter=createMemoryAdapter(),store=createStore({adapter});
+ await store.upsert('items',{id:ITEM,name:'Photo item',photo_path:OLD});
+ await store.meta.set('photo:'+ITEM,{path:NEW,dataUrl:dataUrl('second')});
+ await store.meta.set('photoq:'+ITEM,{path:NEW,replaces:OLD});
+ const uploaded=[];
+ const client={
+  auth:{getSession:async()=>({data:{session:{user:{id:UID}}}})},
+  storage:{from:()=>({
+   upload:async path=>{uploaded.push(path);return {error:null};},
+   remove:async()=>({error:null})
+  })}
+ };
+ const service=createPhotos({store,client});
+ assert.equal(await service.flushQueue(),0);
+ assert.equal((await store.meta.get('photoq:'+ITEM)).path,NEW);
+ assert.deepEqual(uploaded,[]);
+ // The user's photo selection finishes its item update after that retry.
+ await store.upsert('items',{id:ITEM,photo_path:NEW});
+ assert.equal(await service.flushQueue(),1);
+ assert.deepEqual(uploaded,[NEW]);
+ assert.equal(await store.meta.get('photoq:'+ITEM),undefined);
+});
+
+test('genuinely stale photo markers are still cleaned up when cache has a different path',async()=>{
+ const adapter=createMemoryAdapter(),store=createStore({adapter});
+ await store.upsert('items',{id:ITEM,name:'Photo item',photo_path:NEW});
+ await store.meta.set('photo:'+ITEM,{path:NEW,dataUrl:dataUrl('second')});
+ await store.meta.set('photoq:'+ITEM,{path:OLD});
+ const client={
+  auth:{getSession:async()=>({data:{session:{user:{id:UID}}}})},
+  storage:{from:()=>({upload:async()=>{throw Error('Stale upload must not run');}})}
+ };
+ assert.equal(await createPhotos({store,client}).flushQueue(),0);
+ assert.equal(await store.meta.get('photoq:'+ITEM),undefined);
+});
