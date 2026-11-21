@@ -56,12 +56,19 @@ export function createGameBackupService({client, store}) {
   // A successful Storage upload is not a complete backup until its metadata
   // can be discovered from another signed-in device. Local setting writes
   // only queue synchronization, so verify the same per-backup row in PostgREST.
-  async function confirmServerUploadIndex(uid,key,record){
-    const local=await store.get('settings',key);
-    if(!local||local.deleted_at)throw Error('Uploaded backup metadata is missing from this device.');
+  async function confirmServerUploadIndex(uid,key,record,{allowMissingLocal=false}={}){
+    let local;
+    try {local=await store.get('settings',key);}
+    catch(err){if(!allowMissingLocal)throw err;}
+    if((!local||local.deleted_at)&&!allowMissingLocal)
+      throw Error('Uploaded backup metadata is missing from this device.');
+    // A failed IndexedDB write must not make a successful Storage upload
+    // undiscoverable. In that case recover directly to the authenticated
+    // owner-only cloud index using a fresh timestamp.
+    const now=new Date().toISOString();
     const {data,error}=await client.from('settings').upsert({
-      user_id:uid,key,value:record,created_at:local.created_at,
-      updated_at:local.updated_at,deleted_at:null
+      user_id:uid,key,value:record,created_at:local?.created_at??now,
+      updated_at:local?.updated_at??now,deleted_at:null
     },{onConflict:'user_id,key'}).select('key,value');
     if(error||!Array.isArray(data)||!data.some(row=>
        row.key===key&&row.value?.id===record.id&&
@@ -127,10 +134,16 @@ export function createGameBackupService({client, store}) {
     const key=ENTRY_PREFIX + id;
     try {await store.setSetting(key,rec);}
     catch {
-      // Never destroy already-uploaded bytes after an indexing failure. The
-      // file remains under its opaque owner-scoped Storage path so the owner
-      // can recover it even if this device's IndexedDB quota is exhausted.
-      throw new Error('Save file uploaded but local indexing failed. The private Storage copy was retained; do not delete your original save. Check device storage and contact support with the upload time.');
+      // The local device could be out of space. Attempt a direct PostgREST
+      // index write before losing the session, since the Storage object
+      // already exists and must not be destroyed as an error workaround.
+      try {
+        await confirmServerUploadIndex(uid,key,rec,{allowMissingLocal:true});
+        throw new Error('Save file and cloud index were stored, but the device cache could not save metadata. Keep your original save, free browser storage, then reload and Sync to recover the cloud entry.');
+      }catch(err){
+        if(/cloud index were stored/.test(err.message))throw err;
+        throw new Error('Save bytes were uploaded to private Storage at '+path+', but indexing could not be confirmed on this device or Supabase. Keep your original save. Do not clear this account’s browser data until you recover the Storage file.');
+      }
     }
     try {await confirmServerUploadIndex(uid,key,rec);}
     catch {
