@@ -1,6 +1,7 @@
 // The Mud tab: today's answer first, then five observed days, today, and five
 // forecast days, each with a mud score and a one-line reason.
 import { h, replace, openSheet } from './dom.js';
+import {dayHourlyPlaceholder} from './day-hourly.js';
 import { t, language } from './language.js';
 import { isNightAtLocation, moonPhaseSvg } from '../weather/moon-phase.js';
 import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, skyEventInformation } from '../weather/sky-events.js';
@@ -44,6 +45,7 @@ export function openDayDetail(row, weather) {
       h('div', { class: 'detail-head' }, mudChip(row), h('span', { class: 'detail-wx', html: glyphSvg(g.glyph) }), h('span', {}, localizedWeather(g.text))),
       mudBar(row),
       h('p', { class: 'prose' }, `${localizedMudWhy(row.why)}.`),
+      dayHourlyPlaceholder(row.date,weather),
       h('p', { class: 'hint' }, row.phase === 'past' ? 'Observed: weather that already happened.' : row.phase === 'today' ? 'Today: part observed, part forecast.' : 'Forecast: expected weather, which can change.'),
       h('h3', { class: 'detail-h' }, 'How the score was built'),
       h('table', { class: 'detail-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Factor'), h('th', {}, 'Score'), h('th', {}, 'Adds'))), h('tbody', {}, factors)),
@@ -127,8 +129,8 @@ export function createMudView({ store, weather }) {
     const temp = current?.temperature_2m;
     const number = (value, unit = '') => typeof value === 'number' ? `${Math.round(value)}${unit}` : '—';
     const stat = (label, value) => h('div', { class: 'wx-stat' }, h('span', { class: 'wx-stat-label' }, label), h('strong', {}, value));
-    const days = [today, ...future].slice(0, 6);
-    return h('section', { class: 'wx-panel', 'aria-label': 'Weather conditions and six day outlook' },
+    const days = [today, ...future].slice(0, 7);
+    return h('section', { class: 'wx-panel', 'aria-label': 'Weather conditions and seven day outlook' },
       h('div', { class: 'wx-heading' }, h('h3', {}, t('Weather')), h('span', { class: 'hint' }, current ? 'Current conditions' : 'Daily forecast')),
       h('div', { class: 'wx-hero' },
         h('div', { class: `wx-scene wx-${kind}`, 'aria-hidden': 'true' },
@@ -161,7 +163,7 @@ export function createMudView({ store, weather }) {
         language()==='es'
           ? ' · El estado del suelo es un cálculo meteorológico, no una medición directa. La calificación indica los datos disponibles, no una precisión comprobada.'
           : ' · Ground conditions are modeled from weather, not measured with a sensor. The rating reflects available inputs, not a verified accuracy percentage.'),
-      h('h4', { class: 'wx-outlook-title' }, t('Weather and ground — next six days')),
+      h('h4', { class: 'wx-outlook-title' }, language()==='es'?'Clima y suelo — próximos siete días':'Weather and ground — next seven days'),
       h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
         return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather), title: 'View weather and ground details' },
@@ -195,7 +197,7 @@ export function createMudView({ store, weather }) {
   function skyPanel(state) {
     const events=upcomingSkyEvents(new Date(),6);
     return h('details',{class:'wx-sky-events'},h('summary',{},t('Upcoming sky events')+` (${events.length})`),
-      h('p',{class:'wx-history-note'},t('Dates are approximate. Visibility at your location is not guaranteed; check the source before planning.')),
+
       ...events.map(event=>{
         const exact=skyEventOnDate(event.date);
         const kind=event.kind==='moon'?'moon':exact?.kind||'meteor';
@@ -205,8 +207,8 @@ export function createMudView({ store, weather }) {
         const es=language()==='es';
         const info=kind==='solar_eclipse'||kind==='lunar_eclipse'
           ? (es?'La visibilidad y el horario dependen de tu ubicación. Consulta el mapa antes de planear una observación.':'Visibility and timing depend on your location. Check the visibility map before planning to watch.')
-          : kind==='moon'?(es?'La fecha de la fase lunar es aproximada.':'The moon phase date is approximate.')
-          : (es?'Fecha aproximada del máximo. El horario y las condiciones del cielo pueden variar.':'Approximate peak date. Timing and sky conditions depend on your location.');
+          : kind==='moon'?(es?'Fase lunar':'Lunar phase')
+          : (es?'Máximo de la lluvia de meteoros':'Meteor-shower peak');
         const details=skyEventInformation(event,language());
         return h('details',{class:'wx-sky-card'},
           h('summary',{},h('span',{class:'wx-event-symbol',html:kind==='moon'?moonPhaseSvg(new Date(event.date+'T12:00:00Z')):skyEventIconSvg(kind)}),
@@ -218,11 +220,12 @@ export function createMudView({ store, weather }) {
             es?`Guía para ${place}: `:`Guide for ${place}: `,
             clouds===null?(es?'Sin datos actuales de nubes.':'No current cloud data.')
               : (es?`Nubosidad actual: ${clouds}%. `:`Current cloud cover: ${clouds}%. `),
-            isNear?(es?'Consulta las condiciones esta noche y busca un lugar oscuro con el horizonte despejado.':'Check conditions tonight and choose a dark location with a clear horizon.')
-              : (es?'El cielo puede cambiar antes del evento.':'Clouds may change before the event.'),
+            isNear?(es?'Busca un lugar oscuro con horizonte despejado.':'Choose a dark location with a clear horizon.')
+              : null,
             ' ',
-            es?'La dirección exacta, el horario máximo y la visibilidad deben verificarse en la fuente.':'Confirm viewing direction, peak time, and local visibility with the event source.'),
-          h('p',{class:'hint'},es?'No se supone que un eclipse sea visible desde este lugar.':'An eclipse is not assumed visible from this location.'),
+            (kind==='solar_eclipse'||kind==='lunar_eclipse')?(es?'Consulta la ruta de visibilidad.':'Check the visibility path.'):null),
+          (kind==='solar_eclipse'||kind==='lunar_eclipse')
+            ? h('p',{class:'hint'},es?'La trayectoria determina dónde será visible el eclipse.':'Eclipse visibility depends on the event path.'):null,
           h('a',{href:event.url,target:'_blank',rel:'noopener noreferrer'},es?'Consultar fuente y visibilidad':'Check source and visibility'));
       }));
   }

@@ -1,4 +1,6 @@
 import { openMedications } from './medications.js';
+import {forecastAgendaDays} from '../widgets/fit.js';
+import {dayHourlyPlaceholder} from './day-hourly.js';
 // The Calendar tab: a month grid with a mud dot on every day that has a
 // forecast, the next two weeks as a list, and add / edit / import of events.
 import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
@@ -39,7 +41,11 @@ export function createCalendarView({ store, weather }) {
     state.weekStart = ui?.week_start === 'sun' ? 0 : 1;
   }
 
-  const mudByDate = () => new Map(weather.getState().rows.map((r) => [r.date, r]));
+  const mudByDate = () => {
+    const rows=weather.getState().rows;
+    const projected=forecastAgendaDays(rows,todayKey());
+    return new Map([...rows,...projected].map(r=>[r.date,r]));
+  };
 
   // ---- month grid -----------------------------------------------------------------
 
@@ -131,7 +137,11 @@ export function createCalendarView({ store, weather }) {
             mudChip(dm),
             key===todayKey()?uvMeter(weather.getState().current?.uv_index,{stale:weather.getState().status==='stale'}):null,
             uvMeter(dm.raw?.uvMax,{peak:true,stale:weather.getState().status==='stale'})),
-          h('span', { class:'day-weather-explanation' }, `${dm.why}.`)) : null,
+          h('span', { class:'day-weather-explanation' },
+            dm.estimated
+              ? (locale().startsWith('es')?'Estimación: humedad del día anterior.':'Estimated wetness: carried forward from the previous day.')
+              : `${dm.why}.`)) : null,
+        dayHourlyPlaceholder(key,weather),
         occs.length
           ? h('ul', { class: 'day-events' }, occs.map((o) => h('li', {},
             h('button', { class: 'day-event', type: 'button', style: `--c:${o.event.color || EVENT_COLORS[0]}`, onclick: () => { sheet.close(); openEventSheet({ event: o.event, occurrenceKey: o.key }); } },

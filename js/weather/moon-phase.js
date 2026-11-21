@@ -1,4 +1,5 @@
 // Mean synodic month approximation; displayed phase, not a precise astronomical ephemeris.
+import {pixelStackIconSvg} from '../ui/sprite-stack.js';
 const SYNODIC = 29.530588853;
 const REFERENCE_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
 export function moonPhase(date = new Date()) {
@@ -59,7 +60,7 @@ export function moonPhaseSvg(date = new Date()) {
       x=end;
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><g data-part="earthshine">${dark.join('')}</g><g data-part="illuminated">${light.join('')}</g></svg>`;
+  return pixelStackIconSvg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-label="${phase.label}" role="img"><g data-part="earthshine">${dark.join('')}</g><g data-part="illuminated">${light.join('')}</g></svg>`);
 }
 export function isNightAtLocation(current, date = new Date()) {
   if (current?.is_day === 0) return true;

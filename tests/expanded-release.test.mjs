@@ -17,7 +17,7 @@ test('hourly rain forecast is an optional separate endpoint and parser',()=>{
   assert.match(url,/precipitation_probability/);
   assert.doesNotMatch(buildForecastUrl({lat:20.7,lon:-101.4},'daily'),/precipitation_probability/);
   const rows=parseHourly({hourly:{time:['2026-11-04T13:00'],precipitation_probability:[55],precipitation:[1.2],weather_code:[61]}});
-  assert.deepEqual(rows,[{time:'2026-11-04T13:00',probability:55,precipitation:1.2,weather_code:61}]);
+  assert.deepEqual(rows,[{time:'2026-11-04T13:00',probability:55,precipitation:1.2,weather_code:61,uv_index:null}]);
   assert.deepEqual(parseHourly({}),[]);
 });
 test('sky event watch is dated, non-local-visibility-labeled and links to authorities',()=>{

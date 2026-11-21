@@ -11,9 +11,9 @@ const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 // Ten days of history gives the first displayed day (5 days back) a few days of
-// "what fell before" to remember. Six forecast days = today plus five ahead.
+// "what fell before" to remember. Seven forecast days = today plus six ahead.
 export const PAST_DAYS = 34;
-export const FORECAST_DAYS = 6;
+export const FORECAST_DAYS = 7;
 
 export const DAILY_VARS = [
   'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'rain_sum',
@@ -37,7 +37,7 @@ export function buildForecastUrl({ lat, lon }, kind) {
     forecast_days: String(FORECAST_DAYS),
   });
   if (kind === 'soil') p.set('hourly', SOIL_VARS.join(','));
-  else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code');
+  else if (kind === 'rain') p.set('hourly', 'precipitation_probability,precipitation,weather_code,uv_index');
   else {
     p.set('daily', DAILY_VARS.join(','));
     p.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,cloud_cover,uv_index');
@@ -115,6 +115,7 @@ export function parseHourly(json) {
     time, probability: typeof data.precipitation_probability?.[i] === 'number' ? data.precipitation_probability[i] : null,
     precipitation: typeof data.precipitation?.[i] === 'number' ? data.precipitation[i] : null,
     weather_code: data.weather_code?.[i] ?? null,
+    uv_index: Number.isFinite(data.uv_index?.[i]) ? data.uv_index[i] : null,
   })) : [];
 }
 

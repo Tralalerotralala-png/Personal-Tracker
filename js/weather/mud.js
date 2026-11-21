@@ -156,7 +156,7 @@ export function computeMud(days, { params: rawParams, weights: rawWeights, soilA
 }
 
 // The five days before today, today, and the five days after: exactly 11 rows.
-export function displayWindow(results, todayDate, before = 5, after = 5) {
+export function displayWindow(results, todayDate, before = 5, after = 6) {
   const t = results.findIndex((r) => r.date === todayDate);
   if (t < 0) return [];
   return results.slice(Math.max(0, t - before), t + after + 1).map((r) => {

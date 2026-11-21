@@ -1,16 +1,32 @@
-// Shared dashboard agenda bounds and no-scroll sizing utilities.
-// A day only belongs to the Coming Up widget if there is an actual modelled
-// wetness score for that exact date. The full calendar remains unrestricted.
-export function forecastAgendaDays(rows=[],today){
+// Coming Up covers seven local calendar dates. A weather-model row wins;
+// when a cached/partial response does not reach the end of the window, carry
+// forward the last valid wetness index. Carried rows are visibly ESTIMATED,
+// not fabricated observations or live weather/UV measurements.
+const nextDate=(date,offset)=>{
+ const d=new Date(date+'T12:00:00Z');
+ d.setUTCDate(d.getUTCDate()+offset);
+ return d.toISOString().slice(0,10);
+};
+export function forecastAgendaDays(rows=[],today,days=7){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(today||'')||!Array.isArray(rows))return [];
  const unique=new Map();
  for(const row of rows){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(row?.date||'')||row.date<today||
-     row.phase==='past'||!Number.isFinite(row.index)||row.index<0||row.index>100||
-     !['Dry','Tacky','Muddy','Swamp'].includes(row.label))continue;
+    row.phase==='past'||!Number.isFinite(row.index)||row.index<0||row.index>100||
+    !['Dry','Tacky','Muddy','Swamp'].includes(row.label))continue;
   unique.set(row.date,row);
  }
- return [...unique.values()].sort((a,b)=>a.date.localeCompare(b.date));
+ const out=[];let previous=null;
+ for(let offset=0;offset<Math.max(1,Math.min(7,days));offset++){
+  const date=nextDate(today,offset),actual=unique.get(date);
+  if(actual){out.push(actual);previous=actual;continue;}
+  if(!previous)continue;
+  const carried={...previous,date,phase:'projected',estimated:true,
+    raw:{weather_code:null,uvMax:null},
+    why:'Ground wetness carried forward from the previous forecast day'};
+  out.push(carried);previous=carried;
+ }
+ return out;
 }
 
 // Compact widgets should show complete rows and an explicit expansion button,
@@ -47,6 +63,16 @@ export function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
   used+=size;visible++;
  }
  rows.forEach((row,i)=>{row.hidden=i>=visible;});
+ more.hidden=visible===rows.length;
+ // Actual DOM dimensions include grid gaps, padding and type metrics that
+ // estimates cannot predict exactly. Remove one full day when the whole card
+ // would otherwise need internal scrolling. Never cut a row in half.
+ while(visible>1&&Number.isFinite(body.clientHeight)&&body.clientHeight>0&&
+       body.scrollHeight>body.clientHeight+1){
+  visible--;
+  rows[visible].hidden=true;
+  more.hidden=false;
+ }
  const hidden=rows.length-visible;
  more.hidden=hidden===0;
  more.dataset.hiddenCount=String(hidden);

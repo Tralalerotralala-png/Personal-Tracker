@@ -8,5 +8,5 @@ test('weather archives old forecasts without claiming measurements',()=>{
  assert.match(service,/retrospectiveRain/);
  assert.match(view,/Both values come from Open-Meteo model data/);
  assert.match(view,/wx-viewing-guide/);
- assert.match(view,/Confirm viewing direction, peak time, and local visibility/);
+ assert.match(view,/Check the visibility path/);
 });
