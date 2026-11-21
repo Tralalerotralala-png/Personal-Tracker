@@ -532,9 +532,16 @@ async function route() {
   // The phone bottom bar scrolls horizontally; reveal the active section.
   if(matchMedia('(max-width: 899px)').matches)
     requestAnimationFrame(()=>nav.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}));
-  if (!mounted.has(key)) { mounted.add(key); await VIEWS[key].mount(); }
-  for (const [k, view] of Object.entries(VIEWS)) if (k !== key) view.hide?.();
-  VIEWS[key].show?.();
+  const firstMount=!mounted.has(key);
+  if(firstMount){mounted.add(key);await VIEWS[key].mount();}
+  for(const [k,view] of Object.entries(VIEWS))if(k!==key)view.hide?.();
+  // Several views do all their loading and drawing in mount(). Repeating
+  // show() immediately doubled IndexedDB reads, network refreshes and DOM
+  // work (and could reopen a just-created sheet). Views that need show() for
+  // deep-link handling still receive it on first mount.
+  if(!firstMount||(
+    VIEWS[key].showAfterMount!==false&&VIEWS[key].mount!==VIEWS[key].show
+  )) VIEWS[key].show?.();
   document.title = `${t(NAV.find((n) => n[0] === key)[1])} - Personal Tracker`;
 }
 window.addEventListener('hashchange', route);
