@@ -48,7 +48,7 @@ test('photo, game save and local audio are archived with checked binary data',as
 
 test('missing/truncated archives and unsafe asset paths are rejected before writes',async()=>{
  const {blob}=await createPortableTar({backup:backup()});
- await assert.rejects(inspectPortableTar(blob.slice(0,blob.size-512)),/Missing archive manifest or end marker/);
+ await assert.rejects(inspectPortableTar(blob.slice(0,blob.size-512)),/Missing archive manifest or end marker|Truncated TAR end marker/);
  await assert.rejects(createPortableTar({backup:backup(),assets:[
   {kind:'audio',id:AUDIO,path:'../bad.bin',blob:new Blob(['x'])}
  ]}),/unsafe media path/);
