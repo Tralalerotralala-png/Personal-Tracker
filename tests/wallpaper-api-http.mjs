@@ -115,4 +115,26 @@ assert.equal(finalWrite.data[0]?.value?.deleted,true);
 const anonSettings=await call('/settings?select=key');
 statusOneOf('anonymous clients cannot enumerate game-save deletion markers',anonSettings,401,403);
 
-console.log('PASS: disposable PostgREST HTTP owner/nonowner/anon JWT, RLS, wallpaper capability and durable game-save marker checks');
+// The same authenticated settings endpoint is used to confirm freshly
+// uploaded game saves, not only destructive deletion intents.
+const uploadId='55555555-5555-4555-8555-555555555555';
+const uploadKey='game_backup_entry_v2:'+uploadId;
+const uploaded={id:uploadId,gameId:backupId,
+ path:OWNER+'/'+backupId+'/'+uploadId+'.bin',hash:'a'.repeat(64),
+ size:24,createdAt:now,name:'checkpoint.sav'};
+const newIndex=await call('/settings?on_conflict=user_id,key',{
+ token:owner,method:'POST',
+ body:{user_id:OWNER,key:uploadKey,value:uploaded,created_at:now,updated_at:now},
+ headers:{Prefer:'resolution=merge-duplicates,return=representation'}
+});
+statusOneOf('owner can durably acknowledge uploaded game metadata',newIndex,200,201);
+assert.equal(newIndex.data[0]?.key,uploadKey);
+assert.equal(newIndex.data[0]?.value?.hash,uploaded.hash);
+const deniedIndex=await call('/settings?on_conflict=user_id,key',{
+ token:other,method:'POST',
+ body:{user_id:OTHER,key:uploadKey,value:uploaded,created_at:now,updated_at:now},
+ headers:{Prefer:'resolution=merge-duplicates,return=representation'}
+});
+statusOneOf('nonowner cannot publish game backup index',deniedIndex,401,403);
+
+console.log('PASS: disposable PostgREST HTTP owner/nonowner/anon JWT, RLS, wallpaper capability and durable game-save upload and deletion marker checks');
