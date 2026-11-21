@@ -44,6 +44,69 @@ for width,height in [(390,844),(1280,900)]:
             outbox:(await adapter.getAll('outbox')).length};
         }""")
         assert erased=={"items":0,"meta":0,"outbox":0},"Device erasure left cached data: "+str(erased)
+        # Actual Chromium integration: forecast-only days, meter, current UV,
+        # and daily peak UV. A later unmetered event must not enter Coming Up.
+        agenda_fit=page.evaluate("""async () => {
+          const {mountWidget}=await import('./js/widgets/registry.js');
+          const {todayKeyLocal,addDaysKey}=await import('./js/calendar/recurrence.js');
+          const from=todayKeyLocal(),tomorrow=addDaysKey(from,1),missing=addDaysKey(from,4);
+          const raw={weather_code:0,uvMax:8};
+          const dates=[from,tomorrow];
+          const events=[
+            {id:'one',title:'Forecast only today',starts_at:from+'T12:00:00',all_day:false},
+            {id:'two',title:'Forecast only tomorrow',starts_at:tomorrow+'T12:00:00',all_day:false},
+            {id:'three',title:'Invisible without a wetness meter',starts_at:missing+'T12:00:00',all_day:false}
+          ];
+          const store={list:async()=>events,subscribe:()=>()=>{}};
+          const weather={
+            getState:()=>({rows:dates.map((date,i)=>({date,index:20+i*15,label:'Dry',
+              phase:i===0?'today':'future',raw})),
+              status:'ok',current:{uv_index:5}}),
+            subscribe:()=>()=>{}
+          };
+          const widget=document.createElement('section');
+          widget.className='widget wd-calendar';
+          widget.style.cssText='position:fixed;top:10px;left:10px;width:350px;height:230px;z-index:9999';
+          const head=document.createElement('header');head.className='widget-head';head.textContent='Coming up';
+          const body=document.createElement('div');body.className='widget-body';
+          widget.append(head,body);document.body.append(widget);
+          const instance=mountWidget('calendar',body,{store,weather,interactive:true});
+          await new Promise(resolve=>setTimeout(resolve,380));
+          const labels=[...body.querySelectorAll('.w-cal-day')].map(x=>({
+            date:x.dataset.date,meter:!!x.querySelector('.mud-bar'),dailyUV:x.textContent.includes('Peak UV 8')
+          }));
+          const result={labels,uv:body.textContent.includes('UV index 5'),
+            unmetered:body.textContent.includes('Invisible without a wetness meter'),
+            height:body.clientHeight,scrollHeight:body.scrollHeight};
+          instance.destroy();widget.remove();
+          return result;
+        }""")
+        assert len(agenda_fit["labels"])==2 and all(row["meter"] and row["dailyUV"] for row in agenda_fit["labels"]),agenda_fit
+        assert agenda_fit["uv"] and not agenda_fit["unmetered"],agenda_fit
+        assert agenda_fit["scrollHeight"]<=agenda_fit["height"]+8,"Coming Up needed internal scroll: "+str(agenda_fit)
+        # Clicking celestial event opens local prose rather than a source-code
+        # repository, on both mobile and desktop widget dimensions.
+        sky_explanation=page.evaluate("""async () => {
+          const {mountWidget}=await import('./js/widgets/registry.js');
+          const widget=document.createElement('section');widget.className='widget wd-sky';
+          widget.style.cssText='position:fixed;top:10px;left:10px;width:340px;height:240px;z-index:9999';
+          const body=document.createElement('div');body.className='widget-body';
+          widget.append(body);document.body.append(widget);
+          const instance=mountWidget('sky',body,{weather:{getState:()=>({place:null}),subscribe:()=>()=>{}},interactive:true});
+          await new Promise(resolve=>setTimeout(resolve,400));
+          const button=body.querySelector('.w-sky-event');
+          if(!button){instance.destroy();widget.remove();return {count:0};}
+          button.click();
+          const dialog=document.querySelector('dialog.sheet[open]');
+          const result={count:body.querySelectorAll('.w-sky-event').length,
+            explanation:dialog?.querySelector('.sky-explanation')?.textContent||'',
+            links:[...body.querySelectorAll('a[href]')].map(a=>a.href)};
+          dialog?.close();instance.destroy();widget.remove();
+          return result;
+        }""")
+        assert sky_explanation["count"]>=1 and "What is happening" in sky_explanation["explanation"],sky_explanation
+        assert "What it might mean" in sky_explanation["explanation"],sky_explanation
+        assert not sky_explanation["links"],sky_explanation
         # Real mobile/desktop SVG DOM: layered sprites have two complete
         # directions; the classic style remains immediately available.
         page.evaluate("location.hash='#inventory'")
