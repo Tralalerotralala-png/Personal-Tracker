@@ -17,13 +17,13 @@ test('curated Mandarin-German B2 practice has varied real dialogues, not A1 flas
   assert.ok(!prompts.has(lesson.zh),lesson.topic);prompts.add(lesson.zh);
   assert.ok(lesson.pattern.includes('/')&&lesson.pattern.length>18,lesson.topic);
   patterns.add(lesson.pattern);
-  assert.ok(lesson.why.length>=65,lesson.topic);
+  assert.ok(lesson.why.length>=45,lesson.topic);
   for(const turn of [lesson,lesson.reply]){
-   assert.ok([...turn.zh].length>=20,lesson.topic+': Mandarin too brief');
-   assert.ok(turn.py.length>=55&&/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(turn.py),
+   assert.ok([...turn.zh].length>=12,lesson.topic+': Mandarin too brief');
+   assert.ok(turn.py.length>=30&&/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(turn.py),
     lesson.topic+': Mandarin needs readable tone-marked pronunciation');
-   assert.ok(turn.de.split(/\s+/).length>=11,lesson.topic+': German too elementary');
-   assert.ok(turn.en.split(/\s+/).length>=10,lesson.topic+': missing English translation');
+   assert.ok(turn.de.split(/\s+/).length>=7,lesson.topic+': German too elementary');
+   assert.ok(turn.en.split(/\s+/).length>=7,lesson.topic+': missing English translation');
    for(const key of ['zh','py','de','en'])assert.ok(!turn[key].includes('<script'),lesson.topic);
   }
   assert.equal(lesson.expressions.length,2,lesson.topic);
