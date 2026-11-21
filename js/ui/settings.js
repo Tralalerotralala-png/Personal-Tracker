@@ -509,7 +509,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     ['overview', 'Overview & weather', [mudBlock, clockSettings, analogBlock, feedBlock, layoutBlock, wallpaperBlock]],
     ['pack', 'Pack', [cats, rarity]],
     ['appearance', 'Appearance', [display, typography, navigation]],
-    ['data', 'Data & tools', [personalHub, backup]],
+    ['data', 'Data & tools', [personalHub, backup, portable]],
     ['diagnostics', 'Diagnostics', [diagnostics]],
   ];
   const selected = sessionStorage.getItem('tracker-settings-section') || 'general';
