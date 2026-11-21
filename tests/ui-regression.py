@@ -20,6 +20,24 @@ for width,height in [(390,844),(1280,900)]:
             "(el) => [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim())"
         )
         assert not stray_text,"Unexpected text nodes in app grid: "+str(stray_text)
+        # A real IndexedDB transaction must preserve a losing local edit and
+        # its recoverable conflict copy atomically, not just in memory tests.
+        pull_case=page.evaluate("""async () => {
+          const {openIdbAdapter}=await import('./js/data/adapters.js');
+          const db=await openIdbAdapter('tracker-regression-pull-conflict');
+          for(const table of ['items','outbox','meta'])await db.clear(table);
+          const id='77777777-7777-4777-8777-777777777777';
+          await db.put('items',{id,name:'Offline edit',updated_at:'2026-11-20T09:00:00Z'});
+          await db.put('outbox',{key:'items:'+id,table:'items',id});
+          await db.applyRemoteRow('items',{
+            id,name:'Other-device version',updated_at:'2026-11-21T09:00:00Z',
+            synced_at:'2026-11-21T09:00:01Z'
+          });
+          const saved=await db.getAll('meta');
+          return {name:(await db.get('items',id)).name,outbox:(await db.getAll('outbox')).length,
+            conflicts:saved.filter(x=>x.key.startsWith('sync-conflict:')).map(x=>x.value.local.name)};
+        }""")
+        assert pull_case=={"name":"Other-device version","outbox":0,"conflicts":["Offline edit"]},pull_case
         skip=page.locator(".skip-link")
         skip.focus()
         assert skip.bounding_box()["y"]>=0,"Keyboard skip link did not appear on focus"
