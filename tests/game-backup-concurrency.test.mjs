@@ -215,7 +215,7 @@ test('a game-save deletion confirms its per-ID intent in Supabase before removin
  assert.equal(pendingConfirmedBeforeDelete,true);
  assert.equal(objects.has(entry.path),false);
  assert.equal(cloudSettings.get(final)?.deleted,true);
- assert.deepEqual(confirmed,[pending,final]);
+ assert.deepEqual(confirmed,['game_backup_entry_v2:'+entry.id,pending,final]);
 });
 
 test('cloud confirmation error prevents deleting the only game-save bytes',async()=>{
