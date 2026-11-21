@@ -16,6 +16,19 @@ for width,height in [(390,844),(1280,900)]:
         first_widget.wait_for(state="visible",timeout=10000)
         rect=first_widget.bounding_box()
         assert rect and 0<=rect["y"]<height,"Overview widgets were pushed below the viewport"
+        # Stress asynchronous tab mounts: only the final requested view may
+        # complete its navigation and hide the current screen.
+        page.evaluate("""async () => {
+          for (const name of ['calendar','diary','games','hub','inventory','overview']) {
+            location.hash='#'+name;
+            await new Promise(resolve=>setTimeout(resolve,1));
+          }
+        }""")
+        page.wait_for_timeout(350)
+        assert page.locator('main [data-view]:not([hidden])').count()==1,"Multiple tabs stayed visible after rapid navigation"
+        assert page.locator('main [data-view="overview"]').is_visible(),"The latest navigation did not win"
+        assert not errors,"Rapid navigation raised browser errors: "+str(errors)
+
         stray_text=page.locator("#app").evaluate(
             "(el) => [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim())"
         )
