@@ -1,3 +1,5 @@
+import {B2_SPANISH,B2_WHY_ES} from './daily-dialogues-es.js';
+import {B2_LITERAL} from './daily-dialogue-literal.js';
 // Curated B2-level everyday dialogue practice for both Mandarin and German.
 // Distinct two-turn scenarios focus on negotiation, concessions, indirectness,
 // interpersonal nuance and conversational repair. The English paraphrase
@@ -194,3 +196,13 @@ export const B2_DIALOGUES=[
  'Giving someone time is a communication strategy. In Ruhe / 先想一想 lowers pressure and invites a better response.',
  [['理清楚','Gedanken sortieren','sort out'],['不用马上','nicht sofort müssen','no need to answer immediately']])
 ];
+
+if(B2_SPANISH.length!==B2_DIALOGUES.length||B2_WHY_ES.length!==B2_DIALOGUES.length||
+ B2_LITERAL.length!==B2_DIALOGUES.length)throw Error('Daily dialogue translations and glosses must cover every lesson.');
+for(let i=0;i<B2_DIALOGUES.length;i++){
+ const lesson=B2_DIALOGUES[i];
+ lesson.es=B2_SPANISH[i][0];
+ lesson.reply.es=B2_SPANISH[i][1];
+ lesson.whyEs=B2_WHY_ES[i];
+ lesson.literal=B2_LITERAL[i];
+}

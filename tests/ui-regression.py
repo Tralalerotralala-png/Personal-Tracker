@@ -75,6 +75,82 @@ for width,height in [(390,844),(1280,900)]:
         assert dialogue_ui["before"]=={"oldChar":True,"b2":True,"speech":True,"turns":1,"pinyin":True,"replyHidden":True},dialogue_ui
         assert dialogue_ui["after"]=={"sheet":True,"reply":True,"notes":True,"vocab":2,"pinyin":2},dialogue_ui
 
+        # The weather city must precede the live weather icon, never live in
+        # a trailing sliver that splits the final character onto another line.
+        city_layout=page.evaluate("""async () => {
+          const {mountWidget}=await import('./js/widgets/registry.js');
+          const store={getSetting:async()=>({}),subscribe:()=>()=>{}};
+          const weather={getState:()=>({
+            status:'ok',place:{name:'Irapuato'},
+            current:{temperature_2m:14,weather_code:2},rows:[],summary:null
+          }),subscribe:()=>()=>{}};
+          const results=[];
+          for(const width of [320,235]){
+            const widget=document.createElement('section');
+            widget.className='widget wd-mud';
+            widget.style.cssText='position:fixed;top:5px;left:5px;width:'+width+'px;height:245px;z-index:9999';
+            const body=document.createElement('div');body.className='widget-body';
+            widget.append(body);document.body.append(widget);
+            const instance=mountWidget('mud',body,{weather,store,interactive:true});
+            await new Promise(resolve=>setTimeout(resolve,130));
+            const city=body.querySelector('.w-weather-place');
+            const icon=body.querySelector('.w-weather-glyph');
+            results.push({width,text:city?.textContent,whitespace:city?getComputedStyle(city).whiteSpace:null,
+              wraps:city?city.scrollHeight>city.clientHeight+2:true,
+              beforeIcon:!!city&&!!icon&&city.getBoundingClientRect().left<icon.getBoundingClientRect().left,
+              allTextFits:width!==320||city.scrollWidth<=city.clientWidth+2});
+            instance.destroy();widget.remove();
+          }
+          return results;
+        }""")
+        assert len(city_layout)==2 and all(x["text"]=="Irapuato" and x["whitespace"]=="nowrap" and not x["wraps"] and x["beforeIcon"] and x["allTextFits"] for x in city_layout),city_layout
+        # Spanish translations and literal word chunks work from a compact
+        # dashboard widget, and history lists both target languages and their
+        # English/Spanish meanings.
+        spanish_ui=page.evaluate("""async () => {
+          const {createPhraseOfDay,openPhraseHistory}=await import('./js/ui/daily-phrases.js');
+          const original=localStorage.getItem('tracker-language');
+          localStorage.setItem('tracker-language','es');
+          try{
+            const beginner=createPhraseOfDay({date:new Date(2026,10,20)});
+            const compact=document.createElement('section');
+            compact.className='widget wd-phrase';
+            const body=document.createElement('div');body.className='widget-body';
+            const phrase=createPhraseOfDay({date:new Date(2026,10,21)});
+            body.append(phrase);compact.append(body);document.body.append(compact);
+            const translated=phrase.querySelector('.phrase-b2-english')?.textContent||'';
+            phrase.querySelector('.phrase-b2-words-button').click();
+            const sheet=[...document.querySelectorAll('dialog.sheet[open]')].at(-1);
+            const chips=sheet?.querySelectorAll('.phrase-b2-gloss-chip')||[];
+            chips[0]?.click();
+            const note=sheet?.querySelector('.phrase-b2-literal-note')?.textContent||'';
+            const glossCount=chips.length;
+            sheet?.querySelector('.phrase-b2-toggle')?.click();
+            const both=sheet?.querySelectorAll('.phrase-b2-translations p')||[];
+            const response=sheet?.querySelector('.phrase-b2-answer');
+            const detail={spanish:translated.includes('Si aplazamos'),
+              beginnerSpanish:beginner.textContent.includes('Significado:'),
+              glossary:glossCount>=10&&note.includes('EN:')&&note.includes('ES:'),
+              response:!!response&&!response.hidden,
+              bilingualReply:both.length===2&&both[0].textContent.includes('EN')&&both[1].textContent.includes('ES')};
+            sheet?.close();compact.remove();
+            openPhraseHistory();
+            const history=[...document.querySelectorAll('dialog.sheet[open]')].at(-1);
+            const first=history?.querySelector('.phrase-history-row');
+            detail.history=!!first?.querySelector('[lang="zh-Hans"]')&&
+              !!first?.querySelector('[lang="de"]')&&
+              !!first?.querySelector('.phrase-history-meaning [lang="es"]')&&
+              !!first?.querySelector('.phrase-history-meaning [lang="en"]');
+            history?.close();
+            return detail;
+          }finally{
+            if(original===null)localStorage.removeItem('tracker-language');
+            else localStorage.setItem('tracker-language',original);
+          }
+        }""")
+        assert spanish_ui=={"spanish":True,"beginnerSpanish":True,"glossary":True,"response":True,
+                          "bilingualReply":True,"history":True},spanish_ui
+
         # Actual Chromium integration: forecast-only days, meter, current UV,
         # and daily peak UV. Unavailable later dates now carry estimated wetness.
         agenda_fit=page.evaluate("""async () => {

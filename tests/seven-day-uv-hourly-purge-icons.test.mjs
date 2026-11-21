@@ -104,16 +104,15 @@ test('structured exports and imports cannot resurrect the legacy encrypted journ
  assert.equal(await store.getSetting(OLD_JOURNAL_KEY,null),null);
 });
 
-test('modern app launcher icon uses a crisp stacked silhouette with PNG fallback',()=>{
- const svg=readFileSync(new URL('../icons/pixel-stack.svg',import.meta.url),'utf8');
+test('browser and PWA icons retain the original PNG artwork',()=>{
  const manifest=JSON.parse(readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
- assert.match(svg,/shape-rendering="crispEdges"/);
- assert.match(svg,/translate\(8 8\)/);
- assert.match(svg,/translate\(4 4\)/);
- assert.ok(manifest.icons.some(x=>x.src==='icons/pixel-stack.svg'&&x.sizes==='any'));
- assert.ok(manifest.icons.some(x=>x.type==='image/png'));
- assert.match(html,/icons\/pixel-stack\.svg/);
- assert.match(sw,/icons\/pixel-stack\.svg/);
+ assert.deepEqual(manifest.icons.map(icon=>icon.src),
+  ['icons/icon-192.png','icons/icon-512.png','icons/icon-maskable-512.png']);
+ assert.ok(manifest.icons.every(icon=>icon.type==='image/png'));
+ assert.match(html,/rel="icon" href="\.\/icons\/icon-192\.png"/);
+ assert.match(html,/rel="apple-touch-icon" href="\.\/icons\/apple-touch-icon\.png"/);
+ assert.doesNotMatch(html,/pixel-stack\.svg/);
+ assert.doesNotMatch(sw,/icons\/pixel-stack\.svg/);
 });

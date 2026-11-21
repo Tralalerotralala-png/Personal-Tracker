@@ -4,6 +4,17 @@ import { h, replace, openSheet } from './dom.js';
 import { language } from './language.js';
 import { B2_DIALOGUES } from './daily-dialogues.js';
 let dialoguePanelSequence=0;
+// Historical short lessons had English only. Keep their original date
+// selection and character glosses while restoring a Spanish translation.
+const BEGINNER_ES=[
+ 'Buenos días','Muchas gracias','Me gusta el té','Hoy hace buen tiempo',
+ 'Estoy estudiando','Nos vemos mañana','Estoy feliz','Por favor, más despacio',
+ 'Quiero tomar agua','¿Qué día es hoy?','Me gusta la música','Buenas noches',
+ '¿Cómo estás?','Estoy bien','Adiós','Lo siento','No hay problema',
+ 'No lo sé','¿Está bien?','Te quiero','Pasa, por favor',
+ 'Tengo hambre','Estoy cansado','¿Qué hora es?','Quiero ir a casa',
+ 'Buena suerte','¿Dónde estás?','Tengo tiempo','¿Qué te gusta?','Quiero dormir'
+];
 export const LESSONS = [
  {zh:'早上好',py:'zǎoshang hǎo',en:'Good morning',de:'Guten Morgen',ipa:'ˈɡuːtn̩ ˈmɔʁɡn̩',chars:['early / morning','up / on','good'],charPy:['zǎo','shang','hǎo'],words:['good (greeting form)','morning']},
  {zh:'谢谢你',py:'xièxie nǐ',en:'Thank you',de:'Danke schön',ipa:'ˈdaŋkə ʃøːn',chars:['thank','thank (repeated)','you'],charPy:['xiè','xie','nǐ'],words:['thanks','nicely / kindly']},
@@ -37,6 +48,9 @@ export const LESSONS = [
  {zh:'我想睡觉',py:'wǒ xiǎng shuìjiào',en:'I want to sleep',de:'Ich möchte schlafen',ipa:'ɪç ˈmœçtə ˈʃlaːfn̩',chars:['I / me','want / think','sleep','sleep / awakening'],charPy:['wǒ','xiǎng','shuì','jiào'],words:['I','would like','to sleep']},
 
 ];
+// Keep object identity for historical lessons and tests.
+if(BEGINNER_ES.length!==LESSONS.length)throw Error('Beginner Spanish translations are incomplete.');
+LESSONS.forEach((lesson,i)=>{lesson.es=BEGINNER_ES[i];});
 // Calendar-day keys deliberately use the device's local date, not UTC midnight.
 export const PHRASE_ARCHIVE_START = '2026-11-03';
 export const PHRASE_EXPANSION_DATE = '2026-11-04';
@@ -85,10 +99,44 @@ export function phraseHistory(until=new Date(), max=30) {
 // Reveal gives the response, full pinyin, translations and pragmatic reasoning
 // on demand. Historical beginner lessons retain their older per-character
 // and German word gloss interface without migrating or rewriting old dates.
+// Literal translations are curated at meaningful word/phrase boundaries.
+// Tapping or focusing a chunk reveals its direct English and Spanish meaning.
+// Unlike A1 character glosses, B2 syntax often cannot be explained by each
+// isolated Hanzi without giving a misleading translation.
+function createB2Literal(lesson,part,es){
+ const turn=lesson.literal?.[part];
+ if(!turn)return null;
+ const note=h('p',{class:'phrase-b2-literal-note','aria-live':'polite'},
+  es?'Selecciona una palabra o expresión para ver su significado literal.':
+     'Select a word or expression to see its literal meaning.');
+ const column=(items,lang,label)=>h('div',{class:'phrase-b2-literal-column',lang},
+  h('small',{},label),
+  h('div',{class:'phrase-b2-literal-chips'},
+   ...items.map(({word,en,es:spanish})=>{
+    const explanation=`${word} — EN: ${en} · ES: ${spanish}`;
+    const show=()=>{note.textContent=explanation;};
+    return h('button',{type:'button',class:'phrase-b2-gloss-chip',
+      title:explanation,'aria-label':explanation,
+      onclick:show,onmouseenter:show,onfocus:show},word);
+   })));
+ return h('section',{class:'phrase-b2-literal'},
+  h('div',{class:'phrase-b2-literal-head'},h('strong',{},
+   es?'Significado literal, palabra por palabra':'Literal word-by-word meaning'),
+   h('small',{},es?'Por palabras o grupos con sentido':'Meaningful words and chunks')),
+  h('div',{class:'phrase-b2-literal-columns'},
+    column(turn.zh,'zh-Hans',es?'MANDARÍN':'MANDARIN'),
+    column(turn.de,'de',es?'ALEMÁN':'GERMAN')),
+  note);
+}
+function b2Meaning(turn,{es,all=false}){
+ if(all)return h('div',{class:'phrase-b2-translations'},
+  h('p',{lang:'en'},h('strong',{},'EN · '),turn.en),
+  h('p',{lang:'es'},h('strong',{},'ES · '),turn.es));
+ return h('p',{class:'phrase-b2-english',lang:es?'es':'en'},
+  h('strong',{},es?'ES · ':'EN · '),es?turn.es:turn.en);
+}
 function createB2Dialogue({lesson,date,onHistory,expanded=false}){
- const es=language()==='es';
- const prompt=lesson;
- const reply=lesson.reply;
+ const es=language()==='es',prompt=lesson,reply=lesson.reply;
  const replyId='phrase-b2-reply-'+(++dialoguePanelSequence);
  const response=h('div',{class:'phrase-b2-answer',hidden:!expanded,id:replyId},
   h('div',{class:'phrase-b2-turn-head'},h('b',{},'B · '+(es?'Respuesta':'Response'))),
@@ -98,10 +146,11 @@ function createB2Dialogue({lesson,date,onHistory,expanded=false}){
     h('p',{class:'phrase-pronunciation',lang:'zh-Latn-pinyin'},reply.py)),
    h('div',{class:'phrase-b2-language',lang:'de'},h('small',{},es?'ALEMÁN':'GERMAN'),
     h('p',{class:'phrase-b2-utterance'},reply.de))),
-  h('p',{class:'phrase-b2-english',lang:'en'},reply.en),
+  b2Meaning(reply,{es,all:true}),
+  createB2Literal(lesson,'b',es),
   h('div',{class:'phrase-b2-tip'},
    h('strong',{},es?'Por qué funciona':'Why it works'),
-   h('p',{},lesson.why)),
+   h('p',{},es?lesson.whyEs:lesson.why)),
   h('div',{class:'phrase-b2-expressions'},
    h('small',{},es?'EXPRESIONES ÚTILES':'USEFUL EXPRESSIONS'),
    ...lesson.expressions.map(([zh,de,en])=>
@@ -110,8 +159,8 @@ function createB2Dialogue({lesson,date,onHistory,expanded=false}){
  const toggle=h('button',{class:'btn small phrase-b2-toggle',type:'button',
   'aria-expanded':String(expanded),'aria-controls':replyId,
   onclick:()=>{
-   // Small widgets stay self-contained rather than growing into a nested
-   // scrollbar. Reveal the full dialogue in a readable day-detail sheet.
+   // A compact dashboard widget opens a complete sheet rather than pushing
+   // future content below the widget boundary.
    if(toggle.closest('.widget.wd-phrase')){
     openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:true})});
     return;
@@ -124,13 +173,22 @@ function createB2Dialogue({lesson,date,onHistory,expanded=false}){
     :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown');
   }},expanded?(es?'Ocultar respuesta':'Hide response')
    :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown'));
- const panel=h('section',{class:'phrase-panel phrase-b2-panel','aria-label':es?'Diálogo del día B2':'B2 daily dialogue'},
+ const seeWords=h('button',{class:'btn small phrase-b2-words-button',type:'button',
+  onclick:()=>{
+   if(seeWords.closest('.widget.wd-phrase')){
+    openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:false})});
+   }else{
+    const panel=seeWords.closest('.phrase-b2-panel')?.querySelector('.phrase-b2-literal');
+    if(panel){panel.scrollIntoView?.({block:'nearest',behavior:'auto'});
+      panel.querySelector('button')?.focus();}
+   }
+  }},es?'Significado literal':'Word-by-word meaning');
+ return h('section',{class:'phrase-panel phrase-b2-panel','aria-label':es?'Diálogo del día B2':'B2 daily dialogue'},
   h('div',{class:'phrase-heading'},
    h('span',{class:'phrase-day'},phraseDateKey(date)+' · B2'),
    onHistory?h('button',{class:'btn small',type:'button',onclick:onHistory},es?'Historial':'History'):null),
   h('div',{class:'phrase-b2-context'},
-   h('strong',{},lesson.topic),
-   h('small',{},lesson.setting)),
+   h('strong',{},lesson.topic),h('small',{},lesson.setting)),
   h('div',{class:'phrase-b2-pattern'},h('small',{},es?'PATRÓN DE CONVERSACIÓN':'SPEECH PATTERN'),
    h('span',{},lesson.pattern)),
   h('div',{class:'phrase-b2-turn-head'},h('b',{},'A · '+(es?'Situación':'Scenario')),
@@ -141,9 +199,10 @@ function createB2Dialogue({lesson,date,onHistory,expanded=false}){
     h('p',{class:'phrase-pronunciation',lang:'zh-Latn-pinyin'},prompt.py)),
    h('div',{class:'phrase-b2-language',lang:'de'},h('small',{},es?'ALEMÁN':'GERMAN'),
     h('p',{class:'phrase-b2-utterance'},prompt.de))),
-  h('p',{class:'phrase-b2-english',lang:'en'},prompt.en),
-  toggle,response);
- return panel;
+  b2Meaning(prompt,{es,all:false}),
+  createB2Literal(lesson,'a',es),
+  h('div',{class:'phrase-b2-actions'},seeWords,toggle),
+  response);
 }
 export function createPhraseOfDay({ date=new Date(), onHistory=null }={}) {
  const lesson=lessonForDate(date); const es=language()==='es';
@@ -157,7 +216,7 @@ export function createPhraseOfDay({ date=new Date(), onHistory=null }={}) {
      h('div',{},h('small',{},es?'MANDARÍN':'MANDARIN'),line,h('div',{class:'phrase-pronunciation'},lesson.py)),
      h('div',{},h('small',{},es?'ALEMÁN':'GERMAN'),german,h('div',{class:'phrase-pronunciation'},`IPA: ${lesson.ipa}`))),
    h('div',{class:'phrase-gloss','aria-live':'polite'},es?'Toca un carácter chino o una palabra alemana para ver su significado.':'Hover or tap for literal meanings.'),
-   h('div',{class:'phrase-meaning'},`${es?'Significado':'Meaning'}: ${lesson.en}`));
+   h('div',{class:'phrase-meaning'},`${es?'Significado':'Meaning'}: ${es?lesson.es:lesson.en}`));
 }
 export function openPhraseHistory() {
  const es=language()==='es';
@@ -174,9 +233,15 @@ export function openPhraseHistory() {
  }
  datePicker.addEventListener('change',()=>showKey(datePicker.value));
  const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>
-  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{class:lesson.level==='B2'?'phrase-history-topic':''},
-   lesson.level==='B2'?'B2 · '+lesson.topic:lesson.zh),
-  h('span',{},lesson.level==='B2'?lesson.zh:lesson.de))));
+  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},
+   h('time',{datetime:date},date),
+   h('span',{class:'phrase-history-target'},
+    lesson.level==='B2'?h('strong',{class:'phrase-history-topic'},'B2 · '+lesson.topic):null,
+    h('span',{lang:'zh-Hans'},lesson.zh),
+    h('span',{lang:'de'},lesson.de)),
+   h('span',{class:'phrase-history-meaning'},
+    h('span',{lang:es?'es':'en'},(es?'ES · ':'EN · ')+(es?lesson.es:lesson.en)),
+    h('small',{lang:es?'en':'es'},(es?'EN · ':'ES · ')+(es?lesson.en:lesson.es))))));
  const body=h('div',{class:'phrase-archive'},h('p',{class:'hint'},es?'Todas las frases desde el lanzamiento, incluso los días en que no abriste la aplicación.':'Every dated lesson since launch, including days when the app was closed.'),
   h('label',{class:'phrase-date-picker'},es?'Ver fecha':'Jump to date',datePicker),detail,
   h('h3',{},es?'Días anteriores':'Previous days'),history.length?recent:h('p',{class:'hint'},es?'El historial empieza mañana.':'Previous lessons will appear tomorrow.'));
