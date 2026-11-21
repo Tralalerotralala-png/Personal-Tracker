@@ -207,7 +207,7 @@ function customizePack(){
  let draft=readPack();const es=document.documentElement.lang.startsWith('es'),tr=(a,b)=>es?b:a;
  const preview=h('div',{class:'pack-icon-preview'}),choices=h('div',{class:'pack-icon-choices'}),colors=h('div',{class:'pack-color-choices'});
  const picker=h('input',{type:'color',value:draft.color,'aria-label':tr('Custom backpack color','Color personalizado de mochila')});
- const names=[['Classic','Clásica'],['Rucksack','Excursionismo'],['Satchel','Bolso'],['Tactical','Táctica']];
+ const names=[['Classic','Clásica'],['Rucksack','Excursionismo'],['Satchel','Bolso'],['Tactical','Táctica'],['Rolltop','Mochila enrollable'],['Messenger','Mensajero']];
  function draw(){preview.innerHTML=navGlyphSvg('pack',draft);picker.value=draft.color;choices.replaceChildren(...PACK_SHAPES.map((shape,i)=>h('button',{class:'btn pack-shape-choice'+(draft.shape===shape?' primary':''),type:'button','aria-pressed':String(draft.shape===shape),onclick:()=>{draft={...draft,shape};draw();}},h('span',{html:navGlyphSvg('pack',{...draft,shape})}),tr(...names[i]))));colors.replaceChildren(...PACK_COLORS.map(color=>{const b=h('button',{class:'pack-swatch',type:'button','aria-label':color,'aria-pressed':String(color===draft.color),onclick:()=>{draft={...draft,color};draw();}});b.style.backgroundColor=color;return b;}));}
  picker.oninput=()=>{draft={...draft,color:picker.value};draw();};draw();
  packSheet=openSheet({title:tr('Customize backpack','Personalizar mochila'),body:[preview,choices,h('label',{},tr('Color','Color')),colors,picker],footer:[h('button',{class:'btn',type:'button',onclick:()=>{draft=packAppearance();draw();}},tr('Reset','Restablecer')),h('button',{class:'btn primary',type:'button',onclick:()=>{try{localStorage.setItem(PACK_KEY,JSON.stringify(packAppearance(draft)));refreshPackIcon();packSheet?.close();}catch{toast(tr('Could not save appearance','No se pudo guardar la apariencia'));}}},tr('Save','Guardar'))],onClose:()=>{packSheet=null;}});
@@ -215,15 +215,92 @@ function customizePack(){
 refreshPackIcon();
 if(packNav){packNav.title='Double-click or right-click to customize backpack';packNav.addEventListener('dblclick',e=>{e.preventDefault();customizePack();});packNav.addEventListener('contextmenu',e=>{e.preventDefault();customizePack();});packNav.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.shiftKey){e.preventDefault();customizePack();}});}
 window.addEventListener('tracker-customize-pack',customizePack);
+// Every other section can use an alternate 32 px pixel icon and color. These
+// device-local preferences never alter route names, links, or cloud records.
+const NAV_ICON_KEY='tracker-nav-icon-choices-v1';
+const NAV_ICON_GLYPHS=['board','weather','calendar','feed','moon','games','hub','expenses','gear','pack'];
+const validNavColor=value=>/^#[0-9a-f]{6}$/i.test(value||'');
+const readNavIconChoices=()=>{
+ try{
+  const value=JSON.parse(localStorage.getItem(NAV_ICON_KEY)||'{}');
+  if(!value||typeof value!=='object'||Array.isArray(value))return {};
+  return Object.fromEntries(Object.entries(value).filter(([route,choice])=>
+   route!=='inventory'&&NAV.some(([key])=>key===route)
+   &&NAV_ICON_GLYPHS.includes(choice?.glyph)&&validNavColor(choice?.color)));
+ }catch{return {};}
+};
+const customNavIcon=route=>readNavIconChoices()[route]||null;
+function applyNavIconChoices(){
+ const choices=readNavIconChoices();
+ for(const [route,,glyph] of NAV){
+  if(route==='inventory')continue; // the backpack has its own compatible picker
+  const el=navButtons.find(x=>x.dataset.route===route)?.querySelector('.slot-icon');
+  if(!el)continue;
+  const alt=choices[route];
+  if(alt){el.innerHTML=navGlyphSvg(alt.glyph,alt);el.style.color=alt.color;}
+  else{
+   el.style.removeProperty('color');
+   if(route!=='mud'&&route!=='diary')el.innerHTML=navGlyphSvg(glyph);
+  }
+ }
+}
+function customizeNavigationIcon(initialRoute='overview'){
+ const alternateRoutes=NAV.filter(([key])=>key!=='inventory');
+ const es=locale().startsWith('es'),tr=(en,sp)=>es?sp:en;
+ const pending={...readNavIconChoices()};
+ const routeSelect=h('select',{'aria-label':tr('Section to customize','Sección para personalizar')},
+   alternateRoutes.map(([key,name])=>h('option',{value:key,selected:key===initialRoute},t(name))));
+ const glyphSelect=h('select',{'aria-label':tr('Alternate icon','Icono alternativo')},
+   [h('option',{value:'default'},tr('Live/default icon','Icono normal')),...NAV_ICON_GLYPHS.map(value=>h('option',{value},value))]);
+ const color=h('input',{type:'color',value:'#509e85','aria-label':tr('Icon color','Color del icono')});
+ const preview=h('div',{class:'nav-icon-preview'});
+ const explain=h('p',{class:'hint'},tr('Choosing an alternate for Weather or Logs replaces its live weather or moon symbol until reset.','Elegir otro icono para Clima o Registros reemplaza su símbolo dinámico hasta restablecerlo.'));
+ function draw(){
+  const route=routeSelect.value;
+  const selected=pending[route];
+  glyphSelect.value=selected?.glyph||'default';
+  color.value=selected?.color||'#509e85';
+  const defaultGlyph=alternateRoutes.find(([key])=>key===route)?.[2]||'board';
+  preview.innerHTML=navGlyphSvg(selected?.glyph||defaultGlyph,selected||{});
+ }
+ routeSelect.addEventListener('change',draw);
+ glyphSelect.addEventListener('change',()=>{
+  if(glyphSelect.value==='default')delete pending[routeSelect.value];
+  else pending[routeSelect.value]={glyph:glyphSelect.value,color:color.value};
+  draw();
+ });
+ color.addEventListener('input',()=>{
+  const defaultGlyph=alternateRoutes.find(([key])=>key===routeSelect.value)?.[2]||'board';
+  pending[routeSelect.value]={glyph:glyphSelect.value==='default'?defaultGlyph:glyphSelect.value,color:color.value};
+  draw();
+ });
+ draw();
+ let sheet;
+ sheet=openSheet({title:tr('Customize navigation icons','Personalizar iconos de navegación'),
+  body:[h('label',{},tr('Section','Sección'),routeSelect),
+    h('label',{},tr('Icon','Icono'),glyphSelect),
+    h('label',{},tr('Color','Color'),color),preview,explain],
+  footer:[h('button',{class:'btn',type:'button',onclick:()=>{delete pending[routeSelect.value];draw();}},tr('Reset section','Restablecer sección')),
+   h('button',{class:'btn primary',type:'button',onclick:()=>{
+     try{localStorage.setItem(NAV_ICON_KEY,JSON.stringify(pending));applyNavIconChoices();refreshMoonNav();refreshWeatherNav();sheet.close();}
+     catch{toast(tr('Could not save icons','No se pudieron guardar los iconos'));}
+   }},tr('Save icons','Guardar iconos'))]});
+}
+applyNavIconChoices();
+window.addEventListener('tracker-customize-nav-icons',()=>customizeNavigationIcon());
+navButtons.filter(a=>a.dataset.route!=='inventory').forEach(a=>{
+ a.addEventListener('contextmenu',e=>{e.preventDefault();customizeNavigationIcon(a.dataset.route);});
+});
+
 const moonNavIcon = navButtons.find(n => n.dataset.route === 'diary')?.querySelector('.slot-icon');
-function refreshMoonNav(){ if(moonNavIcon) moonNavIcon.innerHTML=moonPhaseSvg(); }
+function refreshMoonNav(){ if(moonNavIcon&&!customNavIcon('diary')) moonNavIcon.innerHTML=moonPhaseSvg(); }
 refreshMoonNav(); setInterval(refreshMoonNav, 60*60*1000);
 const weatherNavIcon=navButtons.find(n=>n.dataset.route==='mud')?.querySelector('.slot-icon');
 let currentUi = {};
 function refreshWeatherNav(){
   const state=weather.getState();
   const current=state.current;
-  if(!weatherNavIcon || !current)return;
+  if(!weatherNavIcon || !current || customNavIcon('mud'))return;
   const code=Number(current.weather_code);
   const sky=skyLighting(state, currentUi, new Date());
   weatherNavIcon.innerHTML=weatherIconSvg(code,{night:sky.night});
@@ -444,6 +521,9 @@ async function route() {
   const key = VIEWS[wanted] ? wanted : 'overview'; // unknown hashes (e.g. sign-in tokens) are ignored, not rewritten
   for (const [k, view] of Object.entries(VIEWS)) view.el.hidden = k !== key;
   navButtons.forEach((a) => { const on = a.dataset.route === key; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  // The phone bottom bar scrolls horizontally; reveal the active section.
+  if(matchMedia('(max-width: 899px)').matches)
+    requestAnimationFrame(()=>nav.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'}));
   if (!mounted.has(key)) { mounted.add(key); await VIEWS[key].mount(); }
   for (const [k, view] of Object.entries(VIEWS)) if (k !== key) view.hide?.();
   VIEWS[key].show?.();
