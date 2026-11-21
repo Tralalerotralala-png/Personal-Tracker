@@ -2123,3 +2123,56 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 /* Accessible preview for custom navigation sprites. */
 .nav-icon-preview{display:flex;align-items:center;justify-content:center;min-height:104px;padding:12px;border:1px solid var(--edge);border-radius:9px;background:var(--panel);}
 .nav-icon-preview svg{width:76px;height:76px;image-rendering:pixelated;}
+
+
+/* Horizontal slice stacks (SpriteCook-style workflow).
+   Inventory items use two pre-baked integer-pixel directions: no runtime
+   animation loop and no costly per-frame canvas paint. The after-composite
+   outline is part of the rasterized sprite, not repeated on every slice.
+   Navigation and informational glyphs stay front-facing for legibility. */
+.sprite-stacked-asset {
+  display: block;
+  overflow: visible;
+  shape-rendering: crispEdges;
+  image-rendering: pixelated;
+  contain: paint;
+}
+.sprite-stack-direction {
+  transition: opacity .18s steps(3,end);
+}
+.sprite-stack-direction-a { opacity: 1; }
+.sprite-stack-direction-b { opacity: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .tile:hover .sprite-stack-direction-a,
+  .row-item:hover .sprite-stack-direction-a,
+  .loot:hover .sprite-stack-direction-a,
+  .pharmacy-preset:hover .sprite-stack-direction-a,
+  .photo-preview:hover .sprite-stack-direction-a,
+  .pharmacy-preset:focus-visible .sprite-stack-direction-a,
+  .tile:focus-visible .sprite-stack-direction-a { opacity: 0; }
+  .tile:hover .sprite-stack-direction-b,
+  .row-item:hover .sprite-stack-direction-b,
+  .loot:hover .sprite-stack-direction-b,
+  .pharmacy-preset:hover .sprite-stack-direction-b,
+  .photo-preview:hover .sprite-stack-direction-b,
+  .pharmacy-preset:focus-visible .sprite-stack-direction-b,
+  .tile:focus-visible .sprite-stack-direction-b { opacity: 1; }
+}
+/* Keep icon edges aligned to device pixels rather than fractional CSS
+   perspective transforms that make low-resolution slices shimmer. */
+.tile:hover .art>svg.sprite-stacked-asset,
+.row-item:hover .art>svg.sprite-stacked-asset,
+.loot:hover .art>svg.sprite-stacked-asset { transform: translateY(-1px); filter: drop-shadow(1px 2px 0 #0007); }
+.sprite-stack-slice-2 { transform: translate(1px, 1px); filter: brightness(.42); opacity: .73; }
+.sprite-stack-slice-1 { transform: translate(1px, 0); filter: brightness(.72); opacity: .87; }
+:root[data-sprite-motion="static"] .sprite-stack-direction,
+.reduce-animations .sprite-stack-direction { transition: none !important; }
+:root[data-sprite-motion="static"] .sprite-stack-direction-a,
+.reduce-animations .sprite-stack-direction-a { opacity: 1 !important; }
+:root[data-sprite-motion="static"] .sprite-stack-direction-b,
+.reduce-animations .sprite-stack-direction-b { opacity: 0 !important; }
+@media (prefers-reduced-motion: reduce) {
+  .sprite-stack-direction { transition: none !important; }
+  .sprite-stack-direction-a { opacity: 1 !important; }
+  .sprite-stack-direction-b { opacity: 0 !important; }
+}
