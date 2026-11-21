@@ -145,7 +145,7 @@ export const B2_LITERAL=[
  "根据~according to~según|物流信息~tracking information~seguimiento|包裹~package~paquete|昨天就该~should already yesterday~debió ayer|到现在~up to now~hasta ahora|还没收到~still not received~todavía no recibo",
  "Laut~according to~según|Sendungsverfolgung~shipment tracking~seguimiento|hätte~would have~habría|gestern~yesterday~ayer|ankommen sollen~should have arrived~debió llegar|noch nicht erhalten~not yet received~todavía no recibido",
  "签收记录~delivery signature record~comprobante de entrega|找不到~cannot find~no encontrar|提交~submit~presentar|调查申请~investigation request~solicitud de investigación",
- "Zustellnachweis~proof of delivery~comprobante de entrega|Falls~if~si|fehlt~is missing~falta|Nachforschung~investigation~investigación|leite ein~initiate~iniciar"
+ "Zustellnachweis~proof of delivery~comprobante de entrega|Falls~if~si|fehlt~is missing~falta|Nachforschung~investigation~investigación|leite ich eine Nachforschung ein~I initiate an investigation~inicio una investigación"
  ),
  G(
  "不介意~do not mind~no te molesta|更想~prefer/want more~preferiría|安静的地方~quiet place~lugar tranquilo|而不是~rather than~en lugar de|那么吵~so noisy~tan ruidoso|酒吧~bar~bar",
@@ -173,7 +173,7 @@ export const B2_LITERAL=[
  ),
  G(
  "本来打算~originally intended~tenía pensado|每天~every day~todos los días|一个小时~one hour~una hora|没想到~didn't expect~no esperaba|反而~instead/contrary to expectation~contrariamente|更现实~more realistic~más realista",
- "Eigentlich~actually/originally~en realidad|hatte vor~had intended~tenía planeado|jeden Tag~every day~cada día|Mittlerweile~by now~ahora|langfristig~long term~a largo plazo|realistischer~more realistic~más realista",
+ "Eigentlich~actually/originally~en realidad|hatte ich vor~I had intended~yo había planeado|jeden Tag~every day~cada día|Mittlerweile~by now~ahora|langfristig~long term~a largo plazo|realistischer~more realistic~más realista",
  "长期~long-term~a largo plazo|坚持~keep at it~mantener constancia|比~compared with~más que|一开始~at the start~al principio|更重要~more important~más importante",
  "Genau~exactly~exacto|Dranzubleiben~sticking with it~mantenerse constante|wichtiger~more important~más importante|am Anfang~in the beginning~al principio|vorzunehmen~set oneself a goal~proponerse"
  ),
@@ -181,22 +181,22 @@ export const B2_LITERAL=[
  "界面~interface~interfaz|既要~must both~debe tanto|又不能~yet cannot~pero no debe|拥挤~cluttered~saturado|确实~indeed~en efecto|平衡~balance~equilibrar",
  "Oberfläche~interface~interfaz|sowohl~both~tanto|als auch~as well as~como|übersichtlich~clear/organized~ordenado|gar nicht so leicht~not so easy at all~nada fácil|auszubalancieren~balance~equilibrar",
  "要不~how about~¿qué tal si?|先~first~primero|突出~highlight~destacar|最常用~most used~más usadas|需要时~when needed~cuando se necesiten|展开~expand~desplegar",
- "Vielleicht~perhaps~quizá|häufigsten~most frequent~más frecuentes|hervor~out/front~destacar|Rest~rest~resto|bei Bedarf~as needed~cuando haga falta|aufklappen~unfold~desplegar"
+ "Vielleicht~perhaps~quizá|häufigsten~most frequent~más frecuentes|hervor~out/front~destacar|Rest~rest~resto|bei Bedarf~as needed~cuando haga falta|klappen den Rest erst bei Bedarf auf~unfold the rest only when needed~desplegamos el resto cuando haga falta"
  ),
  G(
  "邮件~email~correo|坚定~firm~firme|一点~a little~un poco|又不希望~yet don't want~pero no quiero|显得~appear/seem~parecer|强硬~harsh~brusco",
  "E-Mail~email~correo|bestimmt~firm~firme|klingen~sound~sonar|aber~but~pero|nicht zu~not too~no demasiado|schroff wirken~seem harsh~parecer brusco",
  "直接~directly~directamente|说清楚~make clear~dejar claro|要求~request~petición|同时~at the same time~al mismo tiempo|对方~other party~otra persona|余地~room/margin~margen",
- "Dann~then~entonces|formulieren~formulate~formular|Bitte~request~petición|klar~clearly~claramente|zugleich~at the same time~a la vez|Spielraum~room to maneuver~margen"
+ "Dann~then~entonces|formulier~formulate (imperative)~formula (imperativo)|Bitte~request~petición|klar~clearly~claramente|zugleich~at the same time~a la vez|Spielraum~room to maneuver~margen"
  ),
  G(
  "知道~know~sé|不是故意~not intentionally~no a propósito|更在意~care more about~me importa más|以后~in the future~en adelante|提前~ahead of time~con anticipación|说一声~say a word / let know~avisar",
- "Ich weiß~I know~sé|nicht mit Absicht~not on purpose~no a propósito|Mir wäre wichtig~would matter to me~me importaría|nächstes Mal~next time~la próxima vez|früher Bescheid~give notice earlier~avisar antes",
+ "Ich weiß~I know~sé|nicht mit Absicht~not on purpose~no a propósito|Mir wäre aber wichtig~but would matter to me~pero me importaría|nächstes Mal~next time~la próxima vez|früher Bescheid~give notice earlier~avisar antes",
  "你说得对~you said right~tienes razón|以后~from now on~en adelante|尽量~try one's best~intentar|提前~early~con tiempo|通知~notify~avisar",
  "Du hast recht~you are right~tienes razón|werde versuchen~will try~intentaré|künftig~in future~de ahora en adelante|rechtzeitig~in time~a tiempo|informieren~informar~informar"
  ),
  G(
- "机会~opportunity~oportunidad|听起来~sounds~suena|不错~not bad~bien|不过~however~sin embargo|在…之前~before~antes de|弄清楚~make clear~aclarar|职责~responsibilities~responsabilidades",
+ "机会~opportunity~oportunidad|听起来~sounds~suena|不错~not bad~bien|不过~however~sin embargo|答应之前~before agreeing~antes de aceptar|弄清楚~make clear~aclarar|职责~responsibilities~responsabilidades",
  "Angebot~offer~oferta|klingt interessant~sounds interesting~suena interesante|allerdings~however~sin embargo|vor einer Zusage~before accepting~antes de aceptar|genauen Aufgaben~exact duties~funciones concretas|klären~clarify~aclarar",
  "有道理~makes sense~tiene sentido|尤其~especially~sobre todo|问清楚~ask clearly~preguntar bien|工作时间~working hours~horarios|发展空间~growth room~oportunidades de crecimiento",
  "Stimmt~that's right~cierto|vor allem~above all~sobre todo|Arbeitszeiten~work hours~horarios laborales|Entwicklungsmöglichkeiten~development possibilities~posibilidades de crecimiento|nachfragen~ask follow-up~preguntar"
@@ -205,17 +205,17 @@ export const B2_LITERAL=[
  "与其~rather than~en lugar de|一直~continually~todo el tiempo|抱怨~complain~quejarse|流程~process~proceso|不如~better~mejor|找出~find~identificar|改进~improve~mejorar",
  "Statt~instead of~en vez de|ständig~constantly~constantemente|beschweren~complain~quejarse|langsamen Ablauf~slow process~proceso lento|könnten wir~could we~podríamos|Verbesserungsschritt~improvement step~paso para mejorar",
  "从~from~desde|审批环节~approval step~etapa de aprobación|开始~begin~empezar|最容易~most easily~más probable|耽误时间~waste/delay time~perder tiempo",
- "Dann~then~entonces|fangen wir an~let us begin~empecemos|Freigabe~approval~autorización|vermutlich~probably~probablemente|am meisten Zeit~most time~más tiempo"
+ "Dann~then~entonces|fangen wir mit der Freigabe an~let us begin with approval~empecemos con la autorización|Freigabe~approval~autorización|vermutlich~probably~probablemente|am meisten Zeit~most time~más tiempo"
  ),
  G(
  "如果~if~si|周末~weekend~fin de semana|有空~be free~tener tiempo|打算~plan~planear|展览~exhibition~exposición|不用特意~no need especially~sin necesidad de|调整~adjust~cambiar",
- "Falls~if~si|am Wochenende~at weekend~el fin de semana|Lust und Zeit~desire and time~ganas y tiempo|Ausstellung~exhibition~exposición|Du musst nicht~you do not have to~no tienes que|umplanen~reschedule~cambiar planes",
+ "Falls~if~si|am Wochenende~at weekend~el fin de semana|Lust und Zeit~desire and time~ganas y tiempo|Ausstellung~exhibition~exposición|Du musst aber nichts extra~you don't have to do anything extra~no tienes que hacer nada extra|umplanen~reschedule~cambiar planes",
  "听起来~sounds~suena|有意思~interesting~interesante|看一下时间~check time~revisar agenda|晚点~a little later~más tarde|回复~reply~contestar",
  "klingt spannend~sounds exciting~suena interesante|Kalender~calendar~agenda|kurz~briefly~un momento|später~later~después|Bescheid~notification~aviso"
  ),
  G(
  "虽然~although~aunque|修理~repair~reparación|不便宜~not cheap~no barato|从长远看~from long-term view~a largo plazo|划算~worth the cost~conviene",
- "Auch wenn~even if~aunque|Reparatur~repair~reparación|nicht billig~not cheap~no es barato|lohnt sich~is worth it~conviene|langfristig~long term~a largo plazo|Neukauf~new purchase~compra nueva",
+ "Auch wenn~even if~aunque|Reparatur~repair~reparación|nicht billig~not cheap~no es barato|lohnt sie sich~it is worth it~conviene|langfristig~long term~a largo plazo|Neukauf~new purchase~compra nueva",
  "而且~furthermore~además|如果~if~si|几年~few years~unos años|少浪费~waste less~desperdiciar menos|资源~resources~recursos",
  "Und wenn~and if~y si|Gerät~device~aparato|ein paar Jahre~a few years~unos años|hält~lasts~dura|sparen~save~ahorrar|Ressourcen~resources~recursos"
  ),
