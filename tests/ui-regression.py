@@ -25,6 +25,28 @@ for width,height in [(390,844),(1280,900)]:
         assert skip.bounding_box()["y"]>=0,"Keyboard skip link did not appear on focus"
         skip.press("Enter")
         assert page.evaluate("document.activeElement.id")=="main","Skip link did not move keyboard focus to main content"
+        # Customize a non-backpack icon, then verify it persists across reloads.
+        page.locator(".top .gear").click()
+        page.locator(".settings-tabs button",has_text="Appearance").click()
+        page.get_by_role("button",name="Customize navigation icons").click()
+        picker=page.locator("dialog.sheet[open]").last
+        picker.locator('select[aria-label="Section to customize"]').select_option("games")
+        picker.locator('select[aria-label="Alternate icon"]').select_option("gear")
+        picker.locator('input[aria-label="Icon color"]').fill("#bc6745")
+        picker.get_by_role("button",name="Save icons").click()
+        assert page.evaluate("JSON.parse(localStorage.getItem('tracker-nav-icon-choices-v1')).games.glyph")=="gear"
+        page.keyboard.press("Escape")
+        page.reload(wait_until="domcontentloaded")
+        page.locator(".top .gear").wait_for(timeout=25000)
+        assert "#bc6745" in page.locator('.slot[data-route="games"] .slot-icon').inner_html()
+        if width<899:
+            page.evaluate("location.hash='#expenses'")
+            page.locator('.slot[data-route="expenses"][aria-current="page"]').wait_for(timeout=10000)
+            page.wait_for_timeout(150)
+            x=page.locator('.slot[data-route="expenses"]').bounding_box()
+            assert x and 0<=x["x"]<width and x["x"]+x["width"]<=width+3,"Active mobile tab not revealed"
+            page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # Search must read the real locations table, not a missing "places" table.
         page.locator(".pixel-search-toggle").click()
         page.locator(".global-search-input").fill("Headlamp")
