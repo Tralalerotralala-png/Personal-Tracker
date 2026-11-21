@@ -1,11 +1,9 @@
-import { resolveDailyLoot } from '../data/daily-loot.js';
 // The Inventory tab: "Where is it?" search, lost-item quests, the slot grid,
 // filters, and the item editor. Items and Places are two panes of one tab.
 import { h, replace, toast, openSheet, confirmDialog, daysSince } from './dom.js';
 import { pixelIconSvg } from './pixel-icon.js';
 import { INVENTORY_ASSETS, ASSET_GROUPS, assetGroup, isAssetPreset, inventoryAssetSvg, defaultInventoryAsset } from './inventory-assets.js';
 import { PHARMACY_PRESETS, MEDICINE_COLOR_DEFAULTS, isPharmacyCategory, defaultMedicinePreset, defaultMedicineColor, medicinePreset, medicineColor, pharmacyIconSvg } from './pharmacy-icons.js';
-import { todayKeyLocal } from '../calendar/recurrence.js';
 import {
   searchItems, locationPath, locationPathParts, indexById, descendantIds,
 } from '../data/inventory-logic.js';
@@ -48,8 +46,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     ]);
     categories.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
     const [trackingRows, categoryDefaults] = await Promise.all([store.list('settings', { where: r => r.key.startsWith('item_tracking:') }), store.getSetting('category_tracking_defaults')]);
-    const loot = await resolveDailyLoot(store, items);
-    data = { loot, items, locations, categories, rarityLabels, tracking: Object.fromEntries(trackingRows.map(r => [r.key.slice('item_tracking:'.length), r.value])), categoryDefaults: categoryDefaults || {} };
+    data = { items, locations, categories, rarityLabels, tracking: Object.fromEntries(trackingRows.map(r => [r.key.slice('item_tracking:'.length), r.value])), categoryDefaults: categoryDefaults || {} };
   }
 
   const ctx = () => ({ items: data.items, locations: data.locations, categories: data.categories });
@@ -170,7 +167,6 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   function renderQuests() {
     const lost = data.items.filter((i) => i.is_lost);
     const showing = !state.q && !state.category && !state.rarities.size && !state.placeId && !state.lostOnly;
-    const loot = data.loot;
 
     const blocks = [];
     if (showing && lost.length) {
@@ -181,14 +177,6 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
             h('span', { class: 'quest-name' }, i.name),
             h('span', { class: 'quest-meta' }, language() === 'es' ? `perdido hace ${daysSince(i.lost_since) ?? '?'} días, visto por última vez en: ${pathOf(i)}` : `lost ${daysSince(i.lost_since) ?? '?'} days, last seen: ${pathOf(i)}`))))),
         lost.length > 3 ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { state.lostOnly = true; renderAll(); } }, `Show all ${lost.length} lost items`) : null));
-    }
-    if (loot) {
-      blocks.push(h('button', { class: `loot r-${loot.rarity}`, type: 'button', onclick: () => openItemSheet(loot) },
-        h('span', { class: 'loot-art' }, art(loot, 'art')),
-        h('span', { class: 'loot-text' },
-          h('span', { class: 'loot-title' }, t("Today's loot")),
-          h('span', { class: 'loot-name', 'data-user-content':'true' }, loot.name),
-          breadcrumb(loot))));
     }
     questsEl.replaceChildren(...blocks);
   }
@@ -724,13 +712,8 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     requestAnimationFrame(async () => { queued = false; await refresh(); });
   });
 
-  let lastDay = todayKeyLocal();
-  function checkDay() { const day=todayKeyLocal(); if(day!==lastDay && el.isConnected && !el.hidden){lastDay=day;refresh().catch(error => console.warn('Could not refresh daily loot',error));} }
-  const dayTimer=setInterval(checkDay,30000);
-  window.addEventListener('focus',checkDay);
-  document.addEventListener('visibilitychange',checkDay);
   async function show() {
-    await refresh(); renderPane(); checkDay();
+    await refresh(); renderPane();
     const id=sessionStorage.getItem('tracker-open-item');
     if(id){sessionStorage.removeItem('tracker-open-item');const item=data.items.find(i=>i.id===id);if(item)openItemSheet(item);}
   }
@@ -738,7 +721,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     el,
     mount: show,
     show,
-    destroy(){clearInterval(dayTimer);window.removeEventListener('focus',checkDay);document.removeEventListener('visibilitychange',checkDay);},
+    destroy(){},
     focusSearch: () => searchInput.focus(),
   };
 }
