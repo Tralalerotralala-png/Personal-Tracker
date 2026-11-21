@@ -252,14 +252,30 @@ function buildPersonalHub({store, host}) {
   }
   function draw(){drawTabs();replace(panel,...(active==='alerts'?drawAlerts():active==='search'?drawSearch():active==='insights'?drawInsights():active==='timeline'?drawTimeline():active==='review'?drawWeeklyReview():drawEntries(active)));}
   reload().catch(error=>replace(panel,h('p',{class:'form-error'},error.message)));
-  return {refresh:reload};
+  return {refresh:reload,openEntry(type,id){
+    if(!['task','note'].includes(type)||typeof id!=='string')return false;
+    const entry=hub?.[type]?.find(row=>row.id===id);
+    if(!entry)return false;
+    active=type==='task'?'tasks':'notes';
+    draw();
+    editor(type,entry);
+    return true;
+  }};
 }
 
 // Standalone full-window hub. The former side drawer now redirects here.
 export function createPersonalHubView({store}) {
   const el=h('section',{class:'view hub-view'});
-  let controller=null;
-  return {el,async mount(){if(!controller) controller=buildPersonalHub({store,host:el});},async show(){await controller?.refresh();}};
+  let controller=null,pending=null;
+  window.addEventListener('tracker-search-open',event=>{
+    if(event.detail?.target==='hub'&&['task','note'].includes(event.detail.kind))
+      pending={kind:event.detail.kind,id:event.detail.id};
+  });
+  return {el,async mount(){if(!controller) controller=buildPersonalHub({store,host:el});},
+    async show(){
+      await controller?.refresh();
+      if(pending){const {kind,id}=pending;pending=null;controller?.openEntry(kind,id);}
+    }};
 }
 export function openPersonalHub() { location.hash='#hub'; }
 

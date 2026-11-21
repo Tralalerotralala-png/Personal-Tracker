@@ -130,7 +130,10 @@ export async function saveImportedTransactionsBatch(store,entries) {
 
 export function createExpensesView({store}) {
   const el=h('section',{class:'view expense-view'});
-  let entries=[],budgets={},currency='MXN',month=stamp().slice(0,7),search='',typeFilter='all',panel='transactions',editing=null,ready=false,showOnlyMonth=true;
+  let entries=[],budgets={},currency='MXN',month=stamp().slice(0,7),search='',typeFilter='all',panel='transactions',editing=null,ready=false,showOnlyMonth=true,pendingSearchId=null;
+  window.addEventListener('tracker-search-open',event=>{
+    if(event.detail?.target==='expenses'&&event.detail.kind==='expense')pendingSearchId=event.detail.id;
+  });
   const btn=(title,click,extra='')=>h('button',{type:'button',class:`btn small ${extra}`,onclick:click},title);
   const field=(title,node)=>h('label',{class:'expense-field'},h('span',{},title),node);
   const input=(value='',attrs={})=>h('input',{type:'text',value,...attrs});
@@ -264,5 +267,16 @@ export function createExpensesView({store}) {
       h('div',{class:'expense-form-grid'},field(label('Subtotal','Subtotal'),subtotal),field(label('Tax %','Impuesto %'),tax),field(label('Tip %','Propina %'),tip),field(label('People','Personas'),people)),result);
     calc();return content;
   }
-  return {el,async mount(){if(!ready)await load();},async show(){if(ready&&editing===null)await load();}};
+  return {el,async mount(){if(!ready)await load();},async show(){
+    if(ready&&editing===null)await load();
+    if(pendingSearchId){
+      const id=pendingSearchId;pendingSearchId=null;
+      const match=entries.find(row=>row.id===id);
+      if(match){
+        editing=match;month=monthOf(match.due)||month;currency=match.currency;
+        panel='transactions';search='';typeFilter='all';showOnlyMonth=false;
+        renderEditor();
+      }
+    }
+  }};
 }
