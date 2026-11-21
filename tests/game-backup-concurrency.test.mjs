@@ -215,7 +215,7 @@ test('a game-save deletion confirms its per-ID intent in Supabase before removin
  assert.equal(pendingConfirmedBeforeDelete,true);
  assert.equal(objects.has(entry.path),false);
  assert.equal(cloudSettings.get(final)?.deleted,true);
- assert.deepEqual(confirmed,[pending,final]);
+ assert.deepEqual(confirmed,['game_backup_entry_v2:'+entry.id,pending,final]);
 });
 
 test('cloud confirmation error prevents deleting the only game-save bytes',async()=>{
@@ -271,4 +271,77 @@ test('a second device sees a pending deletion and can finish an interrupted dele
  await other.remove(listed[0]);
  assert.deepEqual(await other.listAll(),[]);
  assert.equal(cloudSettings.get('game_backup_removed_v2:'+entry.id)?.deleted,true);
+});
+
+test('successful upload confirms its independently keyed metadata in cloud PostgREST',async()=>{
+ const {client,store:unused,adapter,objects,cloudSettings,confirmed}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const rec=await service.upload(GAME,new File(['irreplaceable save'],'checkpoint.sav'));
+ const key='game_backup_entry_v2:'+rec.id;
+ assert.equal(objects.has(rec.path),true);
+ assert.deepEqual(cloudSettings.get(key),rec);
+ assert.deepEqual(confirmed,[key],'The server acknowledgment is required before success');
+ assert.deepEqual((await service.list(GAME)).map(x=>x.id),[rec.id]);
+});
+
+test('failed cloud index acknowledgment never claims upload success or destroys uploaded bytes',async()=>{
+ const {client,adapter,objects}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ client.from=()=>({upsert:()=>({select:async()=>({
+   data:null,error:{message:'PostgREST unavailable'}
+ })})});
+ await assert.rejects(
+  service.upload(GAME,new File(['critical backup'],'checkpoint.sav')),
+  /cloud index was not confirmed/
+ );
+ const entryRows=(await store.list('settings')).filter(x=>x.key.startsWith('game_backup_entry_v2:'));
+ assert.equal(entryRows.length,1,'Local metadata remains recoverable and syncable');
+ assert.equal(objects.has(entryRows[0].value.path),true,'Never delete the successful Storage copy');
+});
+
+test('local metadata failure recovers the uploaded save into the cloud index',async()=>{
+ const {client,objects,adapter,cloudSettings}=fixture();
+ const underlying=createStore({adapter});
+ const failing={...underlying,setSetting:async(key,value)=>{
+   if(key.startsWith('game_backup_entry_v2:'))throw Error('Quota exceeded');
+   return underlying.setSetting(key,value);
+ }};
+ await assert.rejects(
+  createGameBackupService({client,store:failing}).upload(
+   GAME,new File(['recoverable bytes'],'unique.sav')),
+  /cloud index were stored, but the device cache could not save/
+ );
+ assert.equal(objects.size,1,'Uploaded Storage bytes must be preserved');
+ assert.deepEqual((await underlying.list('settings')).filter(x=>x.key.startsWith('game_backup_entry_v2:')),[]);
+ const [row]=[...cloudSettings].filter(([key])=>key.startsWith('game_backup_entry_v2:'));
+ assert.ok(row,'Direct cloud fallback must retain independent save metadata');
+ assert.equal(objects.has(row[1].path),true);
+});
+
+test('if both local and cloud metadata fail, private Storage bytes remain for manual recovery',async()=>{
+ const {client,objects,adapter}=fixture();
+ const underlying=createStore({adapter});
+ const failing={...underlying,setSetting:async()=>{throw Error('Quota exceeded');}};
+ client.from=()=>({upsert:()=>({select:async()=>({
+  data:null,error:{message:'Cloud unavailable'}
+ })})});
+ await assert.rejects(
+  createGameBackupService({client,store:failing}).upload(
+   GAME,new File(['recoverable bytes'],'unique.sav')),
+  /uploaded to private Storage at .*but indexing could not be confirmed/
+ );
+ assert.equal(objects.size,1,'Never destroy the only uploaded copy on index failure');
+});
+
+test('cloud index upsert cannot acknowledge mismatched uploaded metadata',async()=>{
+ const {client,adapter,objects}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ client.from=()=>({upsert:row=>({select:async()=>({
+   data:[{key:row.key,value:{...row.value,hash:'tampered'}}],error:null
+ })})});
+ await assert.rejects(
+  service.upload(GAME,new File(['contents'],'checkpoint.sav')),
+  /cloud index was not confirmed/
+ );
+ assert.equal(objects.size,1);
 });

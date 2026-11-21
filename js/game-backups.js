@@ -53,6 +53,29 @@ export function createGameBackupService({client, store}) {
       row.value?.path===value.path&&row.value?.[flag]===true))
       throw Error('Could not confirm game-backup deletion marker on the cloud server. The backup was not deliberately removed until this step completed.');
   }
+  // A successful Storage upload is not a complete backup until its metadata
+  // can be discovered from another signed-in device. Local setting writes
+  // only queue synchronization, so verify the same per-backup row in PostgREST.
+  async function confirmServerUploadIndex(uid,key,record,{allowMissingLocal=false}={}){
+    let local;
+    try {local=await store.get('settings',key);}
+    catch(err){if(!allowMissingLocal)throw err;}
+    if((!local||local.deleted_at)&&!allowMissingLocal)
+      throw Error('Uploaded backup metadata is missing from this device.');
+    // A failed IndexedDB write must not make a successful Storage upload
+    // undiscoverable. In that case recover directly to the authenticated
+    // owner-only cloud index using a fresh timestamp.
+    const now=new Date().toISOString();
+    const {data,error}=await client.from('settings').upsert({
+      user_id:uid,key,value:record,created_at:local?.created_at??now,
+      updated_at:local?.updated_at??now,deleted_at:null
+    },{onConflict:'user_id,key'}).select('key,value');
+    if(error||!Array.isArray(data)||!data.some(row=>
+       row.key===key&&row.value?.id===record.id&&
+       row.value?.gameId===record.gameId&&row.value?.path===record.path&&
+       row.value?.hash===record.hash&&row.value?.size===record.size))
+      throw Error('Could not confirm the game backup index on Supabase.');
+  }
   async function listAll() {
     // The legacy shared array is read for backwards compatibility, but all new
     // uploads have their own setting key. Concurrent devices can then upload
@@ -108,11 +131,28 @@ export function createGameBackupService({client, store}) {
     if (error) throw new Error(`Backup upload failed: ${error.message}`);
     const rec = {id,gameId,path,name:cleanFilename(file.name),size:file.size,hash:checksum,
       createdAt:new Date().toISOString(),category:String(category).slice(0,40),notes:String(notes).slice(0,300)};
-    try {await store.setSetting(ENTRY_PREFIX + id, rec);}
-    catch (err) {
-      // Avoid orphaned objects when a metadata write cannot be saved.
-      await client.storage.from(GAME_BACKUP_BUCKET).remove([path]).catch(()=>{});
-      throw new Error('Backup uploaded but could not save its index. Please retry.');
+    const key=ENTRY_PREFIX + id;
+    try {await store.setSetting(key,rec);}
+    catch {
+      // The local device could be out of space. Attempt a direct PostgREST
+      // index write before losing the session, since the Storage object
+      // already exists and must not be destroyed as an error workaround.
+      let remoteSaved=false;
+      try {
+        await confirmServerUploadIndex(uid,key,rec,{allowMissingLocal:true});
+        remoteSaved=true;
+      }catch { /* The upload is still physically in private Storage. */ }
+      if(remoteSaved)
+        throw new Error('Save file and cloud index were stored, but the device cache could not save metadata. Keep your original save, free browser storage, then reload and Sync to recover the cloud entry.');
+      throw new Error('Save bytes were uploaded to private Storage at '+path+', but indexing could not be confirmed on this device or Supabase. Keep your original save. Do not clear this account’s browser data until you recover the Storage file.');
+    }
+    try {await confirmServerUploadIndex(uid,key,rec);}
+    catch {
+      // A Storage upload succeeded but a subsequent API request did not.
+      // The local outbox will retry the index when connectivity returns.
+      // Do not report this as a fully cloud-confirmed backup, and do not
+      // delete the only uploaded copy while the index is in doubt.
+      throw new Error('Save file uploaded and indexed on this device, but the cloud index was not confirmed. Keep your original save and reconnect, then Sync before relying on this backup.');
     }
     return rec;
   }
