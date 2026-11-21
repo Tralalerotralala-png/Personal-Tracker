@@ -2373,7 +2373,13 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 .widget.wd-phrase .phrase-b2-english{font-size:.71rem}
 .widget.wd-phrase .phrase-b2-turn-head{padding-bottom:1px}
 .widget.wd-phrase .phrase-b2-answer{padding-top:6px}
-@container (max-width:440px){.widget.wd-phrase .phrase-b2-grid{grid-template-columns:1fr}}
+@container (max-width:440px){
+ .widget.wd-phrase .phrase-b2-grid{grid-template-columns:1fr}
+ /* Keep narrow dashboard tiles short. Pinyin and English translation are
+    available in full, without clipping, in the Reveal detail sheet. */
+ .widget.wd-phrase .phrase-b2-language .phrase-pronunciation,
+ .widget.wd-phrase .phrase-b2-english{display:none}
+}
 @container (max-width:300px){
  .widget.wd-phrase .phrase-b2-context small{display:none}
  .widget.wd-phrase .phrase-b2-pattern small{display:none}
