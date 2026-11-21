@@ -230,11 +230,25 @@ for width,height in [(390,844),(1280,900)]:
         keys.nth(1).fill("local regression passphrase")
         page.get_by_role("button",name="Create journal key").click()
         page.locator(".journal-shell").wait_for(state="visible",timeout=12000)
+        # The v3 journal must persist independently encrypted entries through
+        # a complete lock/unlock cycle in a real browser and IndexedDB.
+        page.locator(".journal-shell .hub-tabs button",has_text="Private Vault").click()
+        page.locator(".journal-list-head button",has_text="New entry").click()
+        page.locator(".journal-inline-editor input[type=text]").first.fill("Sensitive vault entry")
+        page.locator(".journal-inline-editor textarea").first.fill("Never appears in the public search")
+        page.locator(".journal-editor-actions button",has_text="Save").click()
+        page.locator(".journal-shell .journal-entry").filter(has_text="Sensitive vault entry").wait_for(timeout=10000)
         page.evaluate("location.hash='#overview'")
         page.locator(".journal-shell").wait_for(state="detached",timeout=5000)
         page.evaluate("location.hash='#diary'")
         page.get_by_role("button",name="Open private journal").wait_for(state="visible",timeout=10000)
         assert page.locator(".journal-shell").count()==0,"Private journal remained unlocked after navigating away"
+        page.get_by_role("button",name="Open private journal").click()
+        page.locator(".journal-unlock input[type=password]").first.fill("local regression passphrase")
+        page.get_by_role("button",name="Unlock",exact=True).click()
+        page.locator(".journal-shell").wait_for(state="visible",timeout=12000)
+        page.locator(".journal-shell .hub-tabs button",has_text="Private Vault").click()
+        assert page.locator(".journal-shell .journal-entry").filter(has_text="Sensitive vault entry").count()==1
         page.evaluate("location.hash='#overview'")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         page.locator(".top .gear").click()

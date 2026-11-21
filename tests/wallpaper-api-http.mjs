@@ -75,7 +75,11 @@ statusOneOf('nonowner cannot read owner row',stillHidden,200);
 assert.deepEqual(stillHidden.data,[]);
 const anonItems=await call('/items?select=id');
 statusOneOf('anon has no access to item rows',anonItems,401,403);
-const tamperedToken=other.slice(0,-1)+(other.endsWith('a')?'b':'a');
+// Mutate a significant signature byte. Altering only the last Base64URL
+// character can change unused padding bits without changing the MAC bytes.
+const jwtParts=other.split('.');
+const tamperedToken=jwtParts[0]+'.'+jwtParts[1]+'.'+
+  (jwtParts[2][0]==='a'?'b':'a')+jwtParts[2].slice(1);
 const badAuth=await call('/items?select=id',{token:tamperedToken});
 statusOneOf('invalid JWT signature rejected',badAuth,401,403);
 
