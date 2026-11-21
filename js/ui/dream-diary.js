@@ -8,7 +8,8 @@ import { weatherGlyph, weatherIconSvg } from './pixel-icon.js';
 import { localizedWeather } from './mud-format-v2.js';
 import { skyEventIconSvg } from '../weather/sky-events.js';
 import { baseDreamNight, loadDreamNight } from '../weather/dream-night.js';
-import { JOURNAL_KEY, emptyJournal, validPin, validNewJournalKey, encryptJournal, decryptJournal } from './private-journal-crypto.js';
+import { JOURNAL_KEY, validNewJournalKey } from './private-journal-crypto.js';
+import { JOURNAL_V3_HEADER,createJournalV3,unlockJournalV3,reloadJournalV3,saveJournalV3,changeJournalV3Passphrase } from './private-journal-v3.js';
 const DURATION=40*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const labels={
@@ -53,10 +54,10 @@ export function createDreamDiaryView({store}) {
  const el=h('div',{class:'view private-journal-view'});
  let session=null, timeout=null, sheet=null, failures=0, blockedUntil=0;
  let activeDraftTimer=null, activeDraftFlush=null, editorDirty=false, pendingCapture=null, openCaptureEditor=null;
- let writeChain=Promise.resolve();
+ let writeChain=Promise.resolve(),editorOpen=false,refreshRequested=false,refreshing=false,selectedType='dreams';
  const dialogs=new Set();
  const L=()=>labels[language()];
- const clear=()=>{session=null;clearTimeout(timeout);clearTimeout(activeDraftTimer);timeout=null;activeDraftTimer=null;activeDraftFlush=null;editorDirty=false;};
+ const clear=()=>{session=null;clearTimeout(timeout);clearTimeout(activeDraftTimer);timeout=null;activeDraftTimer=null;activeDraftFlush=null;editorDirty=false;editorOpen=false;refreshRequested=false;};
  function closeDialogs(){
   for(const dlg of [...dialogs]){if(dlg.el?.open)dlg.close();}
   dialogs.clear();
@@ -84,21 +85,50 @@ export function createDreamDiaryView({store}) {
  // The 40-minute idle timer still protects long idle foreground sessions.
  function trackDialog(dialog){dialogs.add(dialog);dialog.el.addEventListener('close',()=>dialogs.delete(dialog),{once:true});return dialog;}
  async function openLocked(){
-  if(sheet) sheet.close();clear();
-  const record=await store.getSetting(JOURNAL_KEY,null);
-  const first=!record;
-  const pin=h('input',{type:'password',inputmode:'text',minlength:first?12:4,maxlength:128,autocomplete:'off','aria-label':L().pin});
+  if(sheet)sheet.close();
+  // Do not show the journal setup flow before the account's latest header
+  // has had a chance to arrive from a second device.
+  clear();
+  await writeChain.catch(()=>{});
+  if(store.sync)await store.sync.syncNow();
+  const header=await store.getSetting(JOURNAL_V3_HEADER,null);
+  const first=!header,legacy=first?await store.getSetting(JOURNAL_KEY,null):null;
+  const pin=h('input',{type:'password',inputmode:'text',minlength:12,maxlength:128,autocomplete:'off','aria-label':L().pin});
   const confirm=h('input',{type:'password',inputmode:'text',minlength:12,maxlength:128,autocomplete:'off','aria-label':L().again});
   const error=h('p',{class:'form-error',role:'alert'});
-  const body=h('div',{class:'form'},h('p',{},first?L().warning:L().intro),h('label',{},L().pin),pin,first?h('label',{},L().again):null,first?confirm:null,error);
+  const intro=first?L().warning:L().intro;
+  const archive=legacy?h('p',{class:'hint'},language()==='es'
+    ?'Este es un diario nuevo, sincronizado por entrada. Los registros cifrados anteriores quedan archivados, pero no aparecen aquí.'
+    :'This starts a new, independently synced journal. Old encrypted Logs remain archived but are not displayed here.'):null;
+  const body=h('div',{class:'form'},h('p',{},intro),archive,
+    h('label',{},L().pin),pin,first?h('label',{},L().again):null,first?confirm:null,error);
+  let busy=false;
   const submit=h('button',{class:'btn primary',type:'button',onclick:async()=>{
+   if(busy)return;
    if(Date.now()<blockedUntil){error.textContent=L().wait;return;}
-   if((first?!validNewJournalKey(pin.value):!validPin(pin.value)) || (first&&pin.value!==confirm.value)){error.textContent=first?(language()==='es'?'Usa dos frases de acceso iguales de 12 caracteres o más.':'Use two matching passphrases of at least 12 characters.'):L().wrong;return;}
+   if(!validNewJournalKey(pin.value)||(first&&pin.value!==confirm.value)){
+    error.textContent=first?(language()==='es'?'Usa dos frases de acceso iguales de 12 caracteres o más.':'Use two matching passphrases of at least 12 characters.'):L().wrong;
+    return;
+   }
+   busy=true;submit.disabled=true;
    try{
-    const data=first?emptyJournal():await decryptJournal(pin.value,record);
-    if(first) await store.setSetting(JOURNAL_KEY,await encryptJournal(pin.value,data));
-    failures=0;session={pin:pin.value,data};pin.value='';confirm.value='';openEntries();
-   }catch(err){failures++;if(failures>=5){blockedUntil=Date.now()+60000;failures=0;}error.textContent=err.message||L().wrong;}
+    if(first&&store.sync){
+      const result=await store.sync.syncNow();
+      if(result.state!=='synced')throw Error('Connect and finish syncing before creating a new journal key on this device.');
+      if(await store.getSetting(JOURNAL_V3_HEADER,null)){
+        throw Error('Another device already created Logs. Reopen Logs and unlock with that passphrase.');
+      }
+    }
+    const unlocked=first?await createJournalV3(store,pin.value):await unlockJournalV3(store,pin.value);
+    // Do not keep the raw passphrase in long-lived JavaScript session state.
+    failures=0;session=unlocked;
+    pin.value='';confirm.value='';
+    openEntries();
+   }catch(err){
+    failures++;
+    if(failures>=5){blockedUntil=Date.now()+60000;failures=0;}
+    error.textContent=err.message||L().wrong;
+   }finally{busy=false;submit.disabled=false;}
   }},first?L().setup:L().unlock);
   const form=h('form',{class:'journal-unlock-form',onsubmit:e=>{e.preventDefault();submit.click();}},body,submit);
   replace(el,h('div',{class:'panel-head'},h('h2',{},L().title)),h('section',{class:'private-landing journal-unlock'},form));
@@ -106,20 +136,41 @@ export function createDreamDiaryView({store}) {
  }
  async function persist(){
   if(!session)return;
-  const pin=session.pin, snapshot=structuredClone(session.data);
-  // Serialize encrypted updates so an older draft cannot overwrite a newer save.
-  writeChain=writeChain.catch(()=>{}).then(async()=>{await store.setSetting(JOURNAL_KEY,await encryptJournal(pin,snapshot));});
-  await writeChain;touch();
+  const current=session,snapshot=structuredClone(current.data);
+  // Encrypt and commit only the changed entries or drafts. Each row has its
+  // own cloud identity, so edits to two unrelated Logs never overwrite.
+  writeChain=writeChain.catch(()=>{}).then(()=>saveJournalV3(store,current,snapshot));
+  await writeChain;
+  if(session===current)touch();
+ }
+ function reloadWhenSafe(){
+  if(!session)return;
+  if(editorOpen||editorDirty){refreshRequested=true;return;}
+  if(refreshing){refreshRequested=true;return;}
+  refreshing=true;const current=session;
+  void writeChain.catch(()=>{}).then(async()=>{
+    if(session!==current||editorOpen||editorDirty)return;
+    await reloadJournalV3(store,current);
+    if(session===current&&!editorOpen)openEntries();
+  }).catch(err=>{
+    if(session===current){toast(err.message||'Could not refresh encrypted Logs.');lock();}
+  }).finally(()=>{
+    refreshing=false;
+    if(refreshRequested&&session&&!editorOpen&&!editorDirty){
+      refreshRequested=false;reloadWhenSafe();
+    }
+  });
  }
  function openEntries(){
   if(!session)return;
   const wrap=h('div',{class:'journal-shell'}),tabs=h('div',{class:'hub-tabs'}),list=h('div',{class:'journal-list'});
-  let active=pendingCapture||'dreams';
+  let active=pendingCapture||selectedType;
   const tabsNames=['dreams','sleep','moods','habits','vault'];
   const dateDisplay=d=>d||today();
   const button=(txt,fn)=>h('button',{class:'btn small',type:'button',onclick:fn},txt);
-  async function edit(type,entry=null){
-   const draftKey=`${type}:${entry?.id||'new'}`;
+  async function edit(type,entry=null,resumeKey=null){
+   editorOpen=true;
+   const draftKey=resumeKey||`${type}:${entry?.id||uuid()}`;
    const draft=session.data.drafts?.[draftKey] || null;
    const original=entry;
    if (draft) entry={...entry,...draft};
@@ -138,7 +189,7 @@ export function createDreamDiaryView({store}) {
    const nightPanel=h('section',{class:'dream-night-panel'});
    const editorSession=session;
    let night=entry?.nightSky||null,nightPromise=null,nightDate=null,nightRequest=0,saving=false;
-   const newEntryId=original?.id||uuid();
+   const newEntryId=original?.id||draftKey.slice(type.length+1);
    function renderNight(loading=false){
     replace(nightPanel,h('h3',{},trNight('Previous night · weather & sky','Noche anterior · clima y cielo')),night?nightDetails(night):null,
       loading?h('p',{class:'hint',role:'status'},trNight('Loading overnight weather…','Consultando el clima de la noche…')):h('button',{type:'button',class:'btn small',onclick:()=>requestNight(true)},trNight('Refresh night data','Actualizar datos de la noche')));
@@ -177,11 +228,19 @@ export function createDreamDiaryView({store}) {
      if(editorDirty&&!confirm(language()==='es'?'¿Salir del editor? Se conservará un borrador cifrado.':'Leave the editor? An encrypted draft will be kept.'))return;
      clearTimeout(activeDraftTimer);activeDraftTimer=null;
      if(editorDirty)try{await persistDraft();}catch{toast(L().saveFailed);return;}
-     editorDirty=false;activeDraftFlush=null;replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();
+     editorDirty=false;editorOpen=false;activeDraftFlush=null;replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();
+     if(refreshRequested){refreshRequested=false;reloadWhenSafe();}
    };
    const editor={close:closeEditor};
    const actions=[
-    original?button(L().delete,async()=>{if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;session.data[type]=session.data[type].filter(x=>x.id!==original.id);delete session.data.drafts?.[draftKey];editorDirty=false;await persist();editor.close();draw();}):null,
+    original?button(L().delete,async()=>{
+      if(!await confirmDialog({title:L().delete,message:'Delete this entry?',confirmLabel:L().delete,danger:true}))return;
+      session.data[type]=session.data[type].filter(x=>x.id!==original.id);
+      delete session.data.drafts?.[draftKey];
+      editorDirty=true;
+      try{await persist();editorDirty=false;editor.close();draw();}
+      catch(err){error.textContent=err.message||L().saveFailed;}
+    }):null,
     h('button',{class:'btn primary',onclick:async(e)=>{
       if(saving)return;
       if(!title.value.trim()){error.textContent='Title required';return;}
@@ -196,8 +255,8 @@ export function createDreamDiaryView({store}) {
        const updated={...entry,id:newEntryId,title:safeText(title.value,140),date:saveDate,body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art,...(type==='dreams'?{nightSky:savedNight}:{})};
        if(session!==editorSession||!form.isConnected||(date.value||today())!==saveDate)return;
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
-       delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;editorDirty=false;
-       await persist();activeDraftFlush=null;editor.close();draw();
+       delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;
+       await persist();editorDirty=false;activeDraftFlush=null;editor.close();draw();
       }catch(err){error.textContent=L().saveFailed;}
       finally{saving=false;saveButton.disabled=false;}
     }},L().save)];
@@ -212,7 +271,7 @@ export function createDreamDiaryView({store}) {
   }
   function draw(){
    if(!session)return;
-   replace(tabs,...tabsNames.map(type=>h('button',{class:`btn small ${active===type?'primary':''}`,onclick:()=>{active=type;draw();}},L()[type])));
+   replace(tabs,...tabsNames.map(type=>h('button',{class:`btn small ${active===type?'primary':''}`,onclick:()=>{active=type;selectedType=type;draw();}},L()[type])));
    const entries=[...session.data[active]].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
    const dreamStats=active==='dreams' && entries.length ? (()=>{
      const counts=new Map();for(const e of entries)for(const tag of e.tags||[])counts.set(tag,(counts.get(tag)||0)+1);
@@ -229,7 +288,7 @@ export function createDreamDiaryView({store}) {
      :h('button',{class:'journal-entry',onclick:()=>edit(active,entry)},h('strong',{},entry.title),h('small',{},dateDisplay(entry.date)),h('span',{},safeText(entry.body,110)),active==='dreams'&&entry.nightSky?h('span',{class:'dream-night-card-summary'},nightSummary(entry.nightSky)):null));
    const drafts=Object.keys(session.data.drafts||{}).filter(k=>k.startsWith(active+':'));
    replace(list,h('div',{class:'journal-list-head'},h('h3',{},L()[active]),button(L().new,()=>edit(active))),
-    drafts.length?h('p',{class:'journal-draft-reminder'},language()==='es'?'Borradores cifrados: ':'Encrypted drafts: ',...drafts.map(key=>button(language()==='es'?'Continuar borrador':'Resume draft',()=>{const id=key.split(':')[1];edit(active,session.data[active].find(x=>x.id===id)||null);}))) : null, dreamStats,
+    drafts.length?h('p',{class:'journal-draft-reminder'},language()==='es'?'Borradores cifrados: ':'Encrypted drafts: ',...drafts.map(key=>button(language()==='es'?'Continuar borrador':'Resume draft',()=>{const id=key.split(':')[1];edit(active,session.data[active].find(x=>x.id===id)||null,key);}))) : null, dreamStats,
     entries.length?cards:h('p',{class:'hint'},L().empty));
   }
   const changePin=async()=>{
@@ -238,15 +297,27 @@ export function createDreamDiaryView({store}) {
    const err=h('p',{class:'form-error'});
    const dialog=trackDialog(openSheet({title:L().change,size:'small',body:h('div',{class:'form'},h('p',{class:'hint'},L().warning),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
     if(!validNewJournalKey(newPin.value)||newPin.value!==again.value){err.textContent=language()==='es'?'Usa una frase nueva de 12 caracteres o más y repítela exactamente.':'Use a new passphrase of at least 12 characters and repeat it exactly.';return;}
-    try{await writeChain;await store.setSetting(JOURNAL_KEY,await encryptJournal(newPin.value,session.data));session.pin=newPin.value;dialog.close();touch();toast(L().save);}catch{err.textContent=L().saveFailed;}
+    try{
+      await writeChain;
+      await changeJournalV3Passphrase(store,session,newPin.value);
+      newPin.value='';again.value='';
+      dialog.close();touch();toast(L().save);
+    }catch(e){err.textContent=e.message||L().saveFailed;}
    }},L().save)]}));
   };
-  wrap.append(h('div',{class:'journal-actions'},button(L().change,changePin),button(L().lock,lock)),tabs,list);
+  wrap.append(h('div',{class:'journal-actions'},
+    button(L().change,changePin),button(L().lock,lock),
+    h('span',{class:'hint'},trNight('Each entry syncs separately; only encrypted data leaves this device.',
+      'Cada entrada se sincroniza por separado y permanece cifrada.'))),tabs,list);
   replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
   draw();touch();
   openCaptureEditor=type=>{if(!session)return;if(editorDirty){toast(language()==='es'?'Guarda el editor actual primero.':'Save the current journal editor first.');return;}active=type;draw();edit(type);};
   if(pendingCapture){const type=pendingCapture;pendingCapture=null;openCaptureEditor(type);}
  }
+ store.subscribe(e=>{
+  if(e.type==='change'&&e.source==='sync'&&e.tables?.includes('settings')&&session)
+   reloadWhenSafe();
+ });
  window.addEventListener('beforeunload', e=>{if(editorDirty){e.preventDefault();e.returnValue='';}});
  window.addEventListener('tracker-private-capture',e=>{const type=e.detail?.type;if(!['dreams','sleep','moods','habits','vault'].includes(type))return;pendingCapture=type;if(session&&openCaptureEditor){pendingCapture=null;openCaptureEditor(type);}else if(!el.hidden)openLocked();});
  landing();
