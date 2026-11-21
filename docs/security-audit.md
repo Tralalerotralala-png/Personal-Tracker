@@ -11,3 +11,9 @@ The November 2026 review led to changes in the feed proxy's outbound URL/DNS gua
 **Release gate:** The feed proxy's outbound-network protection still requires end-to-end checks in a disposable Supabase Edge deployment before it is enabled in production. Other manual gates are mobile weather-day navigation, 1/3/6/7-day forecast layout at multiple widths, PWA update, and Wallpaper Engine/privacy settings.
 
 Do not treat a passing client-side test as a production security audit. If any real secret has ever been committed, revoke or rotate it; deleting a file in a later commit does not erase public Git history.
+
+## Public source and private media
+
+New installations do not auto-seed any individual's books, films, albums or rating preferences. Media entries live in account-scoped settings; book/comic interior images are processed in the browser and stored in device-local IndexedDB metadata only, not uploaded to the database or checked into Git. The device must still be trusted: these local images are not encrypted at rest.
+
+Use the automated repository privacy test for a first-pass scan of tracked source files and obvious credential patterns. It is not a replacement for GitHub secret scanning or a full historical audit: previously removed content can still exist in earlier public commits, forks, downloads and caches. Revoke any exposed credential; contact the repository administrator before attempting a history rewrite.
