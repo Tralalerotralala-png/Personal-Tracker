@@ -436,6 +436,8 @@ for width,height in [(390,844),(1280,900)]:
         game_toolbar.wait_for(state="visible",timeout=10000)
         game_bounds=game_toolbar.bounding_box()
         assert game_toolbar.locator(".media-collection-actions button").count()==3
+        game_action_names=[x.strip() for x in game_toolbar.locator(".media-collection-actions button").all_inner_texts()]
+        assert game_action_names==["Cover grid","New shelf","Add game"],game_action_names
         assert game_toolbar.locator(".media-pixel-icon svg.sprite-stacked-asset").count()>=1
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         books_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
@@ -446,7 +448,7 @@ for width,height in [(390,844),(1280,900)]:
         assert abs(game_bounds["width"]-books_bounds["width"])<=4,(game_bounds,books_bounds)
         def action_names(toolbar):
             return [s.strip() for s in toolbar.locator(".media-collection-actions button").all_inner_texts()]
-        assert action_names(game_toolbar)[:2]==action_names(books_toolbar)[:2],(action_names(game_toolbar),action_names(books_toolbar))
+        assert game_action_names[:2]==action_names(books_toolbar)[:2],(game_action_names,action_names(books_toolbar))
         assert action_names(books_toolbar)==["Cover grid","New shelf","Add Books"],action_names(books_toolbar)
         page.once("dialog",lambda dialog: dialog.accept("Example comics shelf"))
         books_toolbar.locator("button",has_text="New shelf").click()
