@@ -27,6 +27,19 @@ async function accountDbOp(name,mode,fn){
  try{return await new Promise((resolve,reject)=>{const tx=db.transaction('tracks',mode),r=fn(tx.objectStore('tracks'));let result;r.onsuccess=()=>result=r.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}finally{db.close();}
 }
 // The archive tools use the exact same account-scoped IndexedDB as the player.
+// Audio bytes live in a separate per-account database, not in the main store.
+// Device erasure must remove these too, otherwise imported music survives it.
+export async function eraseLocalAudio(accountId){
+ if(!accountId||!/^[0-9a-z-]{8,80}$/i.test(accountId))throw Error('Invalid account for audio erasure');
+ if(typeof indexedDB==='undefined')return;
+ await new Promise((resolve,reject)=>{
+  const request=indexedDB.deleteDatabase('personal-tracker-local-music:'+accountId);
+  request.onsuccess=()=>resolve();
+  request.onerror=()=>reject(request.error||Error('Could not erase local audio'));
+  request.onblocked=()=>reject(Error('Close other Tracker tabs before erasing local audio'));
+ });
+ try{localStorage.removeItem(KEY+':'+accountId);}catch{}
+}
 export const readLocalAudio = accountId =>
   accountDbOp('personal-tracker-local-music:'+accountId,'readonly',store=>store.getAll());
 export async function writeLocalAudio(accountId,record) {
