@@ -163,5 +163,11 @@ export function createPhotos({ store, client }) {
     if (client && !old.startsWith('local/')) client.storage.from(BUCKET).remove([old]).catch(() => {});
   }
 
-  return { urlFor, setPhoto, removePhoto, flushQueue };
+  // Export the exact cached or signed private photo; never substitute another
+  // image or silently drop a missing blob from a portable archive.
+  async function readBlob(item) {
+    const url=await urlFor(item);
+    return url ? (await fetch(url)).blob() : null;
+  }
+  return { urlFor, readBlob, setPhoto, removePhoto, flushQueue };
 }
