@@ -54,7 +54,7 @@ const OUTLINE = '#1a120b';
 
 // Sprite as an inline SVG string. `color` must be a #hex colour (anything
 // else falls back to a neutral tone, so user-entered text can't inject markup).
-export function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
+export function pixelIconSvg(seed, { color = '#c9b58a', style = 'stack' } = {}) {
   const g = spriteGrid(seed);
   const n = g.length;
   const dim = n + 2; // 1 cell of padding for the outline
@@ -63,7 +63,7 @@ export function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
   // RGB palette values enter the geometry renderer; the old flat icon remains
   // as a fallback for extended alpha / shorthand CSS colors.
   const safeSix=/^#[0-9a-f]{6}$/i.test(fill)?fill:null;
-  if(safeSix){
+  if(safeSix&&style!=='flat'){
     const volume=renderLayeredSprite(g.map(row=>row.map(v=>v?safeSix:null)),{depth:3});
     if(volume)return volume.replace('class="sprite-stacked-asset"','class="sprite-random-depth sprite-stacked-asset"');
   }
