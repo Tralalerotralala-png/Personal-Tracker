@@ -10,7 +10,16 @@ for width,height in [(390,844),(1280,900)]:
         page.on("pageerror",lambda e: errors.append(str(e)))
         page.route("**/config.js",lambda route: route.fulfill(status=200,content_type="text/javascript",body="export const CONFIG=null;"))
         page.goto(BASE,wait_until="domcontentloaded")
-        page.locator(".top .gear").wait_for(timeout=25000)
+        try:
+            page.locator(".top .gear").wait_for(timeout=25000)
+        except Exception:
+            print("Bootstrap page errors:", errors)
+            print("Bootstrap visible body:", page.locator("body").inner_text()[:1800])
+            print("Bootstrap failed imports:", page.evaluate("""() => [...performance.getEntriesByType('resource')]
+                .filter(entry => entry.responseStatus >= 400).map(entry => ({
+                    url: entry.name, status: entry.responseStatus
+                }))"""))
+            raise
         assert page.locator(".widget").count()>=3,"Dashboard widgets missing"
         first_widget=page.locator(".overview .widget").first
         first_widget.wait_for(state="visible",timeout=10000)
