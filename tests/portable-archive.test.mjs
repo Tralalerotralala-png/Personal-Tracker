@@ -115,3 +115,45 @@ test('conflicting existing remote objects never get overwritten by restore',asyn
  await assert.rejects(restorePortableArchive({store,client,archive:blob}),/Different cloud file already exists/);
  assert.equal(mergeCalls,0);
 });
+
+test('valid-looking structured JSON mutations fail portable checksum preflight',async()=>{
+ const b=backup();
+ b.tables.items.push({id:PHOTO,name:'Camera'});
+ const {blob,manifest}=await createPortableTar({backup:b});
+ assert.match(manifest.structuredHash,/^[a-f0-9]{64}$/);
+ const bytes=new Uint8Array(await blob.arrayBuffer()),word=new TextEncoder().encode('Camera');
+ let start=-1;
+ for(let i=0;i<bytes.length-word.length;i++){
+  if(word.every((value,j)=>bytes[i+j]===value)){start=i;break;}
+ }
+ assert.ok(start>=0,'Expected item name in uncompressed manifest');
+ bytes[start+3]='f'.charCodeAt(0); // Camfra remains well-formed JSON
+ await assert.rejects(inspectPortableTar(new Blob([bytes])),/Corrupt structured backup checksum/);
+});
+
+test('complete media export refuses omitted cloud-only game saves in local mode',async()=>{
+ const store=createStore({adapter:createMemoryAdapter()});
+ await store.setSetting('game_backup_index_v1',[
+  {id:GAME,gameId:GAME,path:OWNER+'/'+GAME+'/'+GAME+'.bin',name:'save.sav'}
+ ]);
+ await assert.rejects(exportPortableArchive({
+  store,include:{photos:false,games:true,audio:false}
+ }),/Cannot export referenced game saves/);
+ const portable=await exportPortableArchive({
+  store,include:{photos:false,games:false,audio:false}
+ });
+ assert.equal(portable.manifest.mediaCoverage.games,false);
+});
+
+test('previously removed legacy game saves do not prevent complete local export',async()=>{
+ const store=createStore({adapter:createMemoryAdapter()});
+ await store.setSetting('game_backup_index_v1',[
+  {id:GAME,gameId:GAME,path:OWNER+'/'+GAME+'/'+GAME+'.bin',name:'removed.sav'}
+ ]);
+ await store.setSetting('game_backup_removed_v2:'+GAME,{id:GAME,deleted:true});
+ const portable=await exportPortableArchive({
+  store,include:{photos:false,games:true,audio:false}
+ });
+ assert.equal(portable.manifest.mediaCoverage.games,true);
+ assert.equal(portable.manifest.assets.length,0);
+});
