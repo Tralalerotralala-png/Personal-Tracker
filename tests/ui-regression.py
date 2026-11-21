@@ -44,6 +44,37 @@ for width,height in [(390,844),(1280,900)]:
             outbox:(await adapter.getAll('outbox')).length};
         }""")
         assert erased=={"items":0,"meta":0,"outbox":0},"Device erasure left cached data: "+str(erased)
+        # B2 daily practice keeps the old beginner history and reveals the
+        # next turn in an accessible sheet rather than growing a small widget.
+        dialogue_ui=page.evaluate("""async () => {
+          const {createPhraseOfDay}=await import('./js/ui/daily-phrases.js');
+          const old=createPhraseOfDay({date:new Date(2026,10,20)});
+          const newDay=createPhraseOfDay({date:new Date(2026,10,21)});
+          const olderChar=!!old.querySelector('.phrase-char');
+          const compact=document.createElement('div');
+          compact.className='widget wd-phrase';
+          const body=document.createElement('div');
+          body.className='widget-body';compact.append(body);
+          body.append(newDay);document.body.append(compact);
+          const before={oldChar:olderChar,b2:newDay.classList.contains('phrase-b2-panel'),
+            speech:!!newDay.querySelector('.phrase-b2-pattern'),
+            turns:[...newDay.querySelectorAll('.phrase-b2-turn-head')].filter(x=>!x.closest('[hidden]')).length,
+            pinyin:!!newDay.querySelector('[lang="zh-Latn-pinyin"]'),
+            replyHidden:!!newDay.querySelector('.phrase-b2-answer[hidden]')};
+          const toggle=newDay.querySelector('.phrase-b2-toggle');
+          toggle.click();
+          const sheet=[...document.querySelectorAll('dialog.sheet[open]')].at(-1);
+          const reply=sheet?.querySelector('.phrase-b2-answer');
+          const after={sheet:!!sheet,reply:!!reply&&!reply.hidden,
+            notes:!!sheet?.querySelector('.phrase-b2-tip'),
+            vocab:sheet?.querySelectorAll('.phrase-b2-vocab').length||0,
+            pinyin:sheet?.querySelectorAll('[lang="zh-Latn-pinyin"]').length||0};
+          sheet?.close();compact.remove();
+          return {before,after};
+        }""")
+        assert dialogue_ui["before"]=={"oldChar":True,"b2":True,"speech":True,"turns":1,"pinyin":True,"replyHidden":True},dialogue_ui
+        assert dialogue_ui["after"]=={"sheet":True,"reply":True,"notes":True,"vocab":2,"pinyin":2},dialogue_ui
+
         # Actual Chromium integration: forecast-only days, meter, current UV,
         # and daily peak UV. Unavailable later dates now carry estimated wetness.
         agenda_fit=page.evaluate("""async () => {

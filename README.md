@@ -14,6 +14,8 @@ The full instructions are in [SETUP.md](SETUP.md). Start with `config.example.js
 
 Inventory objects now support pixel-perfect horizontal sprite stacking with two pre-baked viewing angles, based on SpriteCook's written sprite-stacking technique. The complete catalog and unnamed item sprites use the new renderer, while the 24px navigation and weather symbols stay clearly recognizable. **Settings → Appearance → Sprite style** switches between layered objects and original flat icons. The existing one-view assets use approximate extrusions; exact 3D reconstruction requires four matching orthographic views. See [the sprite-stacking guide](docs/sprite-stacking.md).
 
+**Daily language practice:** starting **21 November 2026**, Phrase of the Day uses 37 curated **B2-level Mandarin–German mini-dialogues**, each with a realistic speaking context, transferable sentence pattern, tone-marked pinyin, English meaning, a second speaker's reply, and notes on pragmatic nuance. Try responding before revealing the model reply and useful expressions. Short dashboard widgets open the expanded dialogue in a sheet; the phrase-history calendar still shows the exact beginner lesson for dates before this upgrade. Everything works offline without saving voice or responses to the server.
+
 The app uses plain HTML, CSS, and JavaScript modules. No build step is needed to serve the website. For local testing, run `python -m http.server 8080` from the repository folder and open `http://localhost:8080`. Run `node --test` to check the JavaScript tests. The separate Wallpaper Engine files can be rebuilt with `node scripts/build-wallpaper.mjs`.
 
 ## Stabilization and security

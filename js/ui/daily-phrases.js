@@ -2,6 +2,8 @@
 // are context-specific; German uses word-level glosses (letters have no meaning).
 import { h, replace, openSheet } from './dom.js';
 import { language } from './language.js';
+import { B2_DIALOGUES } from './daily-dialogues.js';
+let dialoguePanelSequence=0;
 export const LESSONS = [
  {zh:'早上好',py:'zǎoshang hǎo',en:'Good morning',de:'Guten Morgen',ipa:'ˈɡuːtn̩ ˈmɔʁɡn̩',chars:['early / morning','up / on','good'],charPy:['zǎo','shang','hǎo'],words:['good (greeting form)','morning']},
  {zh:'谢谢你',py:'xièxie nǐ',en:'Thank you',de:'Danke schön',ipa:'ˈdaŋkə ʃøːn',chars:['thank','thank (repeated)','you'],charPy:['xiè','xie','nǐ'],words:['thanks','nicely / kindly']},
@@ -38,6 +40,7 @@ export const LESSONS = [
 // Calendar-day keys deliberately use the device's local date, not UTC midnight.
 export const PHRASE_ARCHIVE_START = '2026-11-03';
 export const PHRASE_EXPANSION_DATE = '2026-11-04';
+export const B2_DIALOGUE_START = '2026-11-21';
 const originalCount = 12;
 export function phraseDateKey(date = new Date()) {
  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -51,6 +54,13 @@ export function phraseDateFromKey(key) {
 export function lessonForDate(date=new Date()) {
  const key = phraseDateKey(date);
  const days = Math.floor(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000);
+ // B2 dialogues start on the upgrade date. The old dated lesson archive
+ // stays deterministic: opening a day from before this release shows exactly
+ // the simpler Mandarin/German phrase that was displayed then.
+ if (key >= B2_DIALOGUE_START) {
+  const start = Math.floor(Date.UTC(2026,10,21)/86400000);
+  return B2_DIALOGUES[((days-start)%B2_DIALOGUES.length+B2_DIALOGUES.length)%B2_DIALOGUES.length];
+ }
  // Preserve the exact daily selections shown by the first release.
  if (key < PHRASE_EXPANSION_DATE) return LESSONS[((days % originalCount)+originalCount)%originalCount];
  const start = Math.floor(Date.UTC(2026,10,4)/86400000);
@@ -71,8 +81,73 @@ export function phraseHistory(until=new Date(), max=30) {
  }
  return items;
 }
+// One active-recall dialogue turn stays readable in compact dashboard slots.
+// Reveal gives the response, full pinyin, translations and pragmatic reasoning
+// on demand. Historical beginner lessons retain their older per-character
+// and German word gloss interface without migrating or rewriting old dates.
+function createB2Dialogue({lesson,date,onHistory,expanded=false}){
+ const es=language()==='es';
+ const prompt=lesson;
+ const reply=lesson.reply;
+ const replyId='phrase-b2-reply-'+(++dialoguePanelSequence);
+ const response=h('div',{class:'phrase-b2-answer',hidden:!expanded,id:replyId},
+  h('div',{class:'phrase-b2-turn-head'},h('b',{},'B · '+(es?'Respuesta':'Response'))),
+  h('div',{class:'phrase-b2-grid'},
+   h('div',{class:'phrase-b2-language',lang:'zh-Hans'},h('small',{},es?'MANDARÍN':'MANDARIN'),
+    h('p',{class:'phrase-b2-utterance'},reply.zh),
+    h('p',{class:'phrase-pronunciation',lang:'zh-Latn-pinyin'},reply.py)),
+   h('div',{class:'phrase-b2-language',lang:'de'},h('small',{},es?'ALEMÁN':'GERMAN'),
+    h('p',{class:'phrase-b2-utterance'},reply.de))),
+  h('p',{class:'phrase-b2-english',lang:'en'},reply.en),
+  h('div',{class:'phrase-b2-tip'},
+   h('strong',{},es?'Por qué funciona':'Why it works'),
+   h('p',{},lesson.why)),
+  h('div',{class:'phrase-b2-expressions'},
+   h('small',{},es?'EXPRESIONES ÚTILES':'USEFUL EXPRESSIONS'),
+   ...lesson.expressions.map(([zh,de,en])=>
+    h('div',{class:'phrase-b2-vocab'},h('span',{lang:'zh-Hans'},zh),
+     h('span',{lang:'de'},de),h('small',{lang:'en'},en)))));
+ const toggle=h('button',{class:'btn small phrase-b2-toggle',type:'button',
+  'aria-expanded':String(expanded),'aria-controls':replyId,
+  onclick:()=>{
+   // Small widgets stay self-contained rather than growing into a nested
+   // scrollbar. Reveal the full dialogue in a readable day-detail sheet.
+   if(toggle.closest('.widget.wd-phrase')){
+    openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:true})});
+    return;
+   }
+   const opening=response.hidden;
+   response.hidden=!opening;
+   toggle.setAttribute('aria-expanded',String(opening));
+   toggle.textContent=opening
+    ?(es?'Ocultar respuesta':'Hide response')
+    :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown');
+  }},expanded?(es?'Ocultar respuesta':'Hide response')
+   :(es?'Mostrar respuesta y análisis':'Reveal reply & breakdown'));
+ const panel=h('section',{class:'phrase-panel phrase-b2-panel','aria-label':es?'Diálogo del día B2':'B2 daily dialogue'},
+  h('div',{class:'phrase-heading'},
+   h('span',{class:'phrase-day'},phraseDateKey(date)+' · B2'),
+   onHistory?h('button',{class:'btn small',type:'button',onclick:onHistory},es?'Historial':'History'):null),
+  h('div',{class:'phrase-b2-context'},
+   h('strong',{},lesson.topic),
+   h('small',{},lesson.setting)),
+  h('div',{class:'phrase-b2-pattern'},h('small',{},es?'PATRÓN DE CONVERSACIÓN':'SPEECH PATTERN'),
+   h('span',{},lesson.pattern)),
+  h('div',{class:'phrase-b2-turn-head'},h('b',{},'A · '+(es?'Situación':'Scenario')),
+   h('small',{},es?'Piensa cómo responderías':'Think of your reply')),
+  h('div',{class:'phrase-b2-grid'},
+   h('div',{class:'phrase-b2-language',lang:'zh-Hans'},h('small',{},es?'MANDARÍN':'MANDARIN'),
+    h('p',{class:'phrase-b2-utterance'},prompt.zh),
+    h('p',{class:'phrase-pronunciation',lang:'zh-Latn-pinyin'},prompt.py)),
+   h('div',{class:'phrase-b2-language',lang:'de'},h('small',{},es?'ALEMÁN':'GERMAN'),
+    h('p',{class:'phrase-b2-utterance'},prompt.de))),
+  h('p',{class:'phrase-b2-english',lang:'en'},prompt.en),
+  toggle,response);
+ return panel;
+}
 export function createPhraseOfDay({ date=new Date(), onHistory=null }={}) {
  const lesson=lessonForDate(date); const es=language()==='es';
+ if(lesson.level==='B2')return createB2Dialogue({lesson,date,onHistory});
  const line=h('div',{class:'phrase-hanzi','aria-label':lesson.zh},Array.from(lesson.zh).map((char,i)=>
    h('button',{class:'phrase-char',type:'button',title:`${char} (${lesson.charPy[i]}): ${lesson.chars[i]}`,'aria-label':`${char} (${lesson.charPy[i]}): ${lesson.chars[i]}`,onclick:e=>{const note=e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss');note.textContent=`${char} (${lesson.charPy[i]}) — ${lesson.chars[i]}`;},onmouseenter:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${char} (${lesson.charPy[i]}) — ${lesson.chars[i]}`;},onfocus:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${char} (${lesson.charPy[i]}) — ${lesson.chars[i]}`;}},char)));
  const german=h('div',{class:'phrase-german'},lesson.de.split(' ').map((word,i)=>h('button',{class:'phrase-word',type:'button',title:`${word}: ${lesson.words[i]}`,'aria-label':`${word}: ${lesson.words[i]}`,onclick:e=>{const note=e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss');note.textContent=`${word} — ${lesson.words[i]}`;},onmouseenter:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${word} — ${lesson.words[i]}`;},onfocus:e=>{e.currentTarget.closest('.phrase-panel').querySelector('.phrase-gloss').textContent=`${word} — ${lesson.words[i]}`;}},word+' ')));
@@ -99,7 +174,9 @@ export function openPhraseHistory() {
  }
  datePicker.addEventListener('change',()=>showKey(datePicker.value));
  const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>
-  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{},lesson.zh),h('span',{},lesson.de))));
+  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{class:lesson.level==='B2'?'phrase-history-topic':''},
+   lesson.level==='B2'?'B2 · '+lesson.topic:lesson.zh),
+  h('span',{},lesson.level==='B2'?lesson.zh:lesson.de))));
  const body=h('div',{class:'phrase-archive'},h('p',{class:'hint'},es?'Todas las frases desde el lanzamiento, incluso los días en que no abriste la aplicación.':'Every dated lesson since launch, including days when the app was closed.'),
   h('label',{class:'phrase-date-picker'},es?'Ver fecha':'Jump to date',datePicker),detail,
   h('h3',{},es?'Días anteriores':'Previous days'),history.length?recent:h('p',{class:'hint'},es?'El historial empieza mañana.':'Previous lessons will appear tomorrow.'));
