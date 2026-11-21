@@ -74,6 +74,8 @@ const PRECACHE = [
   './js/ui/daily-dialogues.js',
   './js/ui/daily-dialogues-es.js',
   './js/ui/daily-dialogue-literal.js',
+  './js/ui/daily-dialogue-pinyin.js',
+  './js/ui/daily-dialogue-ui-es.js',
   './js/ui/media-library.js',
   './js/weather/sky-events.js',
   './js/ui/personal-hub.js',
