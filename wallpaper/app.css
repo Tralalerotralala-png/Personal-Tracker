@@ -2182,3 +2182,98 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
   .sprite-stack-direction-a { opacity: 1 !important; }
   .sprite-stack-direction-b { opacity: 0 !important; }
 }
+
+
+/* Height-aware Coming Up and sky widgets. They expose complete rows and an
+   explicit Expand/Calendar action instead of nesting another scroll area. */
+.widget.wd-calendar .w-cal,
+.widget.wd-sky .w-sky{min-width:0;min-height:0;gap:4px;}
+.widget.wd-calendar .w-cal-uv{
+ display:flex;align-items:center;min-width:0;
+ padding:2px 3px 4px;border-bottom:1px solid var(--edge);color:var(--accent);
+}
+.widget.wd-calendar .w-cal-uv .uv-meter{font-size:.74rem;gap:2px 5px;}
+.widget.wd-calendar .w-cal-uv .uv-scale{transform:scale(.8);transform-origin:left center;}
+.widget.wd-calendar .w-cal-day{padding:3px 0 4px;border-bottom:1px solid var(--edge);min-width:0;}
+.widget.wd-calendar .w-cal-day>header{display:flex;align-items:center;justify-content:flex-start;gap:3px 6px;flex-wrap:wrap;line-height:1.1;}
+.widget.wd-calendar .w-cal-day .w-agenda-date{font-size:.77rem;gap:4px;}
+.widget.wd-calendar .w-cal-day .w-agenda-ground{padding:1px 2px;min-height:20px;}
+.widget.wd-calendar .w-cal-day .w-agenda-ground .mud-bar{width:45px;height:7px;}
+.widget.wd-calendar .w-cal-day .w-agenda-weather{width:18px;height:18px;}
+.widget.wd-calendar .w-cal-day .w-agenda-weather svg{width:18px;height:18px;}
+.widget.wd-calendar .w-agenda-uv{display:inline-flex;align-items:center;min-width:0;}
+.widget.wd-calendar .w-agenda-uv .uv-meter{font-size:.68rem;line-height:1.1;font-weight:400;}
+.widget.wd-calendar .w-agenda-uv .uv-scale{display:none;}
+.widget.wd-calendar .w-cal-day .w-event-link{
+ padding:2px 3px;margin:0;min-width:0;font-size:.78rem;
+ display:grid;grid-template-columns:6px 42px minmax(0,1fr);align-items:center;gap:4px;
+}
+.widget.wd-calendar .w-event-link .w-event-name{
+ display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.widget.wd-calendar .w-event-link .w-time{font-size:.72rem;min-width:0;}
+.widget.wd-calendar .w-event-link .dot{width:5px;height:5px;}
+.w-cal-extra,.w-cal-overflow,.w-sky-overflow{
+ border:0;background:var(--panel-2);color:var(--accent);cursor:pointer;
+ text-align:left;padding:3px 6px;min-height:22px;font:inherit;font-size:.73rem;
+}
+.w-cal-extra{background:transparent;padding-left:12px;}
+.w-cal-overflow,.w-sky-overflow{width:100%;text-align:center;border:1px solid var(--edge);}
+.w-cal-extra:hover,.w-cal-overflow:hover,.w-sky-overflow:hover{color:var(--ink);border-color:var(--accent);}
+.w-cal-extra:focus-visible,.w-cal-overflow:focus-visible,.w-sky-overflow:focus-visible{outline:2px solid var(--accent);}
+.widget.wd-sky .w-sky-scroll{display:grid;gap:0;max-height:none;overflow:visible;min-height:0;}
+.widget.wd-sky .w-sky-event{
+ display:grid;grid-template-columns:22px minmax(0,1fr);
+ width:100%;min-width:0;text-align:left;margin:0;padding:5px 2px;
+ border:0;border-bottom:1px solid var(--edge);
+ background:transparent;color:var(--ink);font:inherit;cursor:pointer;
+}
+.widget.wd-sky .w-sky-event:hover{background:var(--panel-2);color:var(--accent);}
+.widget.wd-sky .w-sky-event:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+.widget.wd-sky .w-sky-event-copy{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.widget.wd-sky .w-sky-event-copy strong{
+ display:block;font-size:.77rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.widget.wd-sky .w-sky-event-date{font-size:.65rem;}
+.widget.wd-sky .w-sky-note,.widget.wd-sky .w-sky-location{font-size:.65rem;line-height:1.3;}
+.widget.wd-sky .w-sky-intro{font-size:.7rem;line-height:1.2;}
+.widget.wd-sky .w-sky-symbol{width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.widget.wd-sky .w-sky-symbol svg{width:19px;height:19px;}
+.sky-explanation{display:grid;gap:9px;line-height:1.4;}
+.sky-explanation h3{font-size:.98rem;margin-top:8px;}
+.sky-explanation p{line-height:1.5;}
+.day-weather-summary{display:grid;align-content:start;gap:7px;}
+.day-weather-readings{display:flex;align-items:center;gap:7px 14px;flex-wrap:wrap;}
+.day-weather-readings .uv-meter{font-size:.76rem;}
+.day-weather-explanation{font-size:.88rem;line-height:1.35;}
+.wx-sky-what,.wx-sky-meaning{margin:3px 0 8px;font-size:.86rem;line-height:1.4;}
+.wx-sky-meaning{color:var(--ink-dim);}
+.wx-event-banner{width:100%;text-align:left;background:var(--panel);cursor:pointer;font:inherit;}
+
+/* Shrink weather forecasts for short desktop dashboard slots; on a phone the
+   intrinsic-height layout avoids empty vertical space without hiding readings. */
+@container widget (max-height:350px){
+ .widget.wd-mud .w-mud-dashboard{gap:3px;}
+ .widget.wd-mud .w-mud-dashboard .w-weather-top{gap:4px;}
+ .widget.wd-mud .w-mud-dashboard .w-forecast-cards{
+   grid-auto-rows:minmax(0,1fr);grid-template-rows:minmax(0,1fr);
+ }
+ .widget.wd-mud .w-mud-dashboard .w-forecast-day{min-height:0;padding:2px 1px;gap:1px;}
+ .widget.wd-mud .w-mud-dashboard .w-forecast-day .w-forecast-condition{font-size:.59rem;}
+}
+@container widget (max-height:230px){
+ .widget.wd-mud .w-mud-dashboard .w-forecast-condition{display:none;}
+ .widget.wd-mud .w-mud-dashboard .w-forecast-day .mud-bar{display:flex;width:90%;height:4px;}
+ .widget.wd-mud .w-mud-dashboard .w-forecast-day small{font-size:.58rem;}
+}
+@media(max-width:899px){
+ .overview .ov-grid .widget.wd-calendar .w-cal-day{padding-block:3px;}
+ .overview .ov-grid .widget.wd-mud .w-mud-dashboard .w-forecast-cards{
+  grid-auto-rows:minmax(74px,auto);gap:4px;
+ }
+ .overview .ov-grid .widget.wd-mud .w-mud-dashboard .w-forecast-day{
+  min-height:74px;padding:4px 2px;gap:2px;
+ }
+}
+/* Manual widget expansion deliberately permits full details and scrolling. */
+.widget-expanded.wd-sky .w-sky-event-copy strong{white-space:normal;overflow:visible;}
