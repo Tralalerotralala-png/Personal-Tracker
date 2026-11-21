@@ -1,6 +1,7 @@
 # Data recovery and backup scope
 
 - Cloud records live in Supabase; account-bound IndexedDB caches are not encrypted. A previously authorized account can use its cached records while offline and upload when reconnected.
+- If a photo is replaced while an earlier photo is still uploading, each cloud photo has its own object path and the pending upload marker remains attached to the newest selected image. An older in-flight upload cannot acknowledge or erase a newer photo's retry marker.
 - A device that has successfully loaded cloud configuration remembers this mode. If `config.js` is later missing, invalid or temporarily unavailable, startup stops with a recovery message **rather than silently opening a separate local sample-data database**. Restore the published `config.js` and reload; do not clear browser site data while troubleshooting unsynced records.
 - Sign-out preserves pending offline edits. For shared computers, **Settings > General > Erase account cache from device** is a separate destructive action blocked when uploads remain.
 - Before changing a legacy unverified browser cache, export it from Settings > General. The old cache has no reliable owner stamp. Review the file; never attach it automatically to an account.
