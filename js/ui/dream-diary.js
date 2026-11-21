@@ -9,12 +9,12 @@ import { localizedWeather } from './mud-format-v2.js';
 import { skyEventIconSvg } from '../weather/sky-events.js';
 import { baseDreamNight, loadDreamNight } from '../weather/dream-night.js';
 import { JOURNAL_KEY, validNewJournalKey } from './private-journal-crypto.js';
-import { JOURNAL_V3_HEADER,createJournalV3,unlockJournalV3,reloadJournalV3,saveJournalV3,changeJournalV3Passphrase } from './private-journal-v3.js';
+import { JOURNAL_V3_HEADER,createJournalV3,unlockJournalV3,reloadJournalV3,saveJournalV3,changeJournalV3Passphrase,listJournalV3Conflicts } from './private-journal-v3.js';
 const DURATION=40*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const labels={
- en:{title:'Logs',intro:'Your dreams and private reflections are locked separately from the rest of Personal Tracker.',open:'Open private journal',warning:'Use a passphrase of 12 or more characters for stronger encryption. Existing four-digit PINs still work but offer limited protection. There is no lost-key recovery.',pin:'PIN or passphrase',again:'Confirm key',setup:'Create journal key',unlock:'Unlock',lock:'Lock now',wrong:'Incorrect PIN or damaged journal.',wait:'Too many attempts. Try again later.',dreams:'Dreams',sleep:'Sleep',moods:'Mood',habits:'Habits',vault:'Private Vault',new:'New entry',empty:'No entries yet.',save:'Save',delete:'Delete',date:'Date',name:'Title',body:'Description',type:'Dream type',vivid:'Vividness',tags:'Tags (comma-separated)',quality:'Sleep quality',hours:'Hours slept',mood:'Mood',done:'Completed today',locked:'Your private entries never appear in global search or Wallpaper Engine.',change:'Change PIN',old:'Current PIN',newPin:'New PIN',repeat:'Repeat new PIN',forgot:'Lost PINs cannot be recovered.',art:'Illustration (optional, max 100 KB)',night:'Dream illustration',none:'None',saveFailed:'Could not save private journal. Try again.',illustration:'Attach illustration'},
- es:{title:'Registros',intro:'Tus sueños y reflexiones privadas tienen un bloqueo separado del resto de Personal Tracker.',open:'Abrir diario privado',warning:'Usa una frase de acceso de 12 caracteres o más. Los PIN de cuatro dígitos siguen funcionando pero son débiles. Una clave perdida no se puede recuperar.',pin:'PIN o frase de acceso',again:'Confirmar clave',setup:'Crear clave del diario',unlock:'Desbloquear',lock:'Bloquear ahora',wrong:'PIN incorrecto o diario dañado.',wait:'Demasiados intentos. Inténtalo más tarde.',dreams:'Sueños',sleep:'Sueño',moods:'Estado de ánimo',habits:'Hábitos',vault:'Bóveda privada',new:'Nueva entrada',empty:'Todavía no hay entradas.',save:'Guardar',delete:'Eliminar',date:'Fecha',name:'Título',body:'Descripción',type:'Tipo de sueño',vivid:'Intensidad del recuerdo',tags:'Etiquetas (separadas por comas)',quality:'Calidad del sueño',hours:'Horas dormidas',mood:'Estado de ánimo',done:'Completado hoy',locked:'Tus entradas privadas nunca aparecen en la búsqueda global ni en Wallpaper Engine.',change:'Cambiar PIN',old:'PIN actual',newPin:'PIN nuevo',repeat:'Repetir PIN nuevo',forgot:'No es posible recuperar un PIN perdido.',art:'Ilustración (opcional, máximo 100 KB)',night:'Ilustración del sueño',none:'Ninguna',saveFailed:'No se pudo guardar el diario privado. Inténtalo de nuevo.',illustration:'Adjuntar ilustración'}
+ en:{title:'Logs',intro:'Your dreams and private reflections are locked separately from the rest of Personal Tracker.',open:'Open private journal',warning:'Use a passphrase of 12 or more characters. Each entry is encrypted separately. Old four-digit PIN journals are archived, not imported. There is no lost-key recovery.',pin:'Passphrase',again:'Confirm key',setup:'Create journal key',unlock:'Unlock',lock:'Lock now',wrong:'Incorrect passphrase or damaged journal.',wait:'Too many attempts. Try again later.',dreams:'Dreams',sleep:'Sleep',moods:'Mood',habits:'Habits',vault:'Private Vault',new:'New entry',empty:'No entries yet.',save:'Save',delete:'Delete',date:'Date',name:'Title',body:'Description',type:'Dream type',vivid:'Vividness',tags:'Tags (comma-separated)',quality:'Sleep quality',hours:'Hours slept',mood:'Mood',done:'Completed today',locked:'Your private entries never appear in global search or Wallpaper Engine.',change:'Change passphrase',old:'Current PIN',newPin:'New passphrase',repeat:'Repeat passphrase',forgot:'Lost passphrases cannot be recovered.',art:'Illustration (optional, max 100 KB)',night:'Dream illustration',none:'None',saveFailed:'Could not save private journal. Try again.',illustration:'Attach illustration'},
+ es:{title:'Registros',intro:'Tus sueños y reflexiones privadas tienen un bloqueo separado del resto de Personal Tracker.',open:'Abrir diario privado',warning:'Usa una frase de acceso de 12 caracteres o más. Cada entrada se cifra por separado. Los diarios anteriores con PIN están archivados, no importados. Una clave perdida no se puede recuperar.',pin:'Frase de acceso',again:'Confirmar clave',setup:'Crear clave del diario',unlock:'Desbloquear',lock:'Bloquear ahora',wrong:'Frase de acceso incorrecta o diario dañado.',wait:'Demasiados intentos. Inténtalo más tarde.',dreams:'Sueños',sleep:'Sueño',moods:'Estado de ánimo',habits:'Hábitos',vault:'Bóveda privada',new:'Nueva entrada',empty:'Todavía no hay entradas.',save:'Guardar',delete:'Eliminar',date:'Fecha',name:'Título',body:'Descripción',type:'Tipo de sueño',vivid:'Intensidad del recuerdo',tags:'Etiquetas (separadas por comas)',quality:'Calidad del sueño',hours:'Horas dormidas',mood:'Estado de ánimo',done:'Completado hoy',locked:'Tus entradas privadas nunca aparecen en la búsqueda global ni en Wallpaper Engine.',change:'Cambiar frase de acceso',old:'PIN actual',newPin:'Nueva frase de acceso',repeat:'Repetir frase de acceso',forgot:'Una frase de acceso perdida no se puede recuperar.',art:'Ilustración (opcional, máximo 100 KB)',night:'Ilustración del sueño',none:'Ninguna',saveFailed:'No se pudo guardar el diario privado. Inténtalo de nuevo.',illustration:'Adjuntar ilustración'}
 };
 
 const trNight=(en,es)=>language()==='es'?es:en;
@@ -255,9 +255,12 @@ export function createDreamDiaryView({store}) {
        const updated={...entry,id:newEntryId,title:safeText(title.value,140),date:saveDate,body:safeText(description.value),dreamType:dreamType.value,vivid:Number(vivid.value),tags:tags.value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,20),hours:Number(hours.value),quality:Number(quality.value),mood:mood.value,art,...(type==='dreams'?{nightSky:savedNight}:{})};
        if(session!==editorSession||!form.isConnected||(date.value||today())!==saveDate)return;
        const rows=session.data[type];const ix=rows.findIndex(x=>x.id===updated.id);if(ix>=0)rows[ix]=updated;else rows.unshift(updated);
+       // If a transaction fails, keep the editor dirty so the encrypted
+       // draft is flushed on navigation rather than silently discarded.
+       editorDirty=true;
        delete session.data.drafts?.[draftKey];clearTimeout(activeDraftTimer);activeDraftTimer=null;
        await persist();editorDirty=false;activeDraftFlush=null;editor.close();draw();
-      }catch(err){error.textContent=L().saveFailed;}
+      }catch(err){error.textContent=err.message||L().saveFailed;}
       finally{saving=false;saveButton.disabled=false;}
     }},L().save)];
    const page=h('section',{class:'journal-inline-editor'},
@@ -295,7 +298,9 @@ export function createDreamDiaryView({store}) {
    const newPin=h('input',{type:'password',maxlength:128,autocomplete:'new-password'});
    const again=h('input',{type:'password',maxlength:128,autocomplete:'new-password'});
    const err=h('p',{class:'form-error'});
-   const dialog=trackDialog(openSheet({title:L().change,size:'small',body:h('div',{class:'form'},h('p',{class:'hint'},L().warning),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
+   const dialog=trackDialog(openSheet({title:L().change,size:'small',body:h('div',{class:'form'},
+    h('p',{class:'hint'},trNight('Other devices will need the new passphrase. Finish syncing and close Logs on offline devices before changing it.',
+      'Los demás dispositivos necesitarán la nueva clave. Sincronízalos y cierra Registros antes de cambiarla.')),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
     if(!validNewJournalKey(newPin.value)||newPin.value!==again.value){err.textContent=language()==='es'?'Usa una frase nueva de 12 caracteres o más y repítela exactamente.':'Use a new passphrase of at least 12 characters and repeat it exactly.';return;}
     try{
       await writeChain;
@@ -305,8 +310,55 @@ export function createDreamDiaryView({store}) {
     }catch(e){err.textContent=e.message||L().saveFailed;}
    }},L().save)]}));
   };
+  async function reviewConflicts(){
+    if(editorOpen)return;
+    const unlocked=session;
+    try{
+      await writeChain;
+      const {readable,unreadable}=await listJournalV3Conflicts(store,unlocked);
+      if(!readable.length){
+        toast(unreadable
+          ?trNight('Older conflicts use another passphrase. Export them from Sync for recovery.',
+            'Hay conflictos con otra clave. Expórtalos desde Sincronización.')
+          :trNight('No journal conflicts need review.','No hay conflictos del diario pendientes.'));
+        return;
+      }
+      const body=h('div',{class:'form'},
+        h('p',{class:'hint'},trNight('Restoring creates a separate encrypted copy. The newer version stays untouched.',
+          'Restaurar crea una copia cifrada independiente sin alterar la versión más reciente.')),
+        ...readable.map(conflict=>{
+          const title=safeText(conflict.entry.title,140)||trNight('Untitled entry','Entrada sin título');
+          const action=h('button',{type:'button',class:'btn small',onclick:async()=>{
+            action.disabled=true;
+            const recovered={...structuredClone(conflict.entry),id:uuid(),
+              title:safeText(title+' (recovered)',140)};
+            unlocked.data[conflict.type].unshift(recovered);
+            try{
+              await persist();
+              await store.meta.set('journal-v3-recovered:'+conflict.key,{savedAt:new Date().toISOString()});
+              dialog.close();
+              openEntries();
+              toast(trNight('Recovered entry saved as a separate copy.','Entrada recuperada como copia independiente.'));
+            }catch(err){
+              unlocked.data[conflict.type]=unlocked.data[conflict.type].filter(e=>e.id!==recovered.id);
+              toast(err.message||L().saveFailed);
+              action.disabled=false;
+            }
+          }},trNight('Restore as a new entry','Restaurar como entrada nueva'));
+          return h('div',{class:'journal-entry'},
+            h('strong',{},title),
+            h('small',{},conflict.savedAt||''),
+            h('span',{},safeText(conflict.entry.body,160)),action);
+        }),
+        unreadable?h('p',{class:'hint'},trNight(
+          unreadable+' more conflict(s) require an older passphrase. Their encrypted copies remain available from Sync.',
+          unreadable+' conflicto(s) requieren una clave anterior. Sus copias cifradas siguen disponibles en Sincronización.')):null);
+      const dialog=trackDialog(openSheet({title:trNight('Recover journal conflicts','Recuperar conflictos del diario'),
+        size:'medium',body}));
+    }catch(err){toast(err.message||L().saveFailed);}
+  }
   wrap.append(h('div',{class:'journal-actions'},
-    button(L().change,changePin),button(L().lock,lock),
+    button(L().change,changePin),button(trNight('Review conflicting entries','Revisar entradas en conflicto'),reviewConflicts),button(L().lock,lock),
     h('span',{class:'hint'},trNight('Each entry syncs separately; only encrypted data leaves this device.',
       'Cada entrada se sincroniza por separado y permanece cifrada.'))),tabs,list);
   replace(el, h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title),h('span',{class:'hint'},L().locked)), wrap);
