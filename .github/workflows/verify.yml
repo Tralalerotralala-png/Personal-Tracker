@@ -164,13 +164,16 @@ jobs:
           # roles it needs an explicit auth-first search_path for its sessions.
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
             -c 'ALTER ROLE tracker_test SET search_path TO auth, public'
-          docker run --rm -d --network host --name tracker-gotrue-test \
+          docker run -d --network host --name tracker-gotrue-test \
             --env-file tests/fixtures/gotrue-ci.env supabase/auth:v2.176.0
           for i in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:9999/health >/dev/null 2>&1; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:9999/health >/dev/null
+          if ! curl -fsS http://127.0.0.1:9999/health >/dev/null; then
+            docker logs tracker-gotrue-test --tail 100 || true
+            exit 1
+          fi
       - name: Authorize only the synthetic GoTrue owner account
         run: |
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test <<'SQL'
