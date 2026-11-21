@@ -3016,7 +3016,6 @@ function nextRetrogradeStation(A,body,date,limitDays=45){
  return null;
 }
 const bodyEs={Sun:'Sol',Moon:'Luna',Mercury:'Mercurio',Venus:'Venus',Mars:'Marte',Jupiter:'Júpiter',Saturn:'Saturno',Uranus:'Urano',Neptune:'Neptuno',Pluto:'Plutón'};
-const ASTRO_REFERENCE='https://github.com/cosinekitty/astronomy';
 function calculatedZodiacEvents(A,date=new Date()){
  const result=[];
  for(const body of ['Sun','Moon']){
@@ -3025,14 +3024,14 @@ function calculatedZodiacEvents(A,date=new Date()){
   for(let i=0;i<(body==='Moon'?6:2);i++){
    const ingress=nextSignIngress(A,body,from,body==='Moon'?5:40);if(!ingress)break;
    const [en,es,symbol]=ZODIAC_SIGNS[ingress.to];
-   result.push({...ingress,kind:body==='Sun'?'zodiac-sun':'zodiac-moon',symbol,en:body+' enters '+en,es:bodyEs[body]+' entra en '+es,url:ASTRO_REFERENCE});
+   result.push({...ingress,kind:body==='Sun'?'zodiac-sun':'zodiac-moon',symbol,en:body+' enters '+en,es:bodyEs[body]+' entra en '+es});
    from=new Date(Date.parse(ingress.at)+2*60000);
   }
  }
  for(const body of SOLAR_BODIES.slice(2)){
   const station=nextRetrogradeStation(A,body,date,45);if(!station)continue;
   const retro=station.type==='retrograde';
-  result.push({...station,kind:retro?'zodiac-retrograde':'zodiac-direct',en:body+(retro?' stations retrograde':' stations direct'),es:bodyEs[body]+(retro?' inicia movimiento retrógrado':' retoma movimiento directo'),url:ASTRO_REFERENCE});
+  result.push({...station,kind:retro?'zodiac-retrograde':'zodiac-direct',en:body+(retro?' stations retrograde':' stations direct'),es:bodyEs[body]+(retro?' inicia movimiento retrógrado':' retoma movimiento directo')});
  }
  // Use precise phase search when available; attach the Moon's sign at that instant.
  for(const [angle,en,es] of [[0,'New moon','Luna nueva'],[180,'Full moon','Luna llena']]){
@@ -3042,7 +3041,7 @@ function calculatedZodiacEvents(A,date=new Date()){
     const at=A.SearchMoonPhase?.(angle,start,34)?.date;
     if(!(at instanceof Date)||!Number.isFinite(at.getTime()))break;
     const sign=ZODIAC_SIGNS[zodiacSector(geoLongitude(A,'Moon',at)).index];
-    result.push({kind:'zodiac-phase',phase:angle===0?'new':'full',at:at.toISOString(),en:en+' in '+sign[0],es:es+' en '+sign[1],symbol:sign[2],url:ASTRO_REFERENCE});
+    result.push({kind:'zodiac-phase',phase:angle===0?'new':'full',at:at.toISOString(),en:en+' in '+sign[0],es:es+' en '+sign[1],symbol:sign[2]});
     start=new Date(at.getTime()+2*60000);
    }
   }catch{}
@@ -3917,11 +3916,105 @@ function mergeSkyAndZodiacEvents(now,calculated,{timezone=null,skyLimit=4,zodiac
  for(const e of future.filter(e=>e.kind==='zodiac-moon'||e.kind==='zodiac-sun'))if(zodiac.length<zodiacLimit&&!zodiac.includes(e))zodiac.push(e);
  return [...sky,...zodiac.slice(0,zodiacLimit)].sort((a,b)=>a.date.localeCompare(b.date)||(a.at||'').localeCompare(b.at||''));
 }
+// Explanations are deliberately local to the app: a calculated transit
+// should never direct people to the astronomy engine's source repository.
+// Distinguish an observable sky event from a traditional, non-predictive
+// symbolic association. No transit is presented as causing life outcomes.
+const THEMES={
+ Aries:['new beginnings and initiative','inicios e iniciativa'],
+ Taurus:['stability, comfort and resources','estabilidad, comodidad y recursos'],
+ Gemini:['curiosity and communication','curiosidad y comunicación'],
+ Cancer:['home, belonging and care','hogar, pertenencia y cuidado'],
+ Leo:['creativity and confidence','creatividad y confianza'],
+ Virgo:['routines and practical details','rutinas y detalles prácticos'],
+ Libra:['balance and relationships','equilibrio y relaciones'],
+ Scorpio:['reflection and transformation','reflexión y transformación'],
+ Sagittarius:['learning and exploration','aprendizaje y exploración'],
+ Capricorn:['structure and commitments','estructura y compromisos'],
+ Aquarius:['ideas and community','ideas y comunidad'],
+ Pisces:['imagination and compassion','imaginación y compasión'],
+};
+function skyEventInformation(event,lang='en'){
+ const es=lang==='es',pick=(en,spanish)=>es?spanish:en;
+ const kind=event?.kind||'',name=String(es?event?.es||'':event?.en||'');
+ if(kind==='zodiac-sun'||kind==='zodiac-moon'){
+  const body=kind==='zodiac-sun'?pick('Sun','Sol'):pick('Moon','Luna');
+  const englishName=String(event?.en||'');
+  const sign=Object.keys(THEMES).find(x=>englishName.endsWith(' '+x));
+  const theme=sign?THEMES[sign][es?1:0]:pick('personal reflection','reflexión personal');
+  return {
+   what:pick(`The ${body} crosses into another 30° sector of the tropical zodiac. These equal sectors mark positions along the ecliptic, not the physical borders of constellations.`,
+             `El ${body} entra en otro sector de 30° del zodiaco tropical. Son divisiones de la eclíptica, no fronteras reales de las constelaciones.`),
+   meaning:pick(`In astrology, this sign is associated with ${theme}. You could use the date as a prompt for reflection; it does not predict or cause personal events.`,
+                `En astrología, este signo se asocia con ${theme}. Puede servir como invitación a reflexionar; no predice ni provoca sucesos personales.`),
+  };
+ }
+ if(kind==='zodiac-retrograde'||kind==='zodiac-direct'){
+  const retro=kind==='zodiac-retrograde';
+  return {
+   what:pick(retro
+     ?'From Earth, this planet appears to pause and drift backward against the sky because of relative orbital motion. It has not reversed its orbit.'
+     :'From Earth, this planet appears to stop drifting backward and resume its usual apparent eastward direction.',
+     retro
+     ?'Desde la Tierra, el planeta parece detenerse y retroceder por el movimiento relativo de las órbitas. No ha invertido su órbita.'
+     :'Desde la Tierra, el planeta parece detener su movimiento retrógrado aparente y retomar su dirección habitual.'),
+   meaning:pick(retro
+     ?'Traditionally linked with reviewing plans or slowing down. It is a symbolic interpretation, not a scientific warning.'
+     :'Traditionally linked with renewed momentum or resuming plans. This is symbolic, not a scientific forecast.',
+     retro
+     ?'Se asocia tradicionalmente con revisar planes o ir más despacio. Es una interpretación simbólica, no una advertencia científica.'
+     :'Se asocia tradicionalmente con retomar planes o avanzar. Es simbólico, no una predicción científica.'),
+  };
+ }
+ if(kind==='zodiac-phase'||kind==='moon'){
+  const full=/full moon|luna llena/i.test(String(event?.en||'')+' '+String(event?.es||''))||event?.phase==='full';
+  return {
+   what:pick(full
+     ?'A full Moon occurs when the Moon faces the Sun from the opposite side of Earth; its near side appears brightly lit.'
+     :'A new Moon occurs when the Moon lies roughly in the Sun’s direction; its near side looks dark.',
+     full
+     ?'La Luna llena ocurre cuando la Luna está en dirección opuesta al Sol vista desde la Tierra; su cara visible aparece iluminada.'
+     :'La Luna nueva ocurre cuando la Luna está cerca de la dirección del Sol y su cara visible se ve oscura.'),
+   meaning:pick(full
+     ?'Often used as a symbolic moment for taking stock or finishing a project. There is no evidence this phase decides personal outcomes.'
+     :'Often used symbolically for intentions or starting something. The phase itself does not determine personal outcomes.',
+     full
+     ?'Puede servir simbólicamente para hacer balance o cerrar una etapa. La fase no determina resultados personales.'
+     :'Puede servir simbólicamente para marcar un comienzo. La fase no determina resultados personales.'),
+  };
+ }
+ const title=String(event?.en||'');
+ if(/solar eclipse/i.test(title))return {
+  what:pick('The Moon passes between Earth and the Sun, partly or completely blocking the Sun from particular locations. Visibility depends on the path.',
+            'La Luna pasa entre la Tierra y el Sol y lo cubre en parte o por completo desde ciertas zonas. La visibilidad depende de la trayectoria.'),
+  meaning:pick('A notable skywatching occasion, not an omen. Never look directly at the Sun without proper eclipse protection.',
+               'Es una ocasión especial para observar el cielo, no un presagio. Nunca mires directamente al Sol sin protección adecuada para eclipses.')
+ };
+ if(/lunar eclipse/i.test(title))return {
+  what:pick('Earth blocks some sunlight from reaching the Moon. A penumbral eclipse creates a subtle shading rather than a dark bite.',
+            'La Tierra bloquea parte de la luz solar que llega a la Luna. En un eclipse penumbral, el oscurecimiento es sutil.'),
+  meaning:pick('A chance to observe the Earth–Sun–Moon alignment. It does not predict events in our lives.',
+               'Permite observar la alineación Tierra-Sol-Luna; no predice sucesos de nuestras vidas.')
+ };
+ if(/peak/i.test(title))return {
+  what:pick('A meteor shower is near its expected maximum as Earth crosses a trail of comet or asteroid debris. Local weather and darkness affect visibility.',
+            'Una lluvia de meteoros se acerca a su máximo cuando la Tierra cruza restos de un cometa o asteroide. Influyen el clima y la oscuridad.'),
+  meaning:pick('It may be a good time to look for meteors away from city lights; an announced peak does not guarantee a local sighting.',
+               'Puede ser buen momento para observar meteoros lejos de las luces urbanas; el máximo no garantiza verlos.')
+ };
+ return {
+  what:pick('A calculated or scheduled sky event. The date may vary by time zone and local visibility.',
+            'Un evento celeste calculado o previsto. La fecha puede variar por zona horaria y visibilidad local.'),
+  meaning:pick('Use it as a reminder to observe the sky, not as a personal prediction.',
+               'Úsalo para observar el cielo, no como una predicción personal.')
+ };
+}
+
 function eventIconKind(event){
  if(event.kind==='calendar')return skyEventOnDate(event.date)?.kind||'meteor';
  return event.kind;
 }
-Object.assign(__exports, { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, eventLocalTime, mergeSkyAndZodiacEvents, eventIconKind });
+Object.assign(__exports, { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, eventLocalTime, mergeSkyAndZodiacEvents, skyEventInformation, eventIconKind });
 });
 __define("js/widgets/currency.js", function (__require, __exports) {
 "use strict";
@@ -4127,6 +4220,80 @@ const PROFILES = {
 };
 Object.assign(__exports, { WIDGET_DEFS, WIDGET_IDS, PROFILES });
 });
+__define("js/widgets/fit.js", function (__require, __exports) {
+"use strict";
+// Shared dashboard agenda bounds and no-scroll sizing utilities.
+// A day only belongs to the Coming Up widget if there is an actual modelled
+// wetness score for that exact date. The full calendar remains unrestricted.
+function forecastAgendaDays(rows=[],today){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(today||'')||!Array.isArray(rows))return [];
+ const unique=new Map();
+ for(const row of rows){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(row?.date||'')||row.date<today||
+     row.phase==='past'||!Number.isFinite(row.index)||row.index<0||row.index>100||
+     !['Dry','Tacky','Muddy','Swamp'].includes(row.label))continue;
+  unique.set(row.date,row);
+ }
+ return [...unique.values()].sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+// Compact widgets should show complete rows and an explicit expansion button,
+// never silently truncate text under a nested scrollbar. On phones use a
+// viewport-based budget; on desktop use the actual resizable widget area.
+function widgetFitBudget(body){
+ const host=body?.closest?.('.widget');
+ if(host?.classList.contains('widget-expanded'))return Infinity;
+ const mobile=typeof window!=='undefined'&&window.matchMedia?.('(max-width: 899px)')?.matches;
+ if(mobile){
+  const height=window.visualViewport?.height||window.innerHeight||720;
+  return Math.max(154,Math.min(410,Math.round(height*.44)));
+ }
+ return Math.max(92,Math.floor(body?.clientHeight||200)-5);
+}
+
+function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
+ const host=body?.firstElementChild;
+ if(!host)return {visible:0,hidden:0};
+ const rows=[...host.querySelectorAll(rowSelector)],more=host.querySelector(moreSelector);
+ if(!rows.length||!more)return {visible:rows.length,hidden:0};
+ rows.forEach(row=>{row.hidden=false;});
+ more.hidden=false;
+ const fixed=[...host.querySelectorAll(staticSelector)].reduce((sum,node)=>
+  sum+node.getBoundingClientRect().height,0);
+ const rects=rows.map(row=>row.getBoundingClientRect().height);
+ const gap=Number.parseFloat(getComputedStyle(host).rowGap)||0;
+ const budget=widgetFitBudget(body);
+ const moreSize=more.getBoundingClientRect().height||24;
+ let used=fixed+gap*2,visible=0;
+ for(let i=0;i<rows.length;i++){
+  const size=Math.max(25,rects[i])+gap;
+  if(visible>0&&used+size>budget)break;
+  used+=size;visible++;
+ }
+ rows.forEach((row,i)=>{row.hidden=i>=visible;});
+ const hidden=rows.length-visible;
+ more.hidden=hidden===0;
+ more.dataset.hiddenCount=String(hidden);
+ return {visible,hidden};
+}
+
+function observeWidgetFit(body,fn){
+ let scheduled=false;
+ const refresh=()=>{
+  if(scheduled)return;
+  scheduled=true;
+  requestAnimationFrame(()=>{scheduled=false;if(body.isConnected)fn();});
+ };
+ const resize=typeof ResizeObserver==='undefined'?null:new ResizeObserver(refresh);
+ if(resize)resize.observe(body);
+ if(typeof window!=='undefined')window.addEventListener('resize',refresh);
+ return {refresh,destroy(){
+  resize?.disconnect();
+  if(typeof window!=='undefined')window.removeEventListener('resize',refresh);
+ }};
+}
+Object.assign(__exports, { forecastAgendaDays, widgetFitBudget, fitWidgetRows, observeWidgetFit });
+});
 __define("js/widgets/layout.js", function (__require, __exports) {
 "use strict";
 // Grid layout logic for the dashboard and the wallpaper. Pure functions.
@@ -4309,6 +4476,7 @@ __define("js/widgets/registry.js", function (__require, __exports) {
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
 const { h, replace, daysSince, openSheet, toast } = __require("js/ui/dom.js");
 const { WIDGET_DEFS } = __require("js/widgets/defs.js");
+const { forecastAgendaDays, fitWidgetRows, observeWidgetFit } = __require("js/widgets/fit.js");
 const { mountCurrency } = __require("js/widgets/currency.js");
 const { uvMeter, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } = __require("js/ui/mud-format-v2.js");
 const { groupByDay, addDaysKey, todayKeyLocal } = __require("js/calendar/recurrence.js");
@@ -4318,7 +4486,7 @@ const { timeAgo } = __require("js/ui/format.js");
 const { articleKey, readingIndex, updateReading } = __require("js/feed/reading.js");
 const { weatherGlyph, glyphSvg, weatherIconSvg } = __require("js/ui/pixel-icon.js");
 const { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } = __require("js/weather/moon-phase.js");
-const { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, mergeSkyAndZodiacEvents, eventIconKind, eventLocalTime } = __require("js/weather/sky-events.js");
+const { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, mergeSkyAndZodiacEvents, eventIconKind, eventLocalTime, skyEventInformation } = __require("js/weather/sky-events.js");
 const { skyLighting } = __require("js/weather/environment.js");
 const { language, t } = __require("js/ui/language.js");
 const { createPhraseOfDay, phraseDateKey, openPhraseHistory } = __require("js/ui/daily-phrases.js");
@@ -4442,38 +4610,79 @@ function openCalendarSelection(detail) {
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
 function mountCalendar(el, { store, weather }) {
-  const render = async () => {
-    const events = await store.list('events');
-    const from = todayKeyLocal();
-    const to = addDaysKey(from, 6);
-    const byDay = groupByDay(events, from, to);
-    const mud = new Map(weather.getState().rows.map((r) => [r.date, r]));
-    const days = [...byDay.keys()].sort();
-    if (!days.length) return replace(el, note(language()==='es' ? 'No hay eventos previstos esta semana.' : 'Nothing planned this week.'));
-    replace(el, h('div', { class: 'w-cal' }, days.map((key) => {
-      const dm = mud.get(key);
-      const dayTitle = `${dayLong(key)} ${dayMonth(key)}`;
-      return h('section', { class: 'w-day' },
-        h('header', {},
-          h('button', { class: 'w-agenda-date', type: 'button', title: dayTitle,
-            'aria-label': `${language()==='es' ? 'Abrir día' : 'Open day'}: ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) },
-            h('b', {}, key === from ? t('Today') : dayShort(key)), h('span', {}, dayMonth(key))),
-          dm ? h('button', { type:'button', class: 'w-agenda-ground',
-            title: `${localizedMudLabel(dm.label)} ${dm.index}/100`,
-            'aria-label': `${localizedMudLabel(dm.label)} ${dm.index} ${language()==='es' ? 'de' : 'out of'} 100. ${language()==='es' ? 'Abrir día' : 'Open day'} ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) },
-            h('span', { class: 'w-agenda-weather', 'aria-hidden': 'true', html: weatherIconSvg(dm.raw?.weather_code, { date: new Date(key + 'T12:00:00') }) }), mudBar(dm)) : null),
-        byDay.get(key).map((o) => h('button', { type: 'button', class: 'w-ev w-event-link',
-          title: `${language()==='es' ? 'Abrir evento' : 'Open event'}: ${o.event.title}`,
-          'aria-label': `${language()==='es' ? 'Abrir evento' : 'Open event'} ${o.event.title} · ${dayTitle}`,
-          onclick: () => openCalendarSelection({ dateKey: key, eventId: o.event.id }) },
-          h('span', { class: 'dot', style: `background:${o.event.color || '#43b9ad'}` }),
-          h('span', { class: 'w-time' }, o.allDay ? t('All day') : `${String(o.start.getHours()).padStart(2, '0')}:${String(o.start.getMinutes()).padStart(2, '0')}`),
-          h('span', { class: 'w-event-name' }, o.event.title))));
-    })));
+  // Respect the actual six-day weather horizon: events outside a day with
+  // a reliable wetness meter belong to Calendar, not this short forecast tile.
+  const fit=observeWidgetFit(el,()=>{
+    const result=fitWidgetRows(el,{
+      rowSelector:'.w-cal-day',
+      moreSelector:'.w-cal-overflow',
+      staticSelector:'.w-cal-uv,.w-cal-overflow',
+    });
+    const more=el.querySelector('.w-cal-overflow');
+    if(more&&result.hidden)more.textContent=language()==='es'
+      ?`Ver ${result.hidden} día(s) más en Calendario`
+      :`View ${result.hidden} more day(s) in Calendar`;
+  });
+  const render=async()=>{
+    const events=await store.list('events');
+    const from=todayKeyLocal();
+    const state=weather.getState(),available=forecastAgendaDays(state.rows,from);
+    const uv=h('div',{class:'w-cal-uv','data-widget-static':'true'},
+      uvMeter(state.current?.uv_index,{stale:state.status==='stale'}));
+    if(!available.length){
+      replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
+        note(language()==='es'
+          ?'No hay pronóstico de humedad del suelo disponible. Abre Clima para actualizarlo.'
+          :'No soil-wetness forecast is available. Open Weather to refresh it.')));
+      fit.refresh();return;
+    }
+    const last=available.at(-1).date,byDay=groupByDay(events,from,last);
+    const days=available.filter(r=>byDay.has(r.date));
+    if(!days.length){
+      replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
+        note(language()==='es'
+          ?'No hay eventos durante los días con pronóstico del suelo.'
+          :'No events during the available ground-forecast days.')));
+      fit.refresh();return;
+    }
+    replace(el,h('div',{class:'w-cal'},
+      uv,
+      ...days.map(dm=>{
+        const key=dm.date,dayTitle=`${dayLong(key)} ${dayMonth(key)}`;
+        const occurrences=byDay.get(key),shown=occurrences.slice(0,2);
+        const peak=uvMeter(dm.raw?.uvMax,{peak:true,stale:state.status==='stale'});
+        return h('section',{class:'w-day w-cal-day',dataset:{date:key}},
+          h('header',{},
+            h('button',{class:'w-agenda-date',type:'button',title:dayTitle,
+              'aria-label':`${language()==='es'?'Abrir día':'Open day'}: ${dayTitle}`,
+              onclick:()=>openCalendarSelection({dateKey:key})},
+              h('b',{},key===from?t('Today'):dayShort(key)),h('span',{},dayMonth(key))),
+            h('button',{type:'button',class:'w-agenda-ground',
+              title:`${localizedMudLabel(dm.label)} ${dm.index}/100`,
+              'aria-label':`${localizedMudLabel(dm.label)} ${dm.index}/100. ${dayTitle}`,
+              onclick:()=>openCalendarSelection({dateKey:key})},
+              h('span',{class:'w-agenda-weather','aria-hidden':'true',
+                html:weatherIconSvg(dm.raw?.weather_code,{date:new Date(key+'T12:00:00')})}),
+              mudBar(dm)),
+            h('span',{class:'w-agenda-uv'},peak)),
+          ...shown.map(o=>h('button',{type:'button',class:'w-ev w-event-link',
+            title:`${language()==='es'?'Abrir evento':'Open event'}: ${o.event.title}`,
+            'aria-label':`${language()==='es'?'Abrir evento':'Open event'} ${o.event.title} · ${dayTitle}`,
+            onclick:()=>openCalendarSelection({dateKey:key,eventId:o.event.id})},
+            h('span',{class:'dot',style:`background:${o.event.color||'#43b9ad'}`}),
+            h('span',{class:'w-time'},o.allDay?t('All day'):`${String(o.start.getHours()).padStart(2,'0')}:${String(o.start.getMinutes()).padStart(2,'0')}`),
+            h('span',{class:'w-event-name'},o.event.title))),
+          occurrences.length>2?h('button',{type:'button',class:'w-cal-extra',
+            onclick:()=>openCalendarSelection({dateKey:key})},
+            language()==='es'?`+${occurrences.length-2} eventos`:`+${occurrences.length-2} more events`):null);
+      }),
+      h('button',{type:'button',class:'w-cal-overflow',hidden:true,
+        onclick:()=>openCalendarSelection({dateKey:el.querySelector('.w-cal-day[hidden]')?.dataset.date||days[0].date})},
+        language()==='es'?'Ver más en Calendario':'View more in Calendar')));
+    fit.refresh();
   };
-  return live(render, (run) => [storeTables(store, ['events'], run), weather.subscribe(run)]);
+  const inst=live(render,run=>[storeTables(store,['events'],run),weather.subscribe(run)]);
+  return {destroy(){fit.destroy();inst.destroy();},refresh:inst.refresh};
 }
 
 // ---- loot and lost quests --------------------------------------------------------------------
@@ -4601,26 +4810,61 @@ function mountRecentlyPlayed(el,{store}) {
   };
   return live(render,run=>[storeTables(store,['settings'],run)]);
 }
-function mountSky(el,{weather}) {
+function mountSky(el,{weather,interactive}) {
  let rows=[],dead=false,loaded=false;
+ const fit=observeWidgetFit(el,()=>{
+   const result=fitWidgetRows(el,{
+     rowSelector:'.w-sky-event',
+     moreSelector:'.w-sky-overflow',
+     staticSelector:'.w-sky-intro,.w-sky-overflow,.w-sky-note,.w-sky-location',
+   });
+   const more=el.querySelector('.w-sky-overflow');
+   if(more&&result.hidden)more.textContent=language()==='es'
+     ?`+${result.hidden} eventos · ampliar`
+     :`+${result.hidden} events · expand`;
+ });
+ const explain=(event,tz)=>{
+  const es=language()==='es',info=skyEventInformation(event,language());
+  openSheet({title:(event.symbol?event.symbol+' ':'')+(es?event.es:event.en),
+    body:h('div',{class:'sky-explanation'},
+      h('p',{class:'hint'},event.date+(event.at?' · '+eventLocalTime(event,tz,language()):'')),
+      h('h3',{},es?'Qué ocurre':'What is happening'),h('p',{},info.what),
+      h('h3',{},es?'Qué podría significar':'What it might mean'),h('p',{},info.meaning),
+      h('small',{class:'hint'},es
+       ?'Las fechas son aproximadas y la visibilidad local no está confirmada. Las interpretaciones simbólicas no son predicciones.'
+       :'Dates may be approximate and local visibility is not verified. Symbolic readings are not predictions.'))});
+ };
  const render=async()=>{
   const now=new Date(),place=weather?.getState()?.place,tz=place?.timezone,es=language()==='es';
   const draw=()=>{
    if(dead)return;
    const events=mergeSkyAndZodiacEvents(now,rows,{timezone:tz,skyLimit:4,zodiacLimit:4});
    replace(el,h('div',{class:'w-sky'},
-    h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
-    h('div',{class:'w-sky-scroll'},...events.map(e=>h('p',{class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':'')},
+    h('p',{class:'w-note w-sky-intro'},t('Dates are approximate. Check local visibility and the weather.')),
+    h('div',{class:'w-sky-scroll'},...events.map(e=>h('button',{type:'button',
+       class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':''),
+       title:es?'Explicar este evento celeste':'Explain this sky event',
+       onclick:()=>explain(e,tz)},
       h('span',{class:'w-sky-symbol',html:skyEventIconSvg(eventIconKind(e))}),
-      h('span',{class:'w-sky-event-copy'},h('small',{class:'w-sky-event-date'},e.date+(e.at?' · '+eventLocalTime(e,tz,language()):'')),
-       h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},(e.symbol?e.symbol+' ':'')+(es?e.es:e.en)))))),
-    h('small',{class:'w-sky-note'},rows.length?(es?'Tránsitos tropicales calculados · no son predicciones.':'Calculated tropical transits · not predictions.'):(loaded?(es?'Tránsitos no disponibles; calendario astronómico conservado.':'Transits unavailable; sky calendar retained.'):(es?'Calculando tránsitos…':'Calculating transits…'))),
-    place?.name?h('small',{},t('Selected location')+': '+place.name):null));
+      h('span',{class:'w-sky-event-copy'},
+       h('small',{class:'w-sky-event-date'},e.date+(e.at?' · '+eventLocalTime(e,tz,language()):'')),
+       h('strong',{},(e.symbol?e.symbol+' ':'')+(es?e.es:e.en)))))),
+    h(interactive?'button':'span',{class:'w-sky-overflow',type:interactive?'button':null,hidden:true,
+      onclick:interactive?()=>{
+       const expand=el.closest('.widget')?.querySelector('.widget-expand');
+       if(expand)expand.click();else location.hash='#mud';
+      }:null},es?'Más eventos':'More events'),
+    h('small',{class:'w-sky-note'},rows.length
+      ?(es?'Tránsitos tropicales calculados · las interpretaciones son simbólicas.':'Calculated tropical transits · interpretations are symbolic.')
+      :(loaded?(es?'Tránsitos no disponibles; calendario astronómico conservado.':'Transits unavailable; sky calendar retained.'):(es?'Calculando tránsitos…':'Calculating transits…'))),
+    place?.name?h('small',{class:'w-sky-location'},t('Selected location')+': '+place.name):null));
+   fit.refresh();
   };
   draw();rows=await loadCalculatedSkyEvents(now);loaded=true;draw();
  };
- const inst=live(render,run=>[weather?.subscribe?.(run)]);const timer=setInterval(()=>inst.refresh(),5*60_000);
- return {destroy(){dead=true;clearInterval(timer);inst.destroy();},refresh:inst.refresh};
+ const inst=live(render,run=>[weather?.subscribe?.(run)]);
+ const timer=setInterval(()=>inst.refresh(),5*60_000);
+ return {destroy(){dead=true;clearInterval(timer);fit.destroy();inst.destroy();},refresh:inst.refresh};
 }
 function mountAudio(el,{audioPlayer,interactive}){if(!audioPlayer||!interactive){replace(el,note(t('Music and radio player · available in the Tracker app.')));return {destroy(){}};}return audioPlayer.mount(el);}
 const MOUNTS = { audio:mountAudio, sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };

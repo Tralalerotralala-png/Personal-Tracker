@@ -5,6 +5,7 @@
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
 import { h, replace, daysSince, openSheet, toast } from '../ui/dom.js';
 import { WIDGET_DEFS } from './defs.js';
+import {forecastAgendaDays,fitWidgetRows,observeWidgetFit} from './fit.js';
 import { mountCurrency } from './currency.js';
 import { uvMeter, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
@@ -14,7 +15,7 @@ import { timeAgo } from '../ui/format.js';
 import {articleKey,readingIndex,updateReading} from '../feed/reading.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
 import { moonPhase, moonPhaseSvg, isNightAtLocation, localizedMoonPhase } from '../weather/moon-phase.js';
-import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, mergeSkyAndZodiacEvents, eventIconKind, eventLocalTime } from '../weather/sky-events.js';
+import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, loadCalculatedSkyEvents, mergeSkyAndZodiacEvents, eventIconKind, eventLocalTime, skyEventInformation } from '../weather/sky-events.js';
 import { skyLighting } from '../weather/environment.js';
 import { language, t } from '../ui/language.js';
 import { createPhraseOfDay, phraseDateKey, openPhraseHistory } from '../ui/daily-phrases.js';
@@ -138,38 +139,79 @@ function openCalendarSelection(detail) {
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
 function mountCalendar(el, { store, weather }) {
-  const render = async () => {
-    const events = await store.list('events');
-    const from = todayKeyLocal();
-    const to = addDaysKey(from, 6);
-    const byDay = groupByDay(events, from, to);
-    const mud = new Map(weather.getState().rows.map((r) => [r.date, r]));
-    const days = [...byDay.keys()].sort();
-    if (!days.length) return replace(el, note(language()==='es' ? 'No hay eventos previstos esta semana.' : 'Nothing planned this week.'));
-    replace(el, h('div', { class: 'w-cal' }, days.map((key) => {
-      const dm = mud.get(key);
-      const dayTitle = `${dayLong(key)} ${dayMonth(key)}`;
-      return h('section', { class: 'w-day' },
-        h('header', {},
-          h('button', { class: 'w-agenda-date', type: 'button', title: dayTitle,
-            'aria-label': `${language()==='es' ? 'Abrir día' : 'Open day'}: ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) },
-            h('b', {}, key === from ? t('Today') : dayShort(key)), h('span', {}, dayMonth(key))),
-          dm ? h('button', { type:'button', class: 'w-agenda-ground',
-            title: `${localizedMudLabel(dm.label)} ${dm.index}/100`,
-            'aria-label': `${localizedMudLabel(dm.label)} ${dm.index} ${language()==='es' ? 'de' : 'out of'} 100. ${language()==='es' ? 'Abrir día' : 'Open day'} ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) },
-            h('span', { class: 'w-agenda-weather', 'aria-hidden': 'true', html: weatherIconSvg(dm.raw?.weather_code, { date: new Date(key + 'T12:00:00') }) }), mudBar(dm)) : null),
-        byDay.get(key).map((o) => h('button', { type: 'button', class: 'w-ev w-event-link',
-          title: `${language()==='es' ? 'Abrir evento' : 'Open event'}: ${o.event.title}`,
-          'aria-label': `${language()==='es' ? 'Abrir evento' : 'Open event'} ${o.event.title} · ${dayTitle}`,
-          onclick: () => openCalendarSelection({ dateKey: key, eventId: o.event.id }) },
-          h('span', { class: 'dot', style: `background:${o.event.color || '#43b9ad'}` }),
-          h('span', { class: 'w-time' }, o.allDay ? t('All day') : `${String(o.start.getHours()).padStart(2, '0')}:${String(o.start.getMinutes()).padStart(2, '0')}`),
-          h('span', { class: 'w-event-name' }, o.event.title))));
-    })));
+  // Respect the actual six-day weather horizon: events outside a day with
+  // a reliable wetness meter belong to Calendar, not this short forecast tile.
+  const fit=observeWidgetFit(el,()=>{
+    const result=fitWidgetRows(el,{
+      rowSelector:'.w-cal-day',
+      moreSelector:'.w-cal-overflow',
+      staticSelector:'.w-cal-uv,.w-cal-overflow',
+    });
+    const more=el.querySelector('.w-cal-overflow');
+    if(more&&result.hidden)more.textContent=language()==='es'
+      ?`Ver ${result.hidden} día(s) más en Calendario`
+      :`View ${result.hidden} more day(s) in Calendar`;
+  });
+  const render=async()=>{
+    const events=await store.list('events');
+    const from=todayKeyLocal();
+    const state=weather.getState(),available=forecastAgendaDays(state.rows,from);
+    const uv=h('div',{class:'w-cal-uv','data-widget-static':'true'},
+      uvMeter(state.current?.uv_index,{stale:state.status==='stale'}));
+    if(!available.length){
+      replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
+        note(language()==='es'
+          ?'No hay pronóstico de humedad del suelo disponible. Abre Clima para actualizarlo.'
+          :'No soil-wetness forecast is available. Open Weather to refresh it.')));
+      fit.refresh();return;
+    }
+    const last=available.at(-1).date,byDay=groupByDay(events,from,last);
+    const days=available.filter(r=>byDay.has(r.date));
+    if(!days.length){
+      replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
+        note(language()==='es'
+          ?'No hay eventos durante los días con pronóstico del suelo.'
+          :'No events during the available ground-forecast days.')));
+      fit.refresh();return;
+    }
+    replace(el,h('div',{class:'w-cal'},
+      uv,
+      ...days.map(dm=>{
+        const key=dm.date,dayTitle=`${dayLong(key)} ${dayMonth(key)}`;
+        const occurrences=byDay.get(key),shown=occurrences.slice(0,2);
+        const peak=uvMeter(dm.raw?.uvMax,{peak:true,stale:state.status==='stale'});
+        return h('section',{class:'w-day w-cal-day',dataset:{date:key}},
+          h('header',{},
+            h('button',{class:'w-agenda-date',type:'button',title:dayTitle,
+              'aria-label':`${language()==='es'?'Abrir día':'Open day'}: ${dayTitle}`,
+              onclick:()=>openCalendarSelection({dateKey:key})},
+              h('b',{},key===from?t('Today'):dayShort(key)),h('span',{},dayMonth(key))),
+            h('button',{type:'button',class:'w-agenda-ground',
+              title:`${localizedMudLabel(dm.label)} ${dm.index}/100`,
+              'aria-label':`${localizedMudLabel(dm.label)} ${dm.index}/100. ${dayTitle}`,
+              onclick:()=>openCalendarSelection({dateKey:key})},
+              h('span',{class:'w-agenda-weather','aria-hidden':'true',
+                html:weatherIconSvg(dm.raw?.weather_code,{date:new Date(key+'T12:00:00')})}),
+              mudBar(dm)),
+            h('span',{class:'w-agenda-uv'},peak)),
+          ...shown.map(o=>h('button',{type:'button',class:'w-ev w-event-link',
+            title:`${language()==='es'?'Abrir evento':'Open event'}: ${o.event.title}`,
+            'aria-label':`${language()==='es'?'Abrir evento':'Open event'} ${o.event.title} · ${dayTitle}`,
+            onclick:()=>openCalendarSelection({dateKey:key,eventId:o.event.id})},
+            h('span',{class:'dot',style:`background:${o.event.color||'#43b9ad'}`}),
+            h('span',{class:'w-time'},o.allDay?t('All day'):`${String(o.start.getHours()).padStart(2,'0')}:${String(o.start.getMinutes()).padStart(2,'0')}`),
+            h('span',{class:'w-event-name'},o.event.title))),
+          occurrences.length>2?h('button',{type:'button',class:'w-cal-extra',
+            onclick:()=>openCalendarSelection({dateKey:key})},
+            language()==='es'?`+${occurrences.length-2} eventos`:`+${occurrences.length-2} more events`):null);
+      }),
+      h('button',{type:'button',class:'w-cal-overflow',hidden:true,
+        onclick:()=>openCalendarSelection({dateKey:el.querySelector('.w-cal-day[hidden]')?.dataset.date||days[0].date})},
+        language()==='es'?'Ver más en Calendario':'View more in Calendar')));
+    fit.refresh();
   };
-  return live(render, (run) => [storeTables(store, ['events'], run), weather.subscribe(run)]);
+  const inst=live(render,run=>[storeTables(store,['events'],run),weather.subscribe(run)]);
+  return {destroy(){fit.destroy();inst.destroy();},refresh:inst.refresh};
 }
 
 // ---- loot and lost quests --------------------------------------------------------------------
@@ -297,26 +339,61 @@ function mountRecentlyPlayed(el,{store}) {
   };
   return live(render,run=>[storeTables(store,['settings'],run)]);
 }
-function mountSky(el,{weather}) {
+function mountSky(el,{weather,interactive}) {
  let rows=[],dead=false,loaded=false;
+ const fit=observeWidgetFit(el,()=>{
+   const result=fitWidgetRows(el,{
+     rowSelector:'.w-sky-event',
+     moreSelector:'.w-sky-overflow',
+     staticSelector:'.w-sky-intro,.w-sky-overflow,.w-sky-note,.w-sky-location',
+   });
+   const more=el.querySelector('.w-sky-overflow');
+   if(more&&result.hidden)more.textContent=language()==='es'
+     ?`+${result.hidden} eventos · ampliar`
+     :`+${result.hidden} events · expand`;
+ });
+ const explain=(event,tz)=>{
+  const es=language()==='es',info=skyEventInformation(event,language());
+  openSheet({title:(event.symbol?event.symbol+' ':'')+(es?event.es:event.en),
+    body:h('div',{class:'sky-explanation'},
+      h('p',{class:'hint'},event.date+(event.at?' · '+eventLocalTime(event,tz,language()):'')),
+      h('h3',{},es?'Qué ocurre':'What is happening'),h('p',{},info.what),
+      h('h3',{},es?'Qué podría significar':'What it might mean'),h('p',{},info.meaning),
+      h('small',{class:'hint'},es
+       ?'Las fechas son aproximadas y la visibilidad local no está confirmada. Las interpretaciones simbólicas no son predicciones.'
+       :'Dates may be approximate and local visibility is not verified. Symbolic readings are not predictions.'))});
+ };
  const render=async()=>{
   const now=new Date(),place=weather?.getState()?.place,tz=place?.timezone,es=language()==='es';
   const draw=()=>{
    if(dead)return;
    const events=mergeSkyAndZodiacEvents(now,rows,{timezone:tz,skyLimit:4,zodiacLimit:4});
    replace(el,h('div',{class:'w-sky'},
-    h('p',{class:'w-note'},t('Dates are approximate. Check local visibility and the weather.')),
-    h('div',{class:'w-sky-scroll'},...events.map(e=>h('p',{class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':'')},
+    h('p',{class:'w-note w-sky-intro'},t('Dates are approximate. Check local visibility and the weather.')),
+    h('div',{class:'w-sky-scroll'},...events.map(e=>h('button',{type:'button',
+       class:'w-sky-event'+(e.kind.startsWith('zodiac-')?' w-sky-zodiac':''),
+       title:es?'Explicar este evento celeste':'Explain this sky event',
+       onclick:()=>explain(e,tz)},
       h('span',{class:'w-sky-symbol',html:skyEventIconSvg(eventIconKind(e))}),
-      h('span',{class:'w-sky-event-copy'},h('small',{class:'w-sky-event-date'},e.date+(e.at?' · '+eventLocalTime(e,tz,language()):'')),
-       h('a',{href:e.url,target:'_blank',rel:'noopener noreferrer'},(e.symbol?e.symbol+' ':'')+(es?e.es:e.en)))))),
-    h('small',{class:'w-sky-note'},rows.length?(es?'Tránsitos tropicales calculados · no son predicciones.':'Calculated tropical transits · not predictions.'):(loaded?(es?'Tránsitos no disponibles; calendario astronómico conservado.':'Transits unavailable; sky calendar retained.'):(es?'Calculando tránsitos…':'Calculating transits…'))),
-    place?.name?h('small',{},t('Selected location')+': '+place.name):null));
+      h('span',{class:'w-sky-event-copy'},
+       h('small',{class:'w-sky-event-date'},e.date+(e.at?' · '+eventLocalTime(e,tz,language()):'')),
+       h('strong',{},(e.symbol?e.symbol+' ':'')+(es?e.es:e.en)))))),
+    h(interactive?'button':'span',{class:'w-sky-overflow',type:interactive?'button':null,hidden:true,
+      onclick:interactive?()=>{
+       const expand=el.closest('.widget')?.querySelector('.widget-expand');
+       if(expand)expand.click();else location.hash='#mud';
+      }:null},es?'Más eventos':'More events'),
+    h('small',{class:'w-sky-note'},rows.length
+      ?(es?'Tránsitos tropicales calculados · las interpretaciones son simbólicas.':'Calculated tropical transits · interpretations are symbolic.')
+      :(loaded?(es?'Tránsitos no disponibles; calendario astronómico conservado.':'Transits unavailable; sky calendar retained.'):(es?'Calculando tránsitos…':'Calculating transits…'))),
+    place?.name?h('small',{class:'w-sky-location'},t('Selected location')+': '+place.name):null));
+   fit.refresh();
   };
   draw();rows=await loadCalculatedSkyEvents(now);loaded=true;draw();
  };
- const inst=live(render,run=>[weather?.subscribe?.(run)]);const timer=setInterval(()=>inst.refresh(),5*60_000);
- return {destroy(){dead=true;clearInterval(timer);inst.destroy();},refresh:inst.refresh};
+ const inst=live(render,run=>[weather?.subscribe?.(run)]);
+ const timer=setInterval(()=>inst.refresh(),5*60_000);
+ return {destroy(){dead=true;clearInterval(timer);fit.destroy();inst.destroy();},refresh:inst.refresh};
 }
 function mountAudio(el,{audioPlayer,interactive}){if(!audioPlayer||!interactive){replace(el,note(t('Music and radio player · available in the Tracker app.')));return {destroy(){}};}return audioPlayer.mount(el);}
 const MOUNTS = { audio:mountAudio, sky: mountSky, recent: mountRecentlyPlayed, currency: mountCurrency, mud: mountMud, calendar: mountCalendar, loot: mountLoot, stats: mountStats, feed: mountFeed, clock: mountClock, phrase: mountPhrase, games: mountGames };

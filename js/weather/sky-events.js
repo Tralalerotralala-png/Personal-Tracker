@@ -94,6 +94,100 @@ export function mergeSkyAndZodiacEvents(now,calculated,{timezone=null,skyLimit=4
  for(const e of future.filter(e=>e.kind==='zodiac-moon'||e.kind==='zodiac-sun'))if(zodiac.length<zodiacLimit&&!zodiac.includes(e))zodiac.push(e);
  return [...sky,...zodiac.slice(0,zodiacLimit)].sort((a,b)=>a.date.localeCompare(b.date)||(a.at||'').localeCompare(b.at||''));
 }
+// Explanations are deliberately local to the app: a calculated transit
+// should never direct people to the astronomy engine's source repository.
+// Distinguish an observable sky event from a traditional, non-predictive
+// symbolic association. No transit is presented as causing life outcomes.
+const THEMES={
+ Aries:['new beginnings and initiative','inicios e iniciativa'],
+ Taurus:['stability, comfort and resources','estabilidad, comodidad y recursos'],
+ Gemini:['curiosity and communication','curiosidad y comunicación'],
+ Cancer:['home, belonging and care','hogar, pertenencia y cuidado'],
+ Leo:['creativity and confidence','creatividad y confianza'],
+ Virgo:['routines and practical details','rutinas y detalles prácticos'],
+ Libra:['balance and relationships','equilibrio y relaciones'],
+ Scorpio:['reflection and transformation','reflexión y transformación'],
+ Sagittarius:['learning and exploration','aprendizaje y exploración'],
+ Capricorn:['structure and commitments','estructura y compromisos'],
+ Aquarius:['ideas and community','ideas y comunidad'],
+ Pisces:['imagination and compassion','imaginación y compasión'],
+};
+export function skyEventInformation(event,lang='en'){
+ const es=lang==='es',pick=(en,spanish)=>es?spanish:en;
+ const kind=event?.kind||'',name=String(es?event?.es||'':event?.en||'');
+ if(kind==='zodiac-sun'||kind==='zodiac-moon'){
+  const body=kind==='zodiac-sun'?pick('Sun','Sol'):pick('Moon','Luna');
+  const englishName=String(event?.en||'');
+  const sign=Object.keys(THEMES).find(x=>englishName.endsWith(' '+x));
+  const theme=sign?THEMES[sign][es?1:0]:pick('personal reflection','reflexión personal');
+  return {
+   what:pick(`The ${body} crosses into another 30° sector of the tropical zodiac. These equal sectors mark positions along the ecliptic, not the physical borders of constellations.`,
+             `El ${body} entra en otro sector de 30° del zodiaco tropical. Son divisiones de la eclíptica, no fronteras reales de las constelaciones.`),
+   meaning:pick(`In astrology, this sign is associated with ${theme}. You could use the date as a prompt for reflection; it does not predict or cause personal events.`,
+                `En astrología, este signo se asocia con ${theme}. Puede servir como invitación a reflexionar; no predice ni provoca sucesos personales.`),
+  };
+ }
+ if(kind==='zodiac-retrograde'||kind==='zodiac-direct'){
+  const retro=kind==='zodiac-retrograde';
+  return {
+   what:pick(retro
+     ?'From Earth, this planet appears to pause and drift backward against the sky because of relative orbital motion. It has not reversed its orbit.'
+     :'From Earth, this planet appears to stop drifting backward and resume its usual apparent eastward direction.',
+     retro
+     ?'Desde la Tierra, el planeta parece detenerse y retroceder por el movimiento relativo de las órbitas. No ha invertido su órbita.'
+     :'Desde la Tierra, el planeta parece detener su movimiento retrógrado aparente y retomar su dirección habitual.'),
+   meaning:pick(retro
+     ?'Traditionally linked with reviewing plans or slowing down. It is a symbolic interpretation, not a scientific warning.'
+     :'Traditionally linked with renewed momentum or resuming plans. This is symbolic, not a scientific forecast.',
+     retro
+     ?'Se asocia tradicionalmente con revisar planes o ir más despacio. Es una interpretación simbólica, no una advertencia científica.'
+     :'Se asocia tradicionalmente con retomar planes o avanzar. Es simbólico, no una predicción científica.'),
+  };
+ }
+ if(kind==='zodiac-phase'||kind==='moon'){
+  const full=/full moon|luna llena/i.test(String(event?.en||'')+' '+String(event?.es||''))||event?.phase==='full';
+  return {
+   what:pick(full
+     ?'A full Moon occurs when the Moon faces the Sun from the opposite side of Earth; its near side appears brightly lit.'
+     :'A new Moon occurs when the Moon lies roughly in the Sun’s direction; its near side looks dark.',
+     full
+     ?'La Luna llena ocurre cuando la Luna está en dirección opuesta al Sol vista desde la Tierra; su cara visible aparece iluminada.'
+     :'La Luna nueva ocurre cuando la Luna está cerca de la dirección del Sol y su cara visible se ve oscura.'),
+   meaning:pick(full
+     ?'Often used as a symbolic moment for taking stock or finishing a project. There is no evidence this phase decides personal outcomes.'
+     :'Often used symbolically for intentions or starting something. The phase itself does not determine personal outcomes.',
+     full
+     ?'Puede servir simbólicamente para hacer balance o cerrar una etapa. La fase no determina resultados personales.'
+     :'Puede servir simbólicamente para marcar un comienzo. La fase no determina resultados personales.'),
+  };
+ }
+ const title=String(event?.en||'');
+ if(/solar eclipse/i.test(title))return {
+  what:pick('The Moon passes between Earth and the Sun, partly or completely blocking the Sun from particular locations. Visibility depends on the path.',
+            'La Luna pasa entre la Tierra y el Sol y lo cubre en parte o por completo desde ciertas zonas. La visibilidad depende de la trayectoria.'),
+  meaning:pick('A notable skywatching occasion, not an omen. Never look directly at the Sun without proper eclipse protection.',
+               'Es una ocasión especial para observar el cielo, no un presagio. Nunca mires directamente al Sol sin protección adecuada para eclipses.')
+ };
+ if(/lunar eclipse/i.test(title))return {
+  what:pick('Earth blocks some sunlight from reaching the Moon. A penumbral eclipse creates a subtle shading rather than a dark bite.',
+            'La Tierra bloquea parte de la luz solar que llega a la Luna. En un eclipse penumbral, el oscurecimiento es sutil.'),
+  meaning:pick('A chance to observe the Earth–Sun–Moon alignment. It does not predict events in our lives.',
+               'Permite observar la alineación Tierra-Sol-Luna; no predice sucesos de nuestras vidas.')
+ };
+ if(/peak/i.test(title))return {
+  what:pick('A meteor shower is near its expected maximum as Earth crosses a trail of comet or asteroid debris. Local weather and darkness affect visibility.',
+            'Una lluvia de meteoros se acerca a su máximo cuando la Tierra cruza restos de un cometa o asteroide. Influyen el clima y la oscuridad.'),
+  meaning:pick('It may be a good time to look for meteors away from city lights; an announced peak does not guarantee a local sighting.',
+               'Puede ser buen momento para observar meteoros lejos de las luces urbanas; el máximo no garantiza verlos.')
+ };
+ return {
+  what:pick('A calculated or scheduled sky event. The date may vary by time zone and local visibility.',
+            'Un evento celeste calculado o previsto. La fecha puede variar por zona horaria y visibilidad local.'),
+  meaning:pick('Use it as a reminder to observe the sky, not as a personal prediction.',
+               'Úsalo para observar el cielo, no como una predicción personal.')
+ };
+}
+
 export function eventIconKind(event){
  if(event.kind==='calendar')return skyEventOnDate(event.date)?.kind||'meteor';
  return event.kind;

@@ -185,7 +185,6 @@ export function nextRetrogradeStation(A,body,date,limitDays=45){
  return null;
 }
 const bodyEs={Sun:'Sol',Moon:'Luna',Mercury:'Mercurio',Venus:'Venus',Mars:'Marte',Jupiter:'Júpiter',Saturn:'Saturno',Uranus:'Urano',Neptune:'Neptuno',Pluto:'Plutón'};
-const ASTRO_REFERENCE='https://github.com/cosinekitty/astronomy';
 export function calculatedZodiacEvents(A,date=new Date()){
  const result=[];
  for(const body of ['Sun','Moon']){
@@ -194,14 +193,14 @@ export function calculatedZodiacEvents(A,date=new Date()){
   for(let i=0;i<(body==='Moon'?6:2);i++){
    const ingress=nextSignIngress(A,body,from,body==='Moon'?5:40);if(!ingress)break;
    const [en,es,symbol]=ZODIAC_SIGNS[ingress.to];
-   result.push({...ingress,kind:body==='Sun'?'zodiac-sun':'zodiac-moon',symbol,en:body+' enters '+en,es:bodyEs[body]+' entra en '+es,url:ASTRO_REFERENCE});
+   result.push({...ingress,kind:body==='Sun'?'zodiac-sun':'zodiac-moon',symbol,en:body+' enters '+en,es:bodyEs[body]+' entra en '+es});
    from=new Date(Date.parse(ingress.at)+2*60000);
   }
  }
  for(const body of SOLAR_BODIES.slice(2)){
   const station=nextRetrogradeStation(A,body,date,45);if(!station)continue;
   const retro=station.type==='retrograde';
-  result.push({...station,kind:retro?'zodiac-retrograde':'zodiac-direct',en:body+(retro?' stations retrograde':' stations direct'),es:bodyEs[body]+(retro?' inicia movimiento retrógrado':' retoma movimiento directo'),url:ASTRO_REFERENCE});
+  result.push({...station,kind:retro?'zodiac-retrograde':'zodiac-direct',en:body+(retro?' stations retrograde':' stations direct'),es:bodyEs[body]+(retro?' inicia movimiento retrógrado':' retoma movimiento directo')});
  }
  // Use precise phase search when available; attach the Moon's sign at that instant.
  for(const [angle,en,es] of [[0,'New moon','Luna nueva'],[180,'Full moon','Luna llena']]){
@@ -211,7 +210,7 @@ export function calculatedZodiacEvents(A,date=new Date()){
     const at=A.SearchMoonPhase?.(angle,start,34)?.date;
     if(!(at instanceof Date)||!Number.isFinite(at.getTime()))break;
     const sign=ZODIAC_SIGNS[zodiacSector(geoLongitude(A,'Moon',at)).index];
-    result.push({kind:'zodiac-phase',phase:angle===0?'new':'full',at:at.toISOString(),en:en+' in '+sign[0],es:es+' en '+sign[1],symbol:sign[2],url:ASTRO_REFERENCE});
+    result.push({kind:'zodiac-phase',phase:angle===0?'new':'full',at:at.toISOString(),en:en+' in '+sign[0],es:es+' en '+sign[1],symbol:sign[2]});
     start=new Date(at.getTime()+2*60000);
    }
   }catch{}
