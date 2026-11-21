@@ -55,7 +55,7 @@ export function createMediaLibraryView({store,backups=null}) {
     media,h('div',{class:'media-case-front'},cover(row),
      h('span',{class:'media-case-badge','aria-hidden':'true'},mediaIcon(kind,row.title))));
   const replay=h('button',{class:'btn small media-replay',type:'button',onclick:()=>{
-    const parts=casing.querySelectorAll('.media-case-front,.media-page-flip,.media-vinyl-record,.media-case-disc');
+    const parts=casing.querySelectorAll('.media-case-front,.media-page-flip,.media-comic-panel,.media-vinyl-record,.media-case-disc');
     parts.forEach(node=>{node.style.animation='none';});
     void casing.offsetWidth;
     parts.forEach(node=>node.style.removeProperty('animation'));
