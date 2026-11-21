@@ -547,6 +547,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         }finally{URL.revokeObjectURL(url);}
       }catch(err){toast(err.message||'AI image generation failed.');}finally{aiButton.disabled=false;aiButton.textContent=old;}
     }},t('Generate with AI'));
+    aiButton.hidden = config?.ENABLE_AI_ICONS !== true;
     const desc = h('textarea', { id: 'it-desc', rows: 3, placeholder: 'e.g. 16x16 pixel art icon of an orange headlamp, 8 colours, transparent background' }, existing?.pixel_description ?? '');
     const suggest = () => {
       const nm = name.value.trim() || 'the item';
