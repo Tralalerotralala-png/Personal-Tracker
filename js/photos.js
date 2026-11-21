@@ -100,11 +100,11 @@ export function createPhotos({ store, client }) {
       const current=await store.get('items',itemId,{includeDeleted:true});
       if(!current||current.photo_path===path)continue;
       try {
-        // The *server*, not the local cache, must confirm that this image is
-        // no longer the item photo. If the query fails, retain both the file
-        // and the retry marker rather than risk deleting an active image.
-        const {data,error}=await client.from('items').select('photo_path').eq('id',itemId).maybeSingle();
-        if(error||!data||data.photo_path===path)continue;
+        // The *server*, not the local cache, must confirm that NO owner
+        // record still references this file (even a different or soft-deleted
+        // item). On query failure, retain the file for another retry.
+        const {data,error}=await client.from('items').select('id').eq('photo_path',path).limit(1);
+        if(error||!Array.isArray(data)||data.length)continue;
         const result=await client.storage.from(BUCKET).remove([path]);
         if(result.error)continue;
         await store.adapter.del('meta',row.key);
