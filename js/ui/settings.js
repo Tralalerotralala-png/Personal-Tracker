@@ -229,7 +229,6 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const spriteStyle=h('select',{'aria-label':'Inventory sprite style',onchange:async e=>{
     await store.setSetting('ui',{...(await store.getSetting('ui')),sprite_style:e.target.value==='flat'?'flat':'stack'});
     window.dispatchEvent(new Event('tracker-theme-refresh'));
-    window.dispatchEvent(new Event('tracker-sprite-style-change'));
   }},[
     h('option',{value:'stack',selected:ui?.sprite_style!=='flat'},language()==='es'?'Objetos pixelados con volumen':'Layered pixel-art objects'),
     h('option',{value:'flat',selected:ui?.sprite_style==='flat'},language()==='es'?'Iconos clásicos planos':'Classic flat icons')
