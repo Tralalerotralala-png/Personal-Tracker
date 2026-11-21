@@ -19,7 +19,8 @@ import { createPlacesPanel, openPlaceSheet, placeOptions } from './places.js';
 const RARITY_RANK = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
 const FALLBACK_COLOR = '#c9b58a';
 const inventoryPreset = value => isAssetPreset(value) ? value : medicinePreset(value);
-const itemAsset = (name,cat,meta) => inventoryAssetSvg(meta.icon_preset) || pharmacyIconSvg(name,cat,meta) || (inventoryPreset(meta.icon_preset)==='auto' ? inventoryAssetSvg(defaultInventoryAsset(name,cat)) : '');
+const spriteStyle=()=>globalThis.document?.documentElement?.dataset?.spriteStyle==='flat'?'flat':'stack';
+const itemAsset = (name,cat,meta) => inventoryAssetSvg(meta.icon_preset,{style:spriteStyle()}) || pharmacyIconSvg(name,cat,meta) || (inventoryPreset(meta.icon_preset)==='auto' ? inventoryAssetSvg(defaultInventoryAsset(name,cat),{style:spriteStyle()}) : '');
 export function createInventoryView({ store, photos, auth = null, config = {} }) {
   const state = {
     pane: 'items', // 'items' | 'places'
@@ -35,6 +36,9 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   let data = { items: [], locations: [], categories: [], rarityLabels: DEFAULT_SETTINGS.rarity_labels, tracking: {}, categoryDefaults: {} };
 
   const el = h('div', { class: 'view inventory' });
+  window.addEventListener('tracker-sprite-style-change',()=>{
+    if(!el.hidden)renderAll();
+  });
 
   // ---- data ----------------------------------------------------------------
 
@@ -95,7 +99,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
   function art(item, cls = 'art') {
     const cat = catById().get(item.category_id);
     const meta = metaOf(item);
-    const box = h('span', { class: cls, html: itemAsset(item.name,cat,meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR }) });
+    const box = h('span', { class: cls, html: itemAsset(item.name,cat,meta) || pixelIconSvg(item.icon_seed || item.id, { color: cat?.color || FALLBACK_COLOR, style:spriteStyle() }) });
     if (item.photo_path && inventoryPreset(meta.icon_preset) === 'auto') {
       photos.urlFor(item).then((url) => {
         if (url && box.isConnected !== false) box.replaceChildren(h('img', { src: url, alt: '', loading: 'lazy' }));
@@ -406,7 +410,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     function drawCatalog(){
       const q=catalogSearch.value.trim().toLowerCase();
       const assets=INVENTORY_ASSETS.filter(a=>(catalogGroup==='all'||a.group===catalogGroup||a.id===draft.iconPreset)&&(!q||(`${a.name} ${a.spanish} ${a.id}`).toLowerCase().includes(q)||a.id===draft.iconPreset));
-      replace(catalogButtons,assets.map(a=>h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===a.id?' on':''}`,'aria-pressed':String(draft.iconPreset===a.id),onclick:()=>{draft.iconPreset=a.id;drawMedicineOptions();renderPhoto();}},h('span',{class:'pharmacy-preset-preview',html:inventoryAssetSvg(a.id)}),h('span',{},language()==='es'?a.spanish:a.name))),assets.length?null:h('span',{class:'hint'},t('No matching icons')));
+      replace(catalogButtons,assets.map(a=>h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===a.id?' on':''}`,'aria-pressed':String(draft.iconPreset===a.id),onclick:()=>{draft.iconPreset=a.id;drawMedicineOptions();renderPhoto();}},h('span',{class:'pharmacy-preset-preview',html:inventoryAssetSvg(a.id,{style:spriteStyle()})}),h('span',{},language()==='es'?a.spanish:a.name))),assets.length?null:h('span',{class:'hint'},t('No matching icons')));
     }
     catalogFilter.addEventListener('change',()=>{catalogGroup=catalogFilter.value;drawCatalog();});
     catalogSearch.addEventListener('input',drawCatalog);
@@ -454,7 +458,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       resetColors.hidden=customAsset||kind==='symbol';
       drawCatalog();
       replace(presetButtons,PHARMACY_PRESETS.map(key=>{
-        const svg=itemAsset(name.value,cat,iconMeta(key))||pixelIconSvg(id,{color:cat?.color||FALLBACK_COLOR});
+        const svg=itemAsset(name.value,cat,iconMeta(key))||pixelIconSvg(id,{color:cat?.color||FALLBACK_COLOR,style:spriteStyle()});
         return h('button',{type:'button',class:`pharmacy-preset${draft.iconPreset===key?' on':''}`,'aria-pressed':String(draft.iconPreset===key),onclick:()=>{
           draft.iconPreset=key;drawMedicineOptions();renderPhoto();
         }},h('span',{class:'pharmacy-preset-preview',html:svg}),h('span',{},t(presetNames[key])));
@@ -482,7 +486,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       const showing = previewUrl || null;
       const preview = h('span', { class: 'photo-preview' });
       const cat = catById().get(category.value);
-      preview.innerHTML = itemAsset(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR});
+      preview.innerHTML = itemAsset(name.value,cat,iconMeta()) || pixelIconSvg(existing?.icon_seed || id,{color:cat?.color || FALLBACK_COLOR,style:spriteStyle()});
       if (draft.iconPreset === 'auto' && showing) preview.replaceChildren(h('img', { src: showing, alt: 'Selected photo' }));
       else if (draft.iconPreset === 'auto' && hasExisting) photos.urlFor(existing).then(url=>{if(url && preview.isConnected)preview.replaceChildren(h('img',{src:url,alt:''}));}).catch(()=>{});
       photoBox.replaceChildren(preview,
@@ -498,7 +502,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const generateIcon = h('button', { class: 'btn small', type: 'button', onclick: async () => {
       try {
         const color = catById().get(category.value)?.color || FALLBACK_COLOR;
-        const svg = pixelIconSvg(name.value.trim() || id, { color });
+        const svg = pixelIconSvg(name.value.trim() || id, { color, style:spriteStyle() });
         const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
         const img = new Image();
         try {

@@ -1,4 +1,5 @@
 import { moonPhaseSvg } from '../weather/moon-phase.js';
+import { renderLayeredSprite } from './sprite-stack.js';
 // Pixel art generated in code: a unique little sprite per item (from its id),
 // and the small glyphs used in the navigation. Pure functions, no DOM.
 
@@ -53,11 +54,19 @@ const OUTLINE = '#1a120b';
 
 // Sprite as an inline SVG string. `color` must be a #hex colour (anything
 // else falls back to a neutral tone, so user-entered text can't inject markup).
-export function pixelIconSvg(seed, { color = '#c9b58a' } = {}) {
+export function pixelIconSvg(seed, { color = '#c9b58a', style = 'stack' } = {}) {
   const g = spriteGrid(seed);
   const n = g.length;
   const dim = n + 2; // 1 cell of padding for the outline
   const fill = SAFE_COLOR.test(color) ? color : '#c9b58a';
+  // Unnamed user items receive a real stack of pixel slices too. Only strict
+  // RGB palette values enter the geometry renderer; the old flat icon remains
+  // as a fallback for extended alpha / shorthand CSS colors.
+  const safeSix=/^#[0-9a-f]{6}$/i.test(fill)?fill:null;
+  if(safeSix&&style!=='flat'){
+    const volume=renderLayeredSprite(g.map(row=>row.map(v=>v?safeSix:null)),{depth:3});
+    if(volume)return volume.replace('class="sprite-stacked-asset"','class="sprite-random-depth sprite-stacked-asset"');
+  }
   const filled = (y, x) => g[y]?.[x] === 1;
   const parts = [];
 
@@ -343,7 +352,15 @@ export function glyphRows(name) { return GLYPHS[name] ?? null; }
 // Separate offset silhouette slices give the existing pixel artwork thickness.
 // Preserve original face, palette and viewBox; CSS controls depth on hover.
 export function stackSprite(face,depth=face){
-  return '<g class="sprite-stack-back" aria-hidden="true">'+depth+'</g><g class="sprite-stack-mid" aria-hidden="true">'+depth+'</g><g class="sprite-stack-face">'+face+'</g>';
+  // Flat/status glyphs keep their recognizable original outline, with a
+  // shallow pixel-aligned stepped bevel. Volumetric inventory icons use the
+  // separate horizontal-slice renderer; navigation symbols remain readable
+  // at 24px rather than spinning into an ambiguous silhouette.
+  return '<g class="sprite-stack-back" aria-hidden="true">'+depth+'</g>'+
+    '<g class="sprite-stack-slice sprite-stack-slice-2" aria-hidden="true">'+depth+'</g>'+
+    '<g class="sprite-stack-mid" aria-hidden="true">'+depth+'</g>'+
+    '<g class="sprite-stack-slice sprite-stack-slice-1" aria-hidden="true">'+depth+'</g>'+
+    '<g class="sprite-stack-face">'+face+'</g>';
 }
 export function glyphSvg(name) {
   const compactCodes={sun:0,partly:2,cloud:3,fog:45,rain:61,snow:71,storm:95};

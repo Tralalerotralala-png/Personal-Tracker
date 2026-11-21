@@ -44,6 +44,30 @@ for width,height in [(390,844),(1280,900)]:
             outbox:(await adapter.getAll('outbox')).length};
         }""")
         assert erased=={"items":0,"meta":0,"outbox":0},"Device erasure left cached data: "+str(erased)
+        # Real mobile/desktop SVG DOM: layered sprites have two complete
+        # directions; the classic style remains immediately available.
+        page.evaluate("location.hash='#inventory'")
+        art=page.locator(".inventory .tile svg.sprite-stacked-asset")
+        art.first.wait_for(state="visible",timeout=15000)
+        pixels=art.first.evaluate("""svg => ({
+          a:svg.querySelector('.sprite-stack-direction-a')?.childElementCount||0,
+          b:svg.querySelector('.sprite-stack-direction-b')?.childElementCount||0,
+          bbox:svg.getBBox().width
+        })""")
+        assert pixels["a"]>0 and pixels["b"]>0 and pixels["bbox"]>0,"Stacked pixel art was blank"
+        page.evaluate("""() => {
+          document.documentElement.dataset.spriteStyle='flat';
+          window.dispatchEvent(new Event('tracker-sprite-style-change'));
+        }""")
+        page.locator(".inventory .tile .sprite-stack-face").first.wait_for(state="visible",timeout=10000)
+        assert page.locator(".inventory .tile svg.sprite-stacked-asset").count()==0,"Classic flat mode still rendered stacks"
+        page.evaluate("""() => {
+          document.documentElement.dataset.spriteStyle='stack';
+          window.dispatchEvent(new Event('tracker-sprite-style-change'));
+        }""")
+        page.locator(".inventory .tile svg.sprite-stacked-asset").first.wait_for(state="visible",timeout=10000)
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
 
         stray_text=page.locator("#app").evaluate(
             "(el) => [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim())"

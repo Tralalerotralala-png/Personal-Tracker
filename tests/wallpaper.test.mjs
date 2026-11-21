@@ -318,7 +318,8 @@ test('bundle: a classic script with no module syntax, and no interactive or sign
     assert.ok(!modules.includes(banned), `${banned} should not be in the wallpaper`);
   }
   assert.ok(modules.includes('js/widgets/registry.js') && modules.includes('js/weather/service.js'));
-  assert.ok(code.length < 250 * 1024, `bundle is ${(code.length / 1024).toFixed(0)} KB`);
+  // Includes the shared offline sprite-stack renderer (under 270 KiB raw).
+  assert.ok(code.length < 270 * 1024, `bundle is ${(code.length / 1024).toFixed(0)} KB`);
   assert.equal(ENTRY, 'js/wallpaper/main.js');
 });
 
