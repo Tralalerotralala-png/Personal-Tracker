@@ -2295,7 +2295,7 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
 :root[data-sprite-style="flat"] svg[data-pixel-stack] .sprite-stack-echo{display:none!important;}
 
 /* Seven forecast cards: when the widget is narrow, preserve legible labels. */
-.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(7,minmax(0,1fr));}
+.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(var(--forecast-day-count,7),minmax(0,1fr));}
 @container widget (max-width:650px){
  .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));}
 }
