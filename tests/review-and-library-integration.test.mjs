@@ -7,27 +7,15 @@ import {REQUESTED_MEDIA,ensureRequestedMedia,markRequestedMediaRemoved} from '..
 import {blockedHost,blockedAddress,allowedUrl} from '../supabase/functions/feed-proxy/safe-target.js';
 
 const source=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
-test('requested comic and animated TV series seed once, preserve existing media and never respawn after deletion',async()=>{
+test('public library has no personalized starter entries and retains account-only items',async()=>{
  const store=createStore({adapter:createMemoryAdapter()});
- const old={books:[{id:'pre-existing',title:'Another book',notes:'keep'}],films:[],albums:[{id:'album',title:'Existing record'}]};
- await store.setSetting('other_media_library_v1',old);
- // Repair even when an older app wrongly recorded its one-time seed marker.
- await store.setSetting('media_requested_additions_20261121',true);
- assert.equal(await ensureRequestedMedia(store),true);
- let data=await store.getSetting('other_media_library_v1');
- assert.equal(data.books.length,2);
- assert.equal(data.films.length,1);
- assert.equal(data.albums.length,1);
- assert.equal(data.books.find(x=>x.title===REQUESTED_MEDIA.books.title).mediaType,'comic');
- assert.equal(data.films[0].title,'Invader Zim');
- assert.equal(data.films[0].mediaType,'series');
- assert.equal(data.books[0].notes,'keep');
+ const existing={books:[{id:'b1',title:'Sample Book',notes:'keep'}],films:[],
+  albums:[{id:'a1',title:'Sample Album'}]};
+ await store.setSetting('other_media_library_v1',existing);
+ assert.deepEqual(REQUESTED_MEDIA,{});
  assert.equal(await ensureRequestedMedia(store),false);
- await markRequestedMediaRemoved(store,'books','Johnny the Homicidal Maniac');
- data.books=data.books.filter(x=>x.title!=='Johnny the Homicidal Maniac');
- await store.setSetting('other_media_library_v1',data);
- assert.equal(await ensureRequestedMedia(store),false);
- assert.equal((await store.getSetting('other_media_library_v1')).books.length,1);
+ assert.deepEqual(await store.getSetting('other_media_library_v1'),existing);
+ assert.equal(await markRequestedMediaRemoved(store,'books','Sample Book'),false);
 });
 test('feeds cannot target localhost, private or metadata IPs, credentials, or nonstandard ports',()=>{
  for(const host of ['localhost','router.local','metadata.internal','127.0.0.1','169.254.169.254','[::1]','127.0.0.1.nip.io.local'])
