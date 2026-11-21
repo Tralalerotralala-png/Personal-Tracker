@@ -4,6 +4,7 @@
 // Every entry/draft is its own settings row so independent offline edits do
 // not compete for one giant encrypted value. The v1 journal is left untouched.
 import {uuid} from '../data/util.js';
+import {getSyncConflicts} from '../data/conflicts.js';
 import {emptyJournal,validNewJournalKey,bytesToBase64} from './private-journal-crypto.js';
 
 export const JOURNAL_V3_HEADER='private_journal_v3_header';
@@ -151,4 +152,21 @@ export async function changeJournalV3Passphrase(store,session,newPassphrase){
  session.header=header;
  session.key=key;
  session.baseline=new Map([...next].map(([rowKey,payload])=>[rowKey,asText(payload)]));
+}
+
+export async function listJournalV3Conflicts(store,session){
+ const copies=await getSyncConflicts(store),readable=[],unreadable=[];
+ for(const copy of copies){
+  if(copy.table!=='settings'||typeof copy.id!=='string'||!copy.id.startsWith(JOURNAL_V3_ENTRY))continue;
+  if(await store.meta.get('journal-v3-recovered:'+copy.key))continue;
+  try{
+   const content=await unseal(session.key,session.header.generation,copy.id,copy.local?.value);
+   const id=copy.id.slice(JOURNAL_V3_ENTRY.length);
+   if(!JOURNAL_TYPES.includes(content?.type)||content.entry?.id!==id)throw Error('Invalid recovery entry');
+   readable.push({key:copy.key,savedAt:copy.savedAt,type:content.type,entry:content.entry});
+  }catch{
+   unreadable.push(copy.key);
+  }
+ }
+ return {readable,unreadable:unreadable.length};
 }
