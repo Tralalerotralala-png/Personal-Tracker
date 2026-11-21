@@ -25,6 +25,7 @@ import { createLogin } from './ui/login.js';
 import { openSettings, createAnalogClockSettings } from './ui/settings.js';
 import { openQuickCapture } from './ui/quick-capture.js';
 import { exportAll, downloadBackup } from './data/backup.js';
+import { getSyncConflicts, exportSyncConflicts } from './data/conflicts.js';
 import { startParts } from './calendar/recurrence.js';
 
 const root = document.getElementById('app');
@@ -80,6 +81,16 @@ window.addEventListener('tracker-theme-refresh', applyDisplay);
 window.addEventListener('tracker-clock-settings',async()=>{if(document.querySelector('.clock-customizer-sheet[open]'))return;const ui=await store.getSetting('ui');const sheet=openSheet({title:t('Analog clock'),body:createAnalogClockSettings(store,ui)});sheet.el.classList.add('clock-customizer-sheet');});
 
 // ---- sync indicator ----------------------------------------------------------------
+let photoStatus={pending:0,error:null},conflictCount=0,warningLoad=0;
+async function refreshPendingWarnings(){
+  const version=++warningLoad;
+  const [photosState,conflicts]=await Promise.all([photos.queueStatus(),getSyncConflicts(store)]);
+  if(version!==warningLoad)return;
+  photoStatus=photosState;
+  conflictCount=conflicts.length;
+  renderPill(mode==='cloud'?store.sync.getStatus():{state:'local'});
+}
+photos.subscribe(()=>{void refreshPendingWarnings().catch(console.warn);});
 const SYNC_TEXT = {
   idle: 'Ready', syncing: 'Syncing', synced: 'Synced', offline: 'Offline',
   unreachable: "Can't reach database", 'auth-required': 'Sign in', error: 'Needs attention', local: 'Local',
@@ -90,6 +101,8 @@ function syncStatus() {
   const s = store.sync.getStatus();
   const bits = [SYNC_TEXT[s.state] ?? s.state];
   if (s.pending) bits.push(`${s.pending} change${s.pending === 1 ? '' : 's'} waiting to upload`);
+  if (photoStatus.pending) bits.push(`${photoStatus.pending} photo${photoStatus.pending===1?'':'s'} waiting to upload`);
+  if (conflictCount) bits.push(`${conflictCount} device conflict cop${conflictCount===1?'y':'ies'} saved for review`);
   if (s.lastSyncAt) bits.push(`last synced ${new Date(s.lastSyncAt).toLocaleTimeString()}`);
   return `${bits.join('. ')}.`;
 }
@@ -106,6 +119,11 @@ function renderPill(s) {
   pill.className = `pill s-${state}`;
   pill.textContent = SYNC_TEXT[state] ?? state;
   if (mode === 'cloud' && s.pending && state !== 'synced') pill.textContent += ` (${s.pending})`;
+  if(mode==='cloud'&&photoStatus.pending){
+    pill.className='pill s-error';
+    pill.textContent=(s.pending?'Sync and photos pending':'Photos pending')+` (${photoStatus.pending})`;
+  }
+  if(conflictCount){pill.className='pill s-error';pill.textContent+=` · ${conflictCount} conflicts`; }
 }
 function showSyncInfo() {
   if (store.adapter.kind === 'memory') {
@@ -128,25 +146,44 @@ function showSyncInfo() {
       entries.length>40?h('small',{},(entries.length-40)+' more changes not shown'):null);
   }).catch(()=>queue.replaceChildren(h('p',{class:'hint'},'Queue details unavailable.')));
   body.push(queue);
-  if (s.error) body.push(h('p', { class: 'prose' }, `Details: ${s.error}`));
+  if(photoStatus.pending)body.push(h('p',{class:'prose',role:'status'},
+    `${photoStatus.pending} photo upload(s) are still pending. Cloud records may be synced even when the images are not visible on other devices. `+
+    (photoStatus.error?'Last upload error: '+photoStatus.error:'Keep this device online and retry before clearing browser storage.')));
+  if(conflictCount)body.push(
+    h('p',{class:'prose'},`${conflictCount} older edits from another device were preserved only in this device's recovery cache. Review or export them before clearing site storage.`),
+    h('button',{class:'btn small',type:'button',onclick:async()=>{
+      try{downloadBackup(await exportSyncConflicts(store),'personal-tracker-sync-conflicts.json');}
+      catch(error){toast('Could not export conflicting edits: '+error.message);}
+    }},'Export conflicting edits'));
+  if (s.error) body.push(h('p', { class: 'prose' }, `Details: ${s.error}`);
   if (s.state === 'unreachable') {
     body.push(h('p', { class: 'prose' },
       'The database is not responding. Free Supabase projects pause after a week with no activity. Open the Supabase dashboard, find your project and choose Restore. Your changes are safe on this device and will upload afterwards.'));
   }
   if (s.state === 'offline') body.push(h('p', { class: 'prose' }, 'You can keep working. Changes upload when the connection returns.'));
   openSheet({ title: 'Sync', size: 'small', body,
-    footer: [h('span', { class: 'spacer' }), h('button', { class: 'btn primary', type: 'button', onclick: () => { store.sync.syncNow(); toast('Syncing'); } }, 'Sync now')] });
+    footer: [h('span', { class: 'spacer' }), h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+      try{
+        await store.sync.syncNow();
+        await photos.flushQueue();
+        await refreshPendingWarnings();
+        toast(photoStatus.pending?'Records checked; photos still waiting to upload':'Sync check complete');
+      }catch(error){toast('Could not complete sync: '+error.message);}
+    } }, 'Sync records and photos')] });
 }
 renderPill(mode === 'cloud' ? store.sync.getStatus() : { state: 'local' });
+void refreshPendingWarnings().catch(console.warn);
 
 store.subscribe((e) => {
   if (e.type === 'sync') {
     renderPill(e.status);
-    if (e.status.state === 'synced') photos.flushQueue();
+    if (e.status.state === 'synced') void photos.flushQueue().catch(console.warn);
+    void refreshPendingWarnings().catch(console.warn);
   }
   if (e.type === 'change' && e.tables?.includes('settings')) applyDisplay();
+  if(e.type==='change')void refreshPendingWarnings().catch(console.warn);
 });
-window.addEventListener('online', () => photos.flushQueue());
+window.addEventListener('online', () => { void photos.flushQueue().catch(console.warn); });
 
 // ---- views -----------------------------------------------------------------------------
 const inventory = createInventoryView({ store, photos, auth, config: ctx.config });
