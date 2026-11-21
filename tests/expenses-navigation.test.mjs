@@ -56,7 +56,7 @@ test('finance CSV import excludes duplicates within one file and already-saved e
   '2026-11-20,expense,Same,19.25,MXN,Food,Card,Lunch,none',
   '2026-11-20,expense,Same,19.25,MXN,Food,Cash,Lunch,none',
   '2026-11-20,expense,Same,19.25,MXN,Food,Card,Dinner,none',
- ].join('\\n'));
+ ].join('\n'));
  const newRows=uniqueTransactionsForImport(batch,[]);
  assert.equal(newRows.length,3,'Duplicate within a single upload must only import once');
  assert.deepEqual(newRows.map(x=>x.account),['Card','Cash','Card']);
