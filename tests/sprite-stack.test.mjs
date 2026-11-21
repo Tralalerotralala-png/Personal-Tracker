@@ -93,7 +93,7 @@ test('visual style choice and reduced motion are exposed to user settings',async
  const app=fs.readFileSync(new URL('../js/app.js',import.meta.url),'utf8');
  const css=fs.readFileSync(new URL('../css/app.css',import.meta.url),'utf8');
  assert.match(settings,/Inventory sprite style/);
- assert.match(settings,/tracker-sprite-style-change/);
+ assert.match(app,/tracker-sprite-style-change/);
  assert.match(app,/dataset.spriteStyle/);
  assert.match(css,/prefers-reduced-motion: reduce/);
  assert.match(css,/sprite-stack-direction-b/);
