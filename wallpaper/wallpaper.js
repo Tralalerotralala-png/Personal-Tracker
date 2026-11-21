@@ -5840,10 +5840,10 @@ function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
  const gap=Number.parseFloat(getComputedStyle(host).rowGap)||0;
  const budget=widgetFitBudget(body);
  const moreSize=more.getBoundingClientRect().height||24;
- let used=fixed+gap*2,visible=0;
+ let used=fixed+gap*2+moreSize,visible=0; // reserve actual overflow control height
  for(let i=0;i<rows.length;i++){
   const size=Math.max(25,rects[i])+gap;
-  if(visible>0&&used+size>budget)break;
+  if(used+size>budget)break;
   used+=size;visible++;
  }
  rows.forEach((row,i)=>{row.hidden=i>=visible;});
@@ -5851,7 +5851,7 @@ function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
  // Actual DOM dimensions include grid gaps, padding and type metrics that
  // estimates cannot predict exactly. Remove one full day when the whole card
  // would otherwise need internal scrolling. Never cut a row in half.
- while(visible>1&&Number.isFinite(body.clientHeight)&&body.clientHeight>0&&
+ while(visible>0&&Number.isFinite(body.clientHeight)&&body.clientHeight>0&&
        body.scrollHeight>body.clientHeight+1){
   visible--;
   rows[visible].hidden=true;
