@@ -468,6 +468,7 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
         page.locator(".media-editor input[type=text]").first.fill("Example Album")
         page.locator(".media-editor + .btn.primary").click()
+        page.locator(".media-case-albums .media-vinyl-record").wait_for(state="visible",timeout=10000)
         assert page.locator(".media-case-albums .media-vinyl-record").count()==1
         assert page.locator(".media-case-albums .media-case-disc").count()==0
         assert "mediaSleeveReveal" in page.locator(".media-case-albums .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
