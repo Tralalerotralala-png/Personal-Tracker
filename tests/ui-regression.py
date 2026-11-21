@@ -56,9 +56,9 @@ for width,height in [(390,844),(1280,900)]:
           const body=document.createElement('div');
           body.className='widget-body';compact.append(body);
           body.append(newDay);document.body.append(compact);
-          const before={oldChar:olderChar,b2:!!newDay.querySelector('.phrase-b2-panel'),
+          const before={oldChar:olderChar,b2:newDay.classList.contains('phrase-b2-panel'),
             speech:!!newDay.querySelector('.phrase-b2-pattern'),
-            turns:newDay.querySelectorAll('.phrase-b2-turn-head').length,
+            turns:[...newDay.querySelectorAll('.phrase-b2-turn-head')].filter(x=>!x.closest('[hidden]')).length,
             pinyin:!!newDay.querySelector('[lang="zh-Latn-pinyin"]'),
             replyHidden:!!newDay.querySelector('.phrase-b2-answer[hidden]')};
           const toggle=newDay.querySelector('.phrase-b2-toggle');
