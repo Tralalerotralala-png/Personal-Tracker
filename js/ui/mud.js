@@ -3,7 +3,7 @@
 import { h, replace, openSheet } from './dom.js';
 import { t, language } from './language.js';
 import { isNightAtLocation, moonPhaseSvg } from '../weather/moon-phase.js';
-import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg } from '../weather/sky-events.js';
+import { upcomingSkyEvents, skyEventOnDate, skyEventIconSvg, skyEventInformation } from '../weather/sky-events.js';
 import { skyLighting, dateKeyAt } from '../weather/environment.js';
 import { uvMeter, dayShort, dayLong, dayMonth, mudClass, mudBar, mudChip, summarySentence, localizedMudWhy, localizedWeather, localizedMudLabel } from './mud-format-v2.js';
 import { glyphSvg, weatherGlyph, weatherIconSvg } from './pixel-icon.js';
@@ -138,7 +138,14 @@ export function createMudView({ store, weather }) {
           h('strong', { class: 'wx-temperature' }, typeof temp === 'number' ? `${Math.round(temp)}°C` : `${number(raw.tmax, '°')} / ${number(raw.tmin, '°')}C`),
           h('span', { class: 'wx-condition' }, localizedWeather(g.text)),
           h('span', { class: 'hint' }, `${t('High')} ${number(raw.tmax, '°')} · ${t('Low')} ${number(raw.tmin, '°')}`))),
-      event?h('a',{class:'wx-event-banner',href:event.url,target:'_blank',rel:'noopener noreferrer',title:'Worldwide event — check local visibility'},
+      event?h('button',{class:'wx-event-banner',type:'button',title:'About this sky event; local visibility may vary',
+        onclick:()=>{
+          const info=skyEventInformation(event,language());
+          openSheet({title:language()==='es'?event.es:event.en,
+            body:h('div',{class:'sky-explanation'},
+              h('h3',{},language()==='es'?'Qué ocurre':'What is happening'),h('p',{},info.what),
+              h('h3',{},language()==='es'?'Qué podría significar':'What it might mean'),h('p',{},info.meaning))});
+        }},
         h('span',{class:'wx-event-symbol',html:skyEventIconSvg(event.kind)}),
         h('span',{},(language()==='es'?event.es:event.en)+' · '+(language()==='es'?'Visibilidad local sin confirmar':'Local visibility unverified'))):null,
       h('div', { class: 'wx-stats' },
@@ -200,10 +207,13 @@ export function createMudView({ store, weather }) {
           ? (es?'La visibilidad y el horario dependen de tu ubicación. Consulta el mapa antes de planear una observación.':'Visibility and timing depend on your location. Check the visibility map before planning to watch.')
           : kind==='moon'?(es?'La fecha de la fase lunar es aproximada.':'The moon phase date is approximate.')
           : (es?'Fecha aproximada del máximo. El horario y las condiciones del cielo pueden variar.':'Approximate peak date. Timing and sky conditions depend on your location.');
+        const details=skyEventInformation(event,language());
         return h('details',{class:'wx-sky-card'},
           h('summary',{},h('span',{class:'wx-event-symbol',html:kind==='moon'?moonPhaseSvg(new Date(event.date+'T12:00:00Z')):skyEventIconSvg(kind)}),
             h('span',{},event.date+' · '+(es?event.es:event.en))),
           h('p',{class:'hint'},info),
+          h('p',{class:'wx-sky-what'},details.what),
+          h('p',{class:'wx-sky-meaning'},details.meaning),
           h('p',{class:'wx-viewing-guide'},
             es?`Guía para ${place}: `:`Guide for ${place}: `,
             clouds===null?(es?'Sin datos actuales de nubes.':'No current cloud data.')
