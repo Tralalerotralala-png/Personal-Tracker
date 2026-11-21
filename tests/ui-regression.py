@@ -45,7 +45,7 @@ for width,height in [(390,844),(1280,900)]:
         }""")
         assert erased=={"items":0,"meta":0,"outbox":0},"Device erasure left cached data: "+str(erased)
         # Actual Chromium integration: forecast-only days, meter, current UV,
-        # and daily peak UV. A later unmetered event must not enter Coming Up.
+        # and daily peak UV. Unavailable later dates now carry estimated wetness.
         agenda_fit=page.evaluate("""async () => {
           const {mountWidget}=await import('./js/widgets/registry.js');
           const {todayKeyLocal,addDaysKey}=await import('./js/calendar/recurrence.js');
@@ -55,7 +55,7 @@ for width,height in [(390,844),(1280,900)]:
           const events=[
             {id:'one',title:'Forecast only today',starts_at:from+'T12:00:00',all_day:false},
             {id:'two',title:'Forecast only tomorrow',starts_at:tomorrow+'T12:00:00',all_day:false},
-            {id:'three',title:'Invisible without a wetness meter',starts_at:missing+'T12:00:00',all_day:false}
+            {id:'three',title:'Estimated final day',starts_at:missing+'T12:00:00',all_day:false}
           ];
           const store={list:async()=>events,subscribe:()=>()=>{}};
           const weather={
@@ -73,17 +73,38 @@ for width,height in [(390,844),(1280,900)]:
           const instance=mountWidget('calendar',body,{store,weather,interactive:true});
           await new Promise(resolve=>setTimeout(resolve,380));
           const labels=[...body.querySelectorAll('.w-cal-day')].map(x=>({
-            date:x.dataset.date,meter:!!x.querySelector('.mud-bar'),dailyUV:x.textContent.includes('Peak UV 8')
+            date:x.dataset.date,meter:!!x.querySelector('.mud-bar'),dailyUV:x.textContent.includes('Peak UV 8'),estimated:x.textContent.includes('Est.')
           }));
           const result={labels,uv:body.textContent.includes('UV index 5'),
-            unmetered:body.textContent.includes('Invisible without a wetness meter'),
+            estimated:body.textContent.includes('Estimated final day'),unavailable:body.textContent.includes('Unavailable'),
             height:body.clientHeight,scrollHeight:body.scrollHeight};
           instance.destroy();widget.remove();
           return result;
         }""")
-        assert len(agenda_fit["labels"])==2 and all(row["meter"] and row["dailyUV"] for row in agenda_fit["labels"]),agenda_fit
-        assert agenda_fit["uv"] and not agenda_fit["unmetered"],agenda_fit
+        assert len(agenda_fit["labels"])==3 and all(row["meter"] for row in agenda_fit["labels"]),agenda_fit
+        assert sum(row["dailyUV"] for row in agenda_fit["labels"])==2,agenda_fit
+        assert any(row["estimated"] for row in agenda_fit["labels"]),agenda_fit
+        assert agenda_fit["uv"] and agenda_fit["estimated"] and not agenda_fit["unavailable"],agenda_fit
         assert agenda_fit["scrollHeight"]<=agenda_fit["height"]+8,"Coming Up needed internal scroll: "+str(agenda_fit)
+        # A day-detail drawer renders both hourly rain and UV on one compact
+        # chart, and omits the UV curve if the model returns no UV values.
+        chart_result=page.evaluate("""async () => {
+          const {renderHourlyDay}=await import('./js/ui/day-hourly.js');
+          const rows=Array.from({length:24},(_,i)=>({
+            time:'2026-11-21T'+String(i).padStart(2,'0')+':00',
+            precipitation:i===14?0.5:0,probability:i===14?45:0,
+            uv_index:i>6&&i<19?Math.round((19-i)*(i-6)/4):0
+          }));
+          const a=renderHourlyDay(rows,'2026-11-21','America/Mexico_City');
+          const info={charts:a?.querySelectorAll('.day-hourly-chart').length||0,
+            rects:a?.querySelectorAll('.hourly-column').length||0,
+            uv:!!a?.textContent.includes('UV over the day')};
+          const empty=renderHourlyDay(rows.map(({uv_index,...x})=>x),'2026-11-21');
+          info.noUv=empty?.querySelectorAll('.day-hourly-chart').length===1;
+          return info;
+        }""")
+        assert chart_result=={"charts":2,"rects":48,"uv":True,"noUv":True},chart_result
+
         # Clicking celestial event opens local prose rather than a source-code
         # repository, on both mobile and desktop widget dimensions.
         sky_explanation=page.evaluate("""async () => {
