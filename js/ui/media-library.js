@@ -4,7 +4,6 @@ import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGamesView } from './games.js';
-import { ensureRequestedMedia, markRequestedMediaRemoved } from '../data/library-starter.js';
 import { mediaIcon, mediaAccent, mediaCollectionToolbar } from './media-art.js';
 const KEY='other_media_library_v1';
 const KINDS=['books','films','albums'];
@@ -30,10 +29,53 @@ export function createMediaLibraryView({store,backups=null}) {
     ?[...new Set(val.shelvesByKind[kind].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,60)))]:[];
   return next;
  }
- async function refreshCollection(){await ensureRequestedMedia(store);const val=await store.getSetting(KEY);data=normalizeData(val);}
+ async function refreshCollection(){const val=await store.getSetting(KEY);data=normalizeData(val);}
  const shelfNames=kind=>[...new Set([...data.shelvesByKind[kind],...list(kind).map(x=>x.shelf||'Collection')])];
  async function load(){await refreshCollection();await games.mount();render();}
- const save=async()=>{await store.setSetting(KEY,data);};
+ // Read and update the latest settings value INSIDE the store's serialized write.
+ // This prevents an old screen snapshot overwriting a fresh rating, journal or shelf.
+ async function commit(mutator){
+  const next=await store.updateSetting(KEY,raw=>{
+   const draft=normalizeData(raw);
+   mutator(draft);
+   return draft;
+  },{books:[],films:[],albums:[]});
+  data=normalizeData(next);
+  return data;
+ }
+ const localPagesKey=id=>'media-inner-pages:v1:'+id;
+ const pagesFor=async id=>{
+  if(!id)return [];
+  const value=await store.meta.get(localPagesKey(id));
+  return Array.isArray(value)?value.filter(page=>typeof page?.src==='string'&&
+    /^data:image\/(?:webp|png|jpeg);base64,/.test(page.src)).slice(0,8):[];
+ };
+ async function convertInteriorImage(file){
+  if(!['image/jpeg','image/png','image/webp'].includes(file?.type)||file.size>8*1024*1024)
+   throw Error(language()==='es'?'Usa PNG, JPG o WebP de menos de 8 MB.':'Use PNG, JPG or WebP under 8 MB.');
+  return new Promise((resolve,reject)=>{
+   const blob=URL.createObjectURL(file),img=new Image();
+   const release=()=>URL.revokeObjectURL(blob);
+   img.onerror=()=>{release();reject(Error('Cannot read this image.'));};
+   img.onload=()=>{
+    try{
+     const scale=Math.min(1,1100/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+     const canvas=document.createElement('canvas');
+     canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+     canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+     const ctx=canvas.getContext('2d');
+     if(!ctx)throw Error('Image conversion unavailable.');
+     ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+     ctx.drawImage(img,0,0,canvas.width,canvas.height);
+     let src=canvas.toDataURL('image/webp',.76);
+     if(src.length>520000)src=canvas.toDataURL('image/jpeg',.68);
+     if(src.length>520000)throw Error('Image is too detailed; please use a smaller image.');
+     resolve({id:uuid(),src,caption:''});
+    }catch(e){reject(e);}finally{release();}
+   };
+   img.src=blob;
+  });
+ }
  function cover(row){
   const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
   const fallback=()=>h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},
