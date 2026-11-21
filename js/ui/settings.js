@@ -6,6 +6,7 @@ import { openPersonalHub } from './personal-hub.js';
 import { RARITIES } from '../data/schema.js';
 import { DEFAULT_SETTINGS } from '../data/defaults.js';
 import { exportAll, importAll, inspectBackup, downloadBackup } from '../data/backup.js';
+import {exportPortableArchive, inspectPortableTar, restorePortableArchive, downloadPortableArchive} from '../data/portable-archive.js';
 import {legacyCacheExists,exportUnverifiedLegacyCache} from '../data/legacy-recovery.js';
 import {getSyncConflicts,exportSyncConflicts} from '../data/conflicts.js';
 import { openPlaceSearchSheet } from './place-search.js';
@@ -405,6 +406,56 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
       } }, 'Restore (merge)')),
     out);
 
+
+  // A portable TAR is an explicit, separate path from legacy structured JSON.
+  // Partial category exports say which media were included. All downloads are
+  // readable local files, so do not store them in public cloud drives.
+  const portableFile=h('input',{type:'file',accept:'.tar,application/x-tar','aria-label':'Portable TAR archive'});
+  const portableScope=h('select',{'aria-label':'Portable media categories'},[
+    ['all','All records, photos, game saves and local audio'],
+    ['photos','Records and photos only'],
+    ['games','Records and game saves only'],
+    ['audio','Records and local audio only'],
+    ['records','Records only (portable TAR)']
+  ].map(([value,name])=>h('option',{value},name)));
+  const portableStatus=h('p',{class:'prose',role:'status','aria-live':'polite'});
+  const portableExport=h('button',{class:'btn small primary',type:'button',onclick:async()=>{
+    if(!await confirmDialog({title:'Export private portable archive?',
+      message:'This TAR includes readable account records and selected files. It can contain private notes and financial records; protect it like a personal document. A full archive requires private media to be reachable.',
+      confirmLabel:'Create private TAR'}))return;
+    portableExport.disabled=true;portableStatus.textContent='Collecting and verifying selected private files…';
+    try{
+      const selected=portableScope.value;
+      const include={photos:['all','photos'].includes(selected),games:['all','games'].includes(selected),audio:['all','audio'].includes(selected)};
+      const result=await exportPortableArchive({store,photos:ctx.photos,gameBackups:ctx.gameBackups,include});
+      downloadPortableArchive(result.blob);
+      portableStatus.textContent='Archive ready: '+result.manifest.assets.length+' media files ('+Math.round(result.blob.size/1048576)+' MB). Keep it private.';
+    }catch(err){portableStatus.textContent='Portable backup failed: '+err.message;}
+    finally{portableExport.disabled=false;}
+  }},'Download portable TAR');
+  const portableRestore=h('button',{class:'btn small',type:'button',onclick:async()=>{
+    const file=portableFile.files?.[0];if(!file){portableStatus.textContent='Choose a portable TAR first.';return;}
+    portableRestore.disabled=true;portableStatus.textContent='Verifying every archived media chunk and record…';
+    try{
+      const inspected=await inspectPortableTar(file),manifest=inspected.manifest;
+      const total=Object.values(inspected.inspection.counts).reduce((s,n)=>s+n,0);
+      if(manifest.accountId!==(store.accountId||null))throw Error('Archive belongs to another account or storage mode.');
+      const categories=Object.entries(manifest.mediaCoverage||{}).filter(([,on])=>on).map(([name])=>name).join(', ')||'none';
+      const ok=await confirmDialog({title:'Review portable restore',
+        message:'This archive contains '+total+' records and '+manifest.assets.length+' checked media files. Included categories: '+categories+'. Existing newer records are kept. Media uploads may be difficult to undo if interrupted. A structured safety checkpoint will be downloaded before any changes.',
+        confirmLabel:'Download checkpoint and restore'});
+      if(!ok){portableStatus.textContent='Canceled: no changes were made.';return;}
+      downloadBackup(await exportAll(store),'personal-tracker-before-portable-restore-'+new Date().toISOString().slice(0,10)+'.json');
+      const done=await restorePortableArchive({store,client:ctx.client,archive:file,inspected});
+      portableStatus.textContent='Restore completed: '+done.summary.added+' records added, '+done.summary.updated+' updated; '+done.restored+' of '+done.files+' media files restored or already present.';
+    }catch(err){portableStatus.textContent='Portable restore stopped: '+err.message+' Keep the TAR for a safe retry.';}
+    finally{portableRestore.disabled=false;}
+  }},'Restore portable TAR (merge)');
+  const portable=h('section',{class:'set-block'},h('h3',{},'Portable backup with media'),
+    h('p',{class:'hint'},'Includes structured records and selected photos, local audio and private game saves. TAR assets are verified with SHA-256 checksums. Up to 150 MB per file and 512 MB per archive; choose a smaller category when needed. Exports never include Supabase login tokens. A missing file stops export instead of silently omitting it.'),
+    h('div',{class:'inline-actions'},portableScope,portableExport),
+    h('div',{class:'inline-actions'},portableFile,portableRestore),portableStatus);
+
   // -- install help
   const install = h('section', { class: 'set-block' },
     h('h3', {}, 'Install on your phone'),
@@ -458,7 +509,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     ['overview', 'Overview & weather', [mudBlock, clockSettings, analogBlock, feedBlock, layoutBlock, wallpaperBlock]],
     ['pack', 'Pack', [cats, rarity]],
     ['appearance', 'Appearance', [display, typography, navigation]],
-    ['data', 'Data & tools', [personalHub, backup]],
+    ['data', 'Data & tools', [personalHub, backup, portable]],
     ['diagnostics', 'Diagnostics', [diagnostics]],
   ];
   const selected = sessionStorage.getItem('tracker-settings-section') || 'general';

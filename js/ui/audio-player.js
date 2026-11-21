@@ -26,6 +26,33 @@ async function accountDbOp(name,mode,fn){
  const db=await openTracks(name);
  try{return await new Promise((resolve,reject)=>{const tx=db.transaction('tracks',mode),r=fn(tx.objectStore('tracks'));let result;r.onsuccess=()=>result=r.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}finally{db.close();}
 }
+// The archive tools use the exact same account-scoped IndexedDB as the player.
+export const readLocalAudio = accountId =>
+  accountDbOp('personal-tracker-local-music:'+accountId,'readonly',store=>store.getAll());
+export async function writeLocalAudio(accountId,record) {
+ if(!/^[0-9a-z-]{8,80}$/i.test(record?.id||'')||!record.name||
+    !(record.blob instanceof Blob)||record.blob.size>150*1024*1024)
+   throw Error('Invalid archived audio record');
+ const name='personal-tracker-local-music:'+accountId;
+ const existing=await accountDbOp(name,'readonly',store=>store.get(record.id));
+ if(existing) {
+  // Compare in bounded slices. Equal byte length alone does NOT mean equal
+  // content; silently treating those tracks as interchangeable loses data.
+  if(existing.blob.size!==record.blob.size)throw Error('Conflicting local audio track: '+record.name);
+  for(let offset=0;offset<record.blob.size;offset+=1024*1024){
+   const [a,b]=await Promise.all([
+    existing.blob.slice(offset,offset+1024*1024).arrayBuffer(),
+    record.blob.slice(offset,offset+1024*1024).arrayBuffer()
+   ]);
+   const left=new Uint8Array(a),right=new Uint8Array(b);
+   if(left.length!==right.length||left.some((v,i)=>v!==right[i]))
+    throw Error('Conflicting local audio track: '+record.name);
+  }
+  return false;
+ }
+ await accountDbOp(name,'readwrite',store=>store.add(record));
+ return true;
+}
 const time=s=>Number.isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'LIVE';
 export function createAudioPlayer({store}){
  const key=KEY+':'+(store.accountId||'local'),dbName='personal-tracker-local-music:'+(store.accountId||'local');
@@ -123,7 +150,9 @@ export function createAudioPlayer({store}){
  }
  launcher.onclick=()=>{expanded=true;prefs.expanded=true;savePrefs();place();};
  drawLibrary();refreshTransport();place();
- dbOp('readonly',s=>s.getAll()).then(rows=>{tracks=rows.sort((a,b)=>a.addedAt-b.addedAt);drawLibrary();}).catch(()=>showStatus(tr('Local music storage unavailable.','Almacenamiento local no disponible.')));
+ const refreshTracks=()=>dbOp('readonly',s=>s.getAll()).then(rows=>{tracks=rows.sort((a,b)=>a.addedAt-b.addedAt);drawLibrary();}).catch(()=>showStatus(tr('Local music storage unavailable.','Almacenamiento local no disponible.')));
+ window.addEventListener('tracker-audio-changed',refreshTracks);
+ refreshTracks();
  store.getSetting('location',null).then(p=>{if(!prefs.region&&p?.label){const parts=p.label.split(',').map(s=>s.trim());if(parts.length>=3)region.value=parts[1];}}).catch(()=>{});
  return {el:floating,mount(host){dockHost=host;place();return {destroy(){if(dockHost===host){dockHost=null;place();}}};},pause(){audio.pause();}};
 }

@@ -430,7 +430,7 @@ const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
   searchWrap, captureButton, h('span', { class: 'spacer' }), skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
-    onclick: () => openSettings({ ctx, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
+    onclick: () => openSettings({ ctx: {...ctx, photos, gameBackups}, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
 replace(root, h('a', { class: 'skip-link', href: '#main', onclick: e => { e.preventDefault(); main.focus(); } }, t('Skip to content')), header,
   store.adapter.kind==='memory'?h('div',{class:'temporary-storage-banner',role:'alert'},'Temporary device storage: changes may disappear after a refresh. Export a backup before leaving this page.'):null,

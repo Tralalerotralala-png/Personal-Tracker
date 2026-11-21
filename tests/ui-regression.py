@@ -88,6 +88,21 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         page.locator(".top .gear").click()
         page.locator("dialog.sheet[open]").wait_for(timeout=5000)
+        # Local-mode TAR export and merge roundtrip use only synthetic data.
+        page.locator(".settings-tabs button",has_text="Data & tools").click()
+        page.locator('select[aria-label="Portable media categories"]').select_option("records")
+        page.locator("button",has_text="Download portable TAR").click()
+        top=page.locator("dialog.sheet[open]").last
+        with page.expect_download(timeout=15000) as archive_download:
+            top.locator("button",has_text="Create private TAR").click()
+        archive=archive_download.value
+        assert archive.suggested_filename.endswith(".tar")
+        portable_path=archive.path()
+        page.locator('input[aria-label="Portable TAR archive"]').set_input_files(str(portable_path))
+        page.locator("button",has_text="Restore portable TAR").click()
+        top=page.locator("dialog.sheet[open]").last
+        top.locator("button",has_text="Download checkpoint and restore").click()
+        page.locator("p[role=status]").filter(has_text="Restore completed").first.wait_for(timeout=20000)
         page.keyboard.press("Escape")
         assert page.locator("dialog.sheet[open]").count()==0,"Settings dialog did not close"
         page.locator(".widget-expand").first.click()
