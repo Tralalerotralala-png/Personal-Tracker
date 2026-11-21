@@ -156,9 +156,24 @@ jobs:
             CREATE TYPE auth.factor_type AS ENUM ('totp','webauthn');
           EXCEPTION WHEN duplicate_object THEN NULL;
           END $enum$;
+          -- GoTrue's historical 20221208 migration contains the expression
+          -- "id = user_id::text", where this old fixture has uuid identities.
+          -- Add a disposable compatibility operator for migration only.
+          CREATE FUNCTION auth.tracker_ci_uuid_eq_text(a uuid,b text)
+          RETURNS boolean LANGUAGE sql IMMUTABLE STRICT SET search_path='' AS $op$
+            SELECT a::text=b;
+          $op$;
+          CREATE OPERATOR auth.= (
+            LEFTARG=uuid,RIGHTARG=text,
+            PROCEDURE=auth.tracker_ci_uuid_eq_text
+          );
           SQL
           docker run --rm --network host --env-file tests/fixtures/gotrue-ci.env \
             supabase/auth:v2.176.0 gotrue migrate
+          # This compatibility operator is only needed by an old one-off
+          # migration. Drop it so it cannot alter runtime comparison rules.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -c 'DROP OPERATOR auth.=(uuid,text); DROP FUNCTION auth.tracker_ci_uuid_eq_text(uuid,text)'
           # GoTrue queries identities and users without schema qualifiers. The
           # vanilla Postgres role defaults to public; unlike Supabase's managed
           # roles it needs an explicit auth-first search_path for its sessions.
