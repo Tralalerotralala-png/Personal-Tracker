@@ -2277,3 +2277,50 @@ button.w-analog-clock{cursor:pointer;}button.w-analog-clock:hover,button.w-analo
 }
 /* Manual widget expansion deliberately permits full details and scrolling. */
 .widget-expanded.wd-sky .w-sky-event-copy strong{white-space:normal;overflow:visible;}
+
+
+/* Shared stepped pixel depth across generated weather, lunar, sky-event and
+   planetary SVG icons. No blurry 3-D rotations or moving animation loops;
+   volume props still use their proper orthographic slice renderer. */
+svg[data-pixel-stack]{overflow:visible;shape-rendering:crispEdges;}
+svg[data-pixel-stack] .sprite-stack-echo{
+ pointer-events:none;filter:brightness(.43);opacity:.77;
+}
+svg[data-pixel-stack] .sprite-stack-echo-1{transform:translate(0,1px);opacity:.69;}
+svg[data-pixel-stack] .sprite-stack-echo-2{transform:translate(0,2px);opacity:.49;}
+svg[data-pixel-stack] .sprite-stack-echo-3{transform:translate(0,3px);opacity:.3;}
+svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-fog-layer,.wx-snow-flake,.wx-lightning,.celestial-corona){
+ animation:none!important;
+}
+:root[data-sprite-style="flat"] svg[data-pixel-stack] .sprite-stack-echo{display:none!important;}
+
+/* Seven forecast cards: when the widget is narrow, preserve legible labels. */
+.widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(7,minmax(0,1fr));}
+@container widget (max-width:650px){
+ .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));}
+}
+@container widget (max-width:330px){
+ .widget.wd-mud .w-forecast-cards{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));}
+}
+.widget.wd-calendar .w-cal-estimated{font-size:.61rem;line-height:1.1;color:var(--warn);font-weight:600;}
+.day-weather-summary .day-weather-explanation{max-width:100%;}
+
+/* Side-drawer daily rain and UV histories fit narrow phones and 460px desktop
+   drawers as compact bar tracks, without hiding data in another scroll pane. */
+.day-hourly-host:empty{display:none;}
+.day-hourly-panel{margin:8px 0 12px;display:grid;gap:7px;min-width:0;}
+.day-hourly-panel>.detail-h{margin:0 0 2px;}
+.day-hourly-grid{display:grid;gap:9px;min-width:0;}
+.day-hourly-chart{display:grid;gap:2px;padding:6px;background:var(--panel-2);border:1px solid var(--edge);min-width:0;}
+.day-hourly-chart h4{font-size:.8rem;font-weight:600;margin:0;}
+.day-hourly-chart small{font-size:.68rem;line-height:1.25;}
+.day-hourly-svg{display:block;min-width:0;overflow:hidden;}
+.day-hourly-svg svg{display:block;max-width:100%;width:100%;height:auto;min-height:78px;overflow:visible;}
+.day-hourly-svg svg text{font-size:8px;fill:var(--ink-dim);}
+.day-hourly-svg .hourly-column.elapsed{fill:var(--accent);}
+.day-hourly-svg .hourly-column.upcoming{fill:var(--ink-dim);opacity:.66;}
+.day-hourly-svg .hourly-column{stroke:var(--edge);stroke-width:.5px;}
+@media(min-width:670px){
+ dialog.sheet:not(.small) .day-hourly-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+ dialog.sheet:not(.small) .day-hourly-svg svg{min-height:64px;}
+}
