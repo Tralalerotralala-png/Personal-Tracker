@@ -61,6 +61,7 @@ export function createOverviewView({ store, ctx }) {
 
   return {
     el,
+    showAfterMount: false,
     async mount() { await render(); },
     async show() { await render(); },
     hide() { clear(); },
