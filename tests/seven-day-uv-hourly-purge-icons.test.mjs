@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {forecastAgendaDays} from '../js/widgets/fit.js';
 import {hourlyDayRows,localHourKey} from '../js/ui/day-hourly.js';
@@ -101,4 +102,18 @@ test('structured exports and imports cannot resurrect the legacy encrypted journ
  await purgeLegacyJournalCache(adapter);
  await importAll(store,oldCopy);
  assert.equal(await store.getSetting(OLD_JOURNAL_KEY,null),null);
+});
+
+test('modern app launcher icon uses a crisp stacked silhouette with PNG fallback',()=>{
+ const svg=readFileSync(new URL('../icons/pixel-stack.svg',import.meta.url),'utf8');
+ const manifest=JSON.parse(readFileSync(new URL('../manifest.webmanifest',import.meta.url),'utf8'));
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
+ assert.match(svg,/shape-rendering="crispEdges"/);
+ assert.match(svg,/translate\(8 8\)/);
+ assert.match(svg,/translate\(4 4\)/);
+ assert.ok(manifest.icons.some(x=>x.src==='icons/pixel-stack.svg'&&x.sizes==='any'));
+ assert.ok(manifest.icons.some(x=>x.type==='image/png'));
+ assert.match(html,/icons\/pixel-stack\.svg/);
+ assert.match(sw,/icons\/pixel-stack\.svg/);
 });
