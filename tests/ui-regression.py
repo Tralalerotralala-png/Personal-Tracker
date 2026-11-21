@@ -438,7 +438,19 @@ for width,height in [(390,844),(1280,900)]:
         assert game_toolbar.locator(".media-collection-actions button").count()==3
         game_action_names=[x.strip() for x in game_toolbar.locator(".media-collection-actions button").all_inner_texts()]
         assert game_action_names==["Cover grid","New shelf","Add game"],game_action_names
-        assert game_toolbar.locator(".media-pixel-icon svg.sprite-stacked-asset").count()>=1
+        assert game_toolbar.locator(".media-collection-title").count()==0
+        assert game_toolbar.locator(".media-pixel-icon").count()==0
+        icons=page.locator(".media-category-tabs .media-pixel-icon svg.sprite-stacked-asset")
+        assert icons.count()==4
+        assert icons.first.evaluate("""el=>{
+          const t=getComputedStyle(el).transform;
+          if(t==='none')return true;
+          const m=new DOMMatrix(t);
+          return Math.abs(m.m11-1)<.001&&Math.abs(m.m22-1)<.001&&
+                 Math.abs(m.m33-1)<.001&&Math.abs(m.m41)<.001&&Math.abs(m.m42)<.001;
+        }""")
+        actions_bounds=game_toolbar.locator(".media-collection-actions").bounding_box()
+        assert abs((actions_bounds["x"]+actions_bounds["width"])-(game_bounds["x"]+game_bounds["width"]))<=4,(game_bounds,actions_bounds)
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         books_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
         books_toolbar.wait_for(state="visible",timeout=10000)
@@ -468,6 +480,8 @@ for width,height in [(390,844),(1280,900)]:
         series_card.wait_for(state="visible",timeout=10000)
         series_card.click()
         assert page.locator(".media-case-films .media-case-disc").count()==1
+        assert page.locator(".media-case-films .media-case-disc").evaluate(
+            "(el)=>getComputedStyle(el,'::before').content")!='"none"'
         assert "mediaOpticalDiscReveal" in page.locator(".media-case-films .media-case-disc").evaluate("(el)=>getComputedStyle(el).animationName")
         assert "mediaDvdCoverReveal" in page.locator(".media-case-films .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()

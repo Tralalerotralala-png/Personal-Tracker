@@ -1,7 +1,6 @@
 // Shared code-only catalogue artwork; uses the existing voxel/pixel-stack
 // renderer. No image APIs, remote assets, user-provided SVG, or personal data.
 import { h } from './dom.js';
-import { language as importedLanguage } from './language.js';
 import { hash32 } from './pixel-icon.js';
 import { renderLayeredSprite } from './sprite-stack.js';
 
@@ -31,7 +30,7 @@ export function mediaIconSvg(kind='books',seed=kind){
  const colors=PALETTES[hash32(seed)%PALETTES.length];
  const shape=SHAPES[kind]||SHAPES.books;
  const grid=shape.map(row=>[...row].map(ch=>ch==='.'?null:colors[ch.charCodeAt(0)-65]));
- const svg=renderLayeredSprite(grid,{depth:3,angle:-37,hoverAngle:31,squash:.77,spacing:1});
+ const svg=renderLayeredSprite(grid,{depth:3,angle:0,hoverAngle:35,squash:1,spacing:1});
  cache.set(key,svg);
  return svg;
 }
@@ -41,13 +40,12 @@ export const mediaIcon=(kind,seed=kind)=>h('span',{
 
 // One toolbar owns the geometry and button order for ALL media categories.
 // Each controller provides its own save/new-shelf handlers; presentation never diverges.
-export function mediaCollectionToolbar({kind,title,count,viewLabel,newShelfLabel,addLabel,onToggle,onNewShelf,onAdd}){
+export function mediaCollectionToolbar({viewLabel,newShelfLabel,addLabel,onToggle,onNewShelf,onAdd}){
  const action=(label,onClick,primary=false)=>h('button',{
   class:'btn '+(primary?'primary':'small'),type:'button',onclick:onClick
  },label);
- return h('div',{class:'media-collection-toolbar'},
-  h('div',{class:'media-collection-title'},mediaIcon(kind),
-   h('div',{},h('h2',{},title),h('small',{},String(count)+' '+(importedLanguage()==='es'?'títulos':'titles')))),
+ // All four categories share exactly this compact, right-aligned action row.
+ return h('div',{class:'media-collection-toolbar media-collection-toolbar-compact'},
   h('div',{class:'media-collection-actions'},
    action(viewLabel,onToggle),
    action(newShelfLabel,onNewShelf),

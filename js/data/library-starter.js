@@ -5,8 +5,8 @@ import { uuid } from './util.js';
 export const MEDIA_LIBRARY_KEY='other_media_library_v1';
 const TOMBSTONES='media_requested_removed_v1';
 export const REQUESTED_MEDIA=Object.freeze({
- books:{title:'Johnny the Homicidal Maniac',creator:'Jhonen Vasquez',mediaType:'comic',status:'To read',shelf:'Comics',notes:'Comic series by Jhonen Vasquez.'},
- films:{title:'Invader Zim',creator:'Jhonen Vasquez',mediaType:'series',status:'To watch',shelf:'TV series',notes:'Animated television series by Jhonen Vasquez.'}
+ books:{title:'Johnny the Homicidal Maniac',creator:'Jhonen Vasquez',mediaType:'comic',status:'To read',shelf:'Comics',notes:'Comic series by Jhonen Vasquez.',cover:'https://freshcomics.s3.amazonaws.com/issue_covers/JAN161034.jpg'},
+ films:{title:'Invader Zim',creator:'Jhonen Vasquez',mediaType:'series',status:'To watch',shelf:'TV series',notes:'Animated television series by Jhonen Vasquez.',cover:'https://bingeddata.s3.amazonaws.com/uploads/2021/01/h9T3oTwclpHP13BeutA7wQjEC4r.jpg'}
 });
 const normalizeTitle=title=>String(title||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase();
 const keyFor=(kind,title)=>kind+':'+normalizeTitle(title);
@@ -29,9 +29,19 @@ export async function ensureRequestedMedia(store){
   next[kind]=Array.isArray(saved?.[kind])?[...saved[kind]]:[];
  let added=false;
  for(const [kind,entry] of Object.entries(REQUESTED_MEDIA)){
-  if(removed?.[keyFor(kind,entry.title)]||
-    next[kind].some(x=>normalizeTitle(x.title)===normalizeTitle(entry.title)))continue;
-  next[kind].push({id:uuid(),...entry,cover:'',rating:null,journal:[]});
+  if(removed?.[keyFor(kind,entry.title)])continue;
+  const existing=next[kind].find(x=>normalizeTitle(x.title)===normalizeTitle(entry.title));
+  if(existing){
+   // Only backfill genuinely missing cover art; preserve custom covers, notes,
+   // shelf/status edits and account-synced records.
+   if(!String(existing.cover||'').trim()){
+    const index=next[kind].indexOf(existing);
+    next[kind][index]={...existing,cover:entry.cover};
+    added=true;
+   }
+   continue;
+  }
+  next[kind].push({id:uuid(),...entry,rating:null,journal:[]});
   added=true;
  }
  if(added)await store.setSetting(MEDIA_LIBRARY_KEY,next);

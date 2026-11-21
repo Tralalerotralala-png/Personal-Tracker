@@ -34,9 +34,14 @@ export function createMediaLibraryView({store,backups=null}) {
  const shelfNames=kind=>[...new Set([...data.shelvesByKind[kind],...list(kind).map(x=>x.shelf||'Collection')])];
  async function load(){await refreshCollection();await games.mount();render();}
  const save=async()=>{await store.setSetting(KEY,data);};
- function cover(row){const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
-  return row.cover&&(/^(https:\/\/|data:image\/)/i.test(row.cover))?h('img',{src:row.cover,alt:row.title,loading:'lazy',referrerpolicy:'no-referrer'}):
-   h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},mediaIcon(kind,row.title),h('span',{class:'media-cover-caption'},row.title));}
+ function cover(row){
+  const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
+  const fallback=()=>h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},
+   mediaIcon(kind,row.title),h('span',{class:'media-cover-caption'},row.title));
+  return row.cover&&(/^(https:\/\/|data:image\/)/i.test(row.cover))
+   ?h('img',{src:row.cover,alt:row.title,loading:'lazy',referrerpolicy:'no-referrer',
+      onerror:e=>e.currentTarget.replaceWith(fallback())}):fallback();
+ }
  function back(){if(dirty&&!confirm(language()==='es'?'¿Descartar cambios sin guardar?':'Discard unsaved changes?'))return;dirty=false;page=null;render();}
  function show(entry=null,editing=false){page={entry,editing};render();}
  function edit(entry){page={entry,editing:true};render();}

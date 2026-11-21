@@ -34,6 +34,29 @@ test('media library repairs legacy missing titles, without touching existing ent
  assert.equal((await store.getSetting('other_media_library_v1')).films.length,0);
 });
 
+test('external cover art is seeded and only missing covers are repaired',async()=>{
+ const store=createStore({adapter:createMemoryAdapter()});
+ const comic='Johnny the Homicidal Maniac',series='Invader Zim';
+ await store.setSetting('other_media_library_v1',{
+  books:[{id:'comic1',title:comic,notes:'do not replace',cover:'',shelf:'Private shelf'}],
+  films:[{id:'series1',title:series,cover:'https://example.com/custom.jpg',status:'Watched'}],
+  albums:[]
+ });
+ assert.equal(await ensureRequestedMedia(store),true);
+ const saved=await store.getSetting('other_media_library_v1');
+ assert.equal(saved.books.length,1);
+ assert.equal(saved.films.length,1);
+ assert.equal(saved.books[0].id,'comic1');
+ assert.equal(saved.books[0].notes,'do not replace');
+ assert.equal(saved.books[0].shelf,'Private shelf');
+ assert.equal(saved.books[0].cover,REQUESTED_MEDIA.books.cover);
+ assert.equal(saved.films[0].cover,'https://example.com/custom.jpg');
+ assert.equal(saved.films[0].status,'Watched');
+ assert.ok(REQUESTED_MEDIA.books.cover.startsWith('https://'));
+ assert.ok(REQUESTED_MEDIA.films.cover.startsWith('https://'));
+ assert.equal(await ensureRequestedMedia(store),false);
+});
+
 test('pixel-stacked catalogue artwork is deterministic, safely generated and category-specific',()=>{
  for(const kind of ['games','books','comic','films','series','albums']){
   const svg=mediaIconSvg(kind,'Sample title');
@@ -57,7 +80,7 @@ test('all categories use the exact same three-action component and category shel
   assert.match(file,/onToggle:/);
   assert.match(file,/onAdd:/);
  }
- assert.equal((helper.match(/class:'media-collection-toolbar'/g)||[]).length,1);
+ assert.equal((helper.match(/class:'media-collection-toolbar media-collection-toolbar-compact'/g)||[]).length,1);
  assert.equal((helper.match(/class:'media-collection-actions'/g)||[]).length,1);
  assert.match(helper,/action\(viewLabel,onToggle\)/);
  assert.match(helper,/action\(newShelfLabel,onNewShelf\)/);
@@ -69,6 +92,15 @@ test('all categories use the exact same three-action component and category shel
  assert.match(dom,/\{transition=true\}=\{\}/);
  assert.match(dom,/!transition\|\|reduced\(\)/);
  assert.match(media,/media-case-/);
+ assert.match(media,/onerror:e=>e\.currentTarget\.replaceWith\(fallback\(\)\)/);
+ assert.doesNotMatch(helper,/media-collection-title/);
+ assert.match(helper,/class:'media-collection-toolbar media-collection-toolbar-compact'/);
+ assert.match(helper,/angle:0,hoverAngle:35/);
+ assert.match(css,/\@keyframes mediaTabTumble/);
+ assert.match(css,/\@keyframes mediaCoverTumble/);
+ assert.match(css,/\.media-case-game \.media-case-disc::before/);
+ assert.match(css,/\.media-case-game \.media-case-disc::after/);
+ assert.match(css,/width:21%;height:21%/);
  assert.match(media,/media-vinyl-record/);
  assert.match(media,/media-comic-panel/);
  assert.match(css,/@keyframes mediaBookCover/);
