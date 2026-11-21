@@ -53,6 +53,22 @@ export function createGameBackupService({client, store}) {
       row.value?.path===value.path&&row.value?.[flag]===true))
       throw Error('Could not confirm game-backup deletion marker on the cloud server. The backup was not deliberately removed until this step completed.');
   }
+  // A successful Storage upload is not a complete backup until its metadata
+  // can be discovered from another signed-in device. Local setting writes
+  // only queue synchronization, so verify the same per-backup row in PostgREST.
+  async function confirmServerUploadIndex(uid,key,record){
+    const local=await store.get('settings',key);
+    if(!local||local.deleted_at)throw Error('Uploaded backup metadata is missing from this device.');
+    const {data,error}=await client.from('settings').upsert({
+      user_id:uid,key,value:record,created_at:local.created_at,
+      updated_at:local.updated_at,deleted_at:null
+    },{onConflict:'user_id,key'}).select('key,value');
+    if(error||!Array.isArray(data)||!data.some(row=>
+       row.key===key&&row.value?.id===record.id&&
+       row.value?.gameId===record.gameId&&row.value?.path===record.path&&
+       row.value?.hash===record.hash&&row.value?.size===record.size))
+      throw Error('Could not confirm the game backup index on Supabase.');
+  }
   async function listAll() {
     // The legacy shared array is read for backwards compatibility, but all new
     // uploads have their own setting key. Concurrent devices can then upload
@@ -108,11 +124,21 @@ export function createGameBackupService({client, store}) {
     if (error) throw new Error(`Backup upload failed: ${error.message}`);
     const rec = {id,gameId,path,name:cleanFilename(file.name),size:file.size,hash:checksum,
       createdAt:new Date().toISOString(),category:String(category).slice(0,40),notes:String(notes).slice(0,300)};
-    try {await store.setSetting(ENTRY_PREFIX + id, rec);}
-    catch (err) {
-      // Avoid orphaned objects when a metadata write cannot be saved.
-      await client.storage.from(GAME_BACKUP_BUCKET).remove([path]).catch(()=>{});
-      throw new Error('Backup uploaded but could not save its index. Please retry.');
+    const key=ENTRY_PREFIX + id;
+    try {await store.setSetting(key,rec);}
+    catch {
+      // Never destroy already-uploaded bytes after an indexing failure. The
+      // file remains under its opaque owner-scoped Storage path so the owner
+      // can recover it even if this device's IndexedDB quota is exhausted.
+      throw new Error('Save file uploaded but local indexing failed. The private Storage copy was retained; do not delete your original save. Check device storage and contact support with the upload time.');
+    }
+    try {await confirmServerUploadIndex(uid,key,rec);}
+    catch {
+      // A Storage upload succeeded but a subsequent API request did not.
+      // The local outbox will retry the index when connectivity returns.
+      // Do not report this as a fully cloud-confirmed backup, and do not
+      // delete the only uploaded copy while the index is in doubt.
+      throw new Error('Save file uploaded and indexed on this device, but the cloud index was not confirmed. Keep your original save and reconnect, then Sync before relying on this backup.');
     }
     return rec;
   }
