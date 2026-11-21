@@ -45,6 +45,13 @@ export function createMemoryAdapter() {
       if(row?.value?.path!==expectedPath)return false;
       s('meta').delete(key);return true;
     },
+    // A signed-photo download can finish after a newer replacement was
+    // selected. Do not overwrite an already cached newer offline photo.
+    async cachePhotoIfCurrent(id,path,dataUrl){
+      const item=s('items').get(id),key='photo:'+id,cached=s('meta').get(key);
+      if(item?.photo_path!==path||(cached?.value?.path&&cached.value.path!==path))return false;
+      s('meta').set(key,{key,value:{path,dataUrl}});return true;
+    },
     async clear(name) { s(name).clear(); },
     async putWithOutbox(name,value,entry) {
       s(name).set(keyOf(name,value),clone(value));
@@ -136,6 +143,19 @@ export async function openIdbAdapter(dbName) {
       req.onsuccess=()=>{
         if(req.result?.value?.path!==expectedPath){done(false);return;}
         store.delete(key);done(true);
+      };
+    }),
+    cachePhotoIfCurrent:(id,path,dataUrl)=>atomic(['items','meta'],(tx,done)=>{
+      const req=tx.objectStore('items').get(id),key='photo:'+id;
+      req.onsuccess=()=>{
+        if(req.result?.photo_path!==path){done(false);return;}
+        const meta=tx.objectStore('meta'),current=meta.get(key);
+        current.onsuccess=()=>{
+          if(current.result?.value?.path&&current.result.value.path!==path){
+            done(false);return;
+          }
+          meta.put({key,value:{path,dataUrl}});done(true);
+        };
       };
     }),
     applyRemoteRow:(table,row)=>atomic([table,'outbox','meta'],(tx,done)=>{
