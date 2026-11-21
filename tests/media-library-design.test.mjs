@@ -4,57 +4,39 @@ import { readFileSync } from 'node:fs';
 import { createStore } from '../js/data/store.js';
 import { createMemoryAdapter } from '../js/data/adapters.js';
 import { ensureRequestedMedia, markRequestedMediaRemoved, REQUESTED_MEDIA } from '../js/data/library-starter.js';
-import { mediaIconSvg, mediaAccent } from '../js/ui/media-art.js';
+import { mediaIconSvg, mediaAccent, mediaPixelGrid } from '../js/ui/media-art.js';
 
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
-test('media library repairs legacy missing titles, without touching existing entries or reviving deleted ones',async()=>{
+test('generic library startup does not seed personal media or alter saved account data',async()=>{
  const store=createStore({adapter:createMemoryAdapter()});
- const current={books:[{id:'existing',title:'My unrelated book',notes:'keep'}],films:[],albums:[]};
- await store.setSetting('other_media_library_v1',current);
- await store.setSetting('media_requested_additions_20261121',true);
- assert.equal(await ensureRequestedMedia(store),true);
- let next=await store.getSetting('other_media_library_v1');
- assert.deepEqual(next.books.map(x=>x.title),['My unrelated book',REQUESTED_MEDIA.books.title]);
- assert.deepEqual(next.films.map(x=>x.title),[REQUESTED_MEDIA.films.title]);
- assert.equal(next.books[0].notes,'keep');
- assert.equal(next.books[1].mediaType,'comic');
- assert.equal(next.films[0].mediaType,'series');
+ const existing={books:[{id:'b1',title:'Sample Book',rating:7.5,notes:'my note'}],
+  films:[{id:'f1',title:'Example Show',status:'Watched'}],albums:[]};
+ await store.setSetting('other_media_library_v1',existing);
+ assert.equal(Object.keys(REQUESTED_MEDIA).length,0);
  assert.equal(await ensureRequestedMedia(store),false);
- // An older synchronized library document can lose a title despite an old marker.
- next.films=[];
- await store.setSetting('other_media_library_v1',next);
- assert.equal(await ensureRequestedMedia(store),true);
- next=await store.getSetting('other_media_library_v1');
- assert.equal(next.films.length,1);
- await markRequestedMediaRemoved(store,'films',REQUESTED_MEDIA.films.title);
- next.films=[];
- await store.setSetting('other_media_library_v1',next);
- assert.equal(await ensureRequestedMedia(store),false);
- assert.equal((await store.getSetting('other_media_library_v1')).films.length,0);
+ assert.deepEqual(await store.getSetting('other_media_library_v1'),existing);
+ assert.equal(await markRequestedMediaRemoved(store,'books','Sample Book'),false);
 });
 
-test('external cover art is seeded and only missing covers are repaired',async()=>{
+test('serialized library edits retain simultaneous ratings, statuses and journal changes',async()=>{
  const store=createStore({adapter:createMemoryAdapter()});
- const comic='Johnny the Homicidal Maniac',series='Invader Zim';
- await store.setSetting('other_media_library_v1',{
-  books:[{id:'comic1',title:comic,notes:'do not replace',cover:'',shelf:'Private shelf'}],
-  films:[{id:'series1',title:series,cover:'https://example.com/custom.jpg',status:'Watched'}],
-  albums:[]
+ const key='other_media_library_v1';
+ await store.setSetting(key,{books:[],albums:[],films:[{id:'f1',title:'Example Show',rating:4,status:'To watch',notes:'keep',journal:[]}]});
+ const edit=(mutate)=>store.updateSetting(key,async draft=>{
+  await Promise.resolve();
+  const original=draft.films.find(x=>x.id==='f1');
+  mutate(original);
+  return draft;
  });
- assert.equal(await ensureRequestedMedia(store),true);
- const saved=await store.getSetting('other_media_library_v1');
- assert.equal(saved.books.length,1);
- assert.equal(saved.films.length,1);
- assert.equal(saved.books[0].id,'comic1');
- assert.equal(saved.books[0].notes,'do not replace');
- assert.equal(saved.books[0].shelf,'Private shelf');
- assert.equal(saved.books[0].cover,REQUESTED_MEDIA.books.cover);
- assert.equal(saved.films[0].cover,'https://example.com/custom.jpg');
- assert.equal(saved.films[0].status,'Watched');
- assert.ok(REQUESTED_MEDIA.books.cover.startsWith('https://'));
- assert.ok(REQUESTED_MEDIA.films.cover.startsWith('https://'));
- assert.equal(await ensureRequestedMedia(store),false);
+ await Promise.all([
+  edit(row=>{row.rating=8.5;}),
+  edit(row=>{row.status='Watched';}),
+  edit(row=>{row.journal.push({text:'test note'});})
+ ]);
+ const row=(await store.getSetting(key)).films[0];
+ assert.equal(row.rating,8.5);assert.equal(row.status,'Watched');
+ assert.equal(row.notes,'keep');assert.equal(row.journal.length,1);
 });
 
 test('pixel-stacked catalogue artwork is deterministic, safely generated and category-specific',()=>{
@@ -67,6 +49,11 @@ test('pixel-stacked catalogue artwork is deterministic, safely generated and cat
   assert.match(mediaAccent(kind),/^#[\da-f]{6}$/i);
  }
  assert.notEqual(mediaIconSvg('books','Sample title'),mediaIconSvg('albums','Sample title'));
+ const spindle=mediaPixelGrid('albums');
+ assert.equal(spindle[7][8],null,'Vinyl needs a visible center hole');
+ assert.equal(spindle[7][9],null);
+ assert.ok(mediaPixelGrid('films')[4].filter(Boolean).length>=14,'TV should look widescreen');
+ assert.match(mediaIconSvg('books'),/#102743/i,'Book needs navy cover');
  assert.doesNotMatch(mediaIconSvg('comic','<img onerror=alert(1)>'),/<img|onerror|script/i);
 });
 
@@ -101,6 +88,10 @@ test('all categories use the exact same three-action component and category shel
  assert.match(css,/\.media-case-game \.media-case-disc::before/);
  assert.match(css,/\.media-case-game \.media-case-disc::after/);
  assert.match(css,/width:21%;height:21%/);
+ assert.match(media,/store\.updateSetting|await commit\(/);
+ assert.match(media,/media-inner-spread/);
+ assert.match(media,/convertInteriorImage/);
+ assert.match(css,/\.media-inner-spread/);
  assert.match(media,/media-vinyl-record/);
  assert.match(media,/media-comic-panel/);
  assert.match(css,/@keyframes mediaBookCover/);
