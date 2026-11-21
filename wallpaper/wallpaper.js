@@ -2893,7 +2893,7 @@ const pairs = [
  ['Theme presets','Temas predefinidos'],
 
  ['Currency Converter','Convertidor de divisas'],['Add pair','Agregar par de monedas'],['Remove','Quitar'],['Swap','Invertir'],['Amount','Cantidad'],['Cached','En caché'],['Rate unavailable','Tipo de cambio no disponible'],['Last updated','Última actualización'],['Choose a place in the Weather tab.','Elige una ubicación en Clima.'],['kinds','tipos'],['lost','perdidos'],['legendary','legendarios'],['Drizzle','Llovizna'],['No weather data','Sin datos del clima'],['Logs','Registros'],
- ['Phrase of the day','Frase del día'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Clima'],['Calendar','Calendario'],['Feed','Noticias'],
+ ['Phrase of the day','Frase del día'],['Lost quests','Objetos perdidos'],['Dream Diary','Diario de sueños'],['Dreams','Sueños'],['Generate 16×16 icon','Generar icono de 16×16'],['General','General'],['Overview & weather','Inicio y clima'],['Appearance','Apariencia'],['Data & tools','Datos y herramientas'],['Overview','Inicio'],['Pack','Mochila'],['Mud','Clima'],['Calendar','Calendario'],['Feed','Noticias'],
  ['Settings','Configuración'],['Edit layout','Editar diseño'],['Weather','Clima'],['Games','Juegos'],['Game Library','Biblioteca de juegos'],['Clear','Despejado'],['Ground conditions','Condiciones del terreno'],['Mud conditions','Condiciones del terreno'],['Weather and mud','Clima y terreno'],['Tune the mud model','Ajustar el modelo del terreno'],['Observed','Observado'],['Forecast','Pronóstico'],['No big change expected.','No se esperan cambios importantes.'],['No rain over 3 days, soil is dry, drying well','Sin lluvia en los últimos 3 días; el suelo está seco y se está secando bien'],['Current conditions','Condiciones actuales'],
  ['Daily forecast','Pronóstico diario'],['Next six days','Próximos seis días'],['Feels like','Sensación térmica'],
  ['Humidity','Humedad'],['Wind','Viento'],['Rain today','Lluvia acumulada de hoy'],['Today','Hoy'],['Tomorrow','Mañana'],
@@ -5758,7 +5758,7 @@ const WIDGET_DEFS = {
   audio: { title:'Audio player', minW:4,minH:3,defaultW:5,defaultH:4,route:null,appOnly:true },
   mud:      { title: 'Weather',          minW: 3, minH: 2, defaultW: 6, defaultH: 3, route: 'mud' },
   calendar: { title: 'Coming up',             minW: 3, minH: 3, defaultW: 4, defaultH: 4, route: 'calendar' },
-  loot:     { title: 'Loot and lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
+  loot:     { title: 'Lost quests',  minW: 3, minH: 2, defaultW: 4, defaultH: 3, route: 'inventory' },
   feed:     { title: 'Headlines',             minW: 3, minH: 3, defaultW: 5, defaultH: 4, route: 'feed' },
   stats:    { title: 'Pack stats',            minW: 3, minH: 1, defaultW: 4, defaultH: 1, route: 'inventory' },
   // The clock is integrated into Weather on the dashboard; legacy wallpaper layouts retain it.
