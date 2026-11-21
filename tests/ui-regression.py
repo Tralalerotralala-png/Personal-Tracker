@@ -53,6 +53,26 @@ for width,height in [(390,844),(1280,900)]:
           return {stale,kept,current,empty:(await db.get('meta',key))===undefined};
         }""")
         assert photo_case=={"stale":False,"kept":"photo-B.webp","current":True,"empty":True},photo_case
+        # An older signed URL request must not overwrite a newly selected
+        # photo's cache in the real IndexedDB adapter.
+        download_cache=page.evaluate("""async () => {
+          const {openIdbAdapter}=await import('./js/data/adapters.js');
+          const db=await openIdbAdapter('tracker-regression-photo-cache');
+          await db.clear('items');await db.clear('meta');
+          const id='88888888-8888-4888-8888-888888888888';
+          await db.put('items',{id,photo_path:'old.webp'});
+          await db.put('meta',{key:'photo:'+id,value:{path:'new.webp',dataUrl:'data:new'}});
+          const blocked=await db.cachePhotoIfCurrent(id,'old.webp','data:stale');
+          const kept=(await db.get('meta','photo:'+id))?.value;
+          await db.put('items',{id,photo_path:'new.webp'});
+          const accepted=await db.cachePhotoIfCurrent(id,'new.webp','data:refresh');
+          const fresh=(await db.get('meta','photo:'+id))?.value;
+          return {blocked,kept,accepted,fresh};
+        }""")
+        assert download_cache=={
+          "blocked":False,"kept":{"path":"new.webp","dataUrl":"data:new"},
+          "accepted":True,"fresh":{"path":"new.webp","dataUrl":"data:refresh"}
+        },download_cache
         skip=page.locator(".skip-link")
         skip.focus()
         assert skip.bounding_box()["y"]>=0,"Keyboard skip link did not appear on focus"
