@@ -78,7 +78,23 @@ export function openHowScored({ weather, store }) {
 
 export function createMudView({ store, weather }) {
   const el = h('div', { class: 'view mud-view' });
-  let weatherTab='forecast', skyMap=null, skyPlaceKey='';
+  let weatherTab='forecast', skyMap=null, skyPlaceKey='', pendingDay=null;
+  let destroyed=false;
+  const onDayRequest=event=>{
+    const date=event.detail?.date;
+    if(typeof date!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return;
+    pendingDay=date;
+    weatherTab='forecast';
+    if(!el.hidden){render(weather.getState());openPendingDay();}
+  };
+  const openPendingDay=()=>{
+    if(!pendingDay||el.hidden)return;
+    const row=weather.getState().rows.find(r=>r.date===pendingDay);
+    if(!row)return;
+    pendingDay=null;
+    openDayDetail(row,weather);
+  };
+  window.addEventListener('tracker-weather-open-day',onDayRequest);
   function tabBar(){return h('div',{class:'hub-tabs weather-tabs'},...[["forecast",language()==='es'?'Pronóstico':'Forecast'],['sky',language()==='es'?'Mapa celeste':'Celestial map']].map(([id,label])=>h('button',{class:'btn small '+(weatherTab===id?'primary':''),type:'button',onclick:()=>{weatherTab=id;render(weather.getState());}},label)));}
 
   function placeHeader(state) {
@@ -293,13 +309,18 @@ export function createMudView({ store, weather }) {
         h('span', { class: 'hint' }, 'Weather data by ', h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener' }, 'Open-Meteo.com'))));
   }
 
-  weather.subscribe(render);
-  setInterval(()=>{if(weatherTab==='sky'&&skyMap?.isConnected&&!el.hidden&&document.visibilityState!=='hidden')skyMap.refreshSky?.();},60_000);
+  const unsubWeather=weather.subscribe(state=>{
+    if(destroyed)return;
+    render(state);
+    if(pendingDay)openPendingDay();
+  });
+  const skyTimer=setInterval(()=>{if(weatherTab==='sky'&&skyMap?.isConnected&&!el.hidden&&document.visibilityState!=='hidden')skyMap.refreshSky?.();},60_000);
   return {
     el,
     showAfterMount: false,
     async mount() { render(weather.getState()); await weather.refresh(); weather.loadHourly?.(); },
-    show() { render(weather.getState()); weather.loadHourly?.(); },
+    show() { render(weather.getState()); weather.loadHourly?.(); openPendingDay(); },
     hide() { skyMap?.stopSky?.(); },
+    destroy(){destroyed=true;unsubWeather?.();clearInterval(skyTimer);window.removeEventListener('tracker-weather-open-day',onDayRequest);skyMap?.stopSky?.();},
   };
 }
