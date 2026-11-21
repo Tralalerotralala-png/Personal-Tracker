@@ -2386,3 +2386,83 @@ svg[data-pixel-stack] .sprite-stack-echo :is(.wx-rain-drop,.wx-cloud-layer,.wx-f
  .widget.wd-phrase .phrase-b2-language .phrase-pronunciation{font-size:.63rem}
 }
 .phrase-history-row .phrase-history-topic{font-weight:600}
+
+
+/* City is the location of the CURRENT reading, not a separate tiny third
+   column. Never break city names midway through a word; allow one-line
+   ellipsis for exceptionally long place names. The full name remains in
+   the element title and accessible label. */
+.widget.wd-mud .w-mud-dashboard .w-weather-top{
+ grid-template-columns:minmax(0,1fr) minmax(245px,1.08fr);
+ column-gap:clamp(8px,1.8cqw,22px);
+}
+.widget.wd-mud .w-mud-dashboard .w-weather-now{
+ display:flex;flex-flow:row nowrap;align-items:center;justify-content:flex-start;
+ gap:clamp(5px,1cqw,11px);min-width:0;max-width:100%;overflow:hidden;
+}
+.widget.wd-mud .w-mud-dashboard .w-weather-now .w-weather-place{
+ display:inline-block!important;flex:0 1 auto;min-width:0;max-width:clamp(76px,17cqw,185px);
+ color:var(--accent);font-size:clamp(.72rem,1.4cqw,.92rem);
+ white-space:nowrap!important;word-break:normal!important;
+ overflow-wrap:normal!important;overflow:hidden;text-overflow:ellipsis;
+ line-height:1.35;
+}
+.widget.wd-mud .w-mud-dashboard .w-weather-reading{
+ min-width:0;flex:1 1 0;
+}
+.widget.wd-mud .w-mud-dashboard .w-weather-reading>span{
+ display:block;overflow-wrap:normal;word-break:normal;
+}
+@container widget (max-width:680px){
+ .widget.wd-mud .w-mud-dashboard .w-weather-top{grid-template-columns:minmax(0,1fr);}
+ .widget.wd-mud .w-mud-dashboard .w-weather-now{justify-content:flex-start;width:100%;}
+ .widget.wd-mud .w-mud-dashboard .w-weather-now .w-weather-place{max-width:clamp(84px,26cqw,190px);}
+}
+@container widget (max-height:165px){
+ .widget.wd-mud .w-mud-dashboard .w-weather-now .w-weather-place{display:inline-block!important;}
+}
+
+/* B2 translations and contextual word-by-word / phrase-chunk meanings.
+   Compact widgets show one localized meaning, with the full bilingual view
+   and touch-accessible gloss buttons in the details sheet. */
+.phrase-b2-actions{display:flex;flex-wrap:wrap;gap:6px 9px;align-items:center}
+.phrase-b2-literal{display:grid;gap:7px;min-width:0;
+ border:1px solid var(--edge);padding:9px;background:var(--panel-2);}
+.phrase-b2-literal-head{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.phrase-b2-literal-head strong{font-size:.8rem;color:var(--accent)}
+.phrase-b2-literal-head small{font-size:.66rem;color:var(--ink-dim)}
+.phrase-b2-literal-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.phrase-b2-literal-column{display:grid;align-content:start;gap:5px;min-width:0}
+.phrase-b2-literal-column>small{font-size:.65rem;color:var(--ink-dim);letter-spacing:.04em}
+.phrase-b2-literal-chips{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.phrase-b2-gloss-chip{display:inline-flex;min-height:27px;align-items:center;
+ color:var(--ink);background:var(--panel);border:1px solid var(--edge);
+ padding:3px 6px;font-size:.78rem;line-height:1.25;cursor:pointer;text-align:left}
+.phrase-b2-gloss-chip:hover,.phrase-b2-gloss-chip:focus-visible{
+ outline:1px solid var(--accent);color:var(--accent);border-color:var(--accent)}
+.phrase-b2-literal-note{padding:5px 7px;color:var(--ink);
+ background:var(--panel);font-size:.78rem;min-height:1.6em;line-height:1.45}
+.phrase-b2-translations{display:grid;gap:5px}
+.phrase-b2-translations p{margin:0;font-size:.79rem;line-height:1.4;color:var(--ink-dim)}
+.phrase-b2-translations strong,.phrase-b2-english strong{color:var(--accent);font-size:.7rem}
+.widget.wd-phrase .phrase-b2-literal{display:none}
+.widget.wd-phrase .phrase-b2-english{display:block!important;overflow:hidden;
+ display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ line-clamp:2;font-size:.72rem;line-height:1.35}
+@container (max-width:440px){
+ .widget.wd-phrase .phrase-b2-english{display:-webkit-box!important}
+}
+@media(max-width:650px){.phrase-b2-literal-columns{grid-template-columns:minmax(0,1fr)}}
+.phrase-history-row{grid-template-columns:minmax(94px,.7fr) minmax(0,1.7fr) minmax(0,1.45fr)}
+.phrase-history-row>.phrase-history-target,
+.phrase-history-row>.phrase-history-meaning{display:grid;align-content:start;gap:3px;min-width:0}
+.phrase-history-row .phrase-history-target>strong{color:var(--accent);font-size:.76rem}
+.phrase-history-row .phrase-history-target>span[lang="zh-Hans"]{font-size:.83rem}
+.phrase-history-row .phrase-history-target>span[lang="de"]{font-size:.76rem;color:var(--ink-dim)}
+.phrase-history-row .phrase-history-meaning>span{font-size:.78rem;line-height:1.35}
+.phrase-history-row .phrase-history-meaning>small{font-size:.7rem;color:var(--ink-dim);line-height:1.35}
+@media(max-width:650px){
+ .phrase-history-row{grid-template-columns:1fr minmax(0,2fr);gap:6px 10px}
+ .phrase-history-row>.phrase-history-target{grid-column:2;grid-row:1}
+ .phrase-history-row>.phrase-history-meaning{grid-column:1/-1;grid-row:2}
+}
