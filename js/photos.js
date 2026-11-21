@@ -117,9 +117,13 @@ export function createPhotos({ store, client }) {
       const itemId = q.key.slice('photoq:'.length);
       const cached = await store.meta.get(cacheKey(itemId));
       const item = await store.get('items', itemId);
-      // Skip (and drop) uploads that were replaced or whose item is gone.
+      // A replacement first saves the new photo cache and queue, then
+      // finishes updating the item record. If another retry runs in that
+      // interval, do NOT discard the new marker just because the item still
+      // refers to the previous image.
       if (!cached || !item || cached.path !== q.value.path || item.photo_path !== q.value.path) {
-        await store.adapter.deleteMetaIfPath(q.key,q.value.path);
+        if(!cached || !item || cached.path !== q.value.path)
+          await store.adapter.deleteMetaIfPath(q.key,q.value.path);
         continue;
       }
       try {
