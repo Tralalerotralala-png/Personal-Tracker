@@ -61,7 +61,12 @@ test('backup service versions uploads, verifies downloads, and deletes objects',
   download:async(p)=>({data:blobs.get(p),error:blobs.has(p)?null:{message:'Missing'}}),
   remove:async(paths)=>{paths.forEach(p=>blobs.delete(p));return {error:null}}
  };
- const client={auth:{getSession:async()=>({data:{session:{user:{id:user}}}})},storage:{from:(bucket)=>{assert.equal(bucket,GAME_BACKUP_BUCKET);return fileApi;}}};
+ const client={auth:{getSession:async()=>({data:{session:{user:{id:user}}}})},
+  storage:{from:(bucket)=>{assert.equal(bucket,GAME_BACKUP_BUCKET);return fileApi;}},
+  from:table=>{
+   assert.equal(table,'settings');
+   return {upsert:row=>({select:async()=>({data:[{key:row.key,value:row.value}],error:null})})};
+  }};
  const service=createGameBackupService({client,store});
  const file=new File(['hello save data'],'save.SAV',{type:'application/octet-stream'});
  const entry=await service.upload(game,file,{category:'Save',notes:'checkpoint'});
