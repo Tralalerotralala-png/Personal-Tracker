@@ -73,3 +73,24 @@ test('transaction CSV dedupe preserves distinct notes, repeat plans and delimite
  assert.equal(uniqueTransactionsForImport(rows).length,4);
  assert.equal(uniqueTransactionsForImport([common,common],[]).length,1);
 });
+
+test('CSV parser rejects malformed quoting instead of mutating financial values',()=>{
+ assert.deepEqual(parseCsv('date,title,notes\r\n2026-11-20,"A ""quoted"" title","Line one\nLine two"'),[
+  ['date','title','notes'],['2026-11-20','A "quoted" title','Line one\nLine two']
+ ]);
+ for(const malformed of [
+  'title,amount\nUnquoted"fragment,10',
+  'title,amount\n"Quoted"garbage,10',
+  'title,amount\n"Unclosed,10',
+ ])assert.throws(()=>parseCsv(malformed),/Invalid CSV|Unclosed CSV/);
+});
+
+test('finance CSV import rejects duplicate headers and unequal column counts',()=>{
+ for(const csv of [
+  'date,date,title,amount,currency\n2026-11-20,2026-11-20,Duplicate,5,USD',
+  'date,title,amount,currency\n2026-11-20,Missing,2',
+  'date,title,amount,currency\n2026-11-20,Extra,2,USD,extra',
+ ])assert.throws(()=>importTransactionsCsv(csv),/Duplicate CSV column|incorrect column count/);
+ const valid='\ufeffdate,title,amount,currency,notes\r\n2026-11-20,"Valid, comma",1,USD,"Two\r\nlines"';
+ assert.equal(importTransactionsCsv(valid)[0].body,'Two\r\nlines');
+});
