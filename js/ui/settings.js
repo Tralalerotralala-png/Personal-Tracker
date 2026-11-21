@@ -93,6 +93,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
         // the main account DB so a blocked delete cannot leave a partial wipe.
         await eraseLocalAudio(ctx.accountId);
         store.sync.stop();
+        await store.sync.whenIdle();
         await store.eraseDeviceCache();
         try{localStorage.removeItem('tracker-verified-owner:'+new URL(ctx.config.SUPABASE_URL).host);}catch{}
         await auth.signOut({scope:'local'});
