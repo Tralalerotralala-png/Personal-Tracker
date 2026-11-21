@@ -75,5 +75,12 @@ export function createGamesView({store,backups=null}){
  updateResults();replace(el,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(e.detail?.kind!=='game')return;const saved=await store.getSetting(KEY);if(!saved)return;const known=new Set(state.games.map(x=>x.id));state.games=[...state.games,...(Array.isArray(saved.games)?saved.games:[]).filter(x=>!known.has(x.id))];if(Array.isArray(saved.shelves))state.shelves=[...new Set([...state.shelves,...saved.shelves])];if(!page)render();});
- return {el,mount:load,show:render,hide:()=>{}};
+ return {el,mount:load,show:render,hide:()=>{},
+  openById(id){
+   const game=state.games.find(x=>x.id===id);
+   if(!game)return false;
+   page=null;dirty=false;query='';gameFilter='all';
+   detail(game);
+   return true;
+  }};
 }
