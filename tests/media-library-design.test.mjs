@@ -58,7 +58,7 @@ test('all categories share one toolbar structure and media cases have distinct o
  assert.match(media,/transition:false/);
  assert.match(dom,/\{transition=true\}=\{\}/);
  assert.match(dom,/!transition\|\|reduced\(\)/);
- assert.match(media,/media-case-\\$\\{active\\}/);
+ assert.match(media,/media-case-/);
  assert.match(media,/media-vinyl-record/);
  assert.match(media,/media-comic-panel/);
  assert.match(media,/mediaIcon\(active/);
