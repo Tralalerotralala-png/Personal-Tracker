@@ -68,6 +68,48 @@ for width,height in [(390,844),(1280,900)]:
         assert page.locator(".media-library-view .media-search-filters select").input_value()=="all"
         page.evaluate("location.hash='#overview'")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
+        # Search deep links must open the exact saved note and expense,
+        # not merely switch to the relevant section.
+        page.evaluate("""async () => {
+          const db=await new Promise((resolve,reject)=>{
+            const req=indexedDB.open('personal-tracker-local',1);
+            req.onsuccess=()=>resolve(req.result);
+            req.onerror=()=>reject(req.error);
+          });
+          const now=new Date().toISOString();
+          await new Promise((resolve,reject)=>{
+            const tx=db.transaction('settings','readwrite');
+            for(const [key,value] of [
+              ['hub_note:99999999-9999-4999-8999-999999999991',{title:'Unique test notebook',body:'Search deep-link test'}],
+              ['hub_expense:99999999-9999-4999-8999-999999999992',{title:'Unique test payment',amount:12,currency:'MXN',category:'Other',due:'2026-11-01',type:'expense'}],
+              ['game_library_v1',{games:[{id:'99999999-9999-4999-8999-999999999993',title:'Unique test game',platform:'PC',status:'Playing',shelf:'Backlog'}],shelves:['Backlog'],mode:'shelf'}]
+            ])tx.objectStore('settings').put({key,value,created_at:now,updated_at:now,deleted_at:null});
+            tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+          });
+          db.close();
+        }""")
+        page.locator(".pixel-search-toggle").click()
+        page.locator(".global-search-input").fill("Unique test notebook")
+        page.locator(".global-search-result").first.click()
+        page.locator("dialog.sheet[open] input").first.wait_for(timeout=10000)
+        assert page.locator("dialog.sheet[open] input").first.input_value()=="Unique test notebook"
+        page.keyboard.press("Escape")
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
+        page.locator(".pixel-search-toggle").click()
+        page.locator(".global-search-input").fill("Unique test payment")
+        page.locator(".global-search-result").first.click()
+        page.locator(".expense-editor input").first.wait_for(timeout=10000)
+        assert page.locator(".expense-editor input").first.input_value()=="Unique test payment"
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
+        page.locator(".pixel-search-toggle").click()
+        page.locator(".global-search-input").fill("Unique test game")
+        page.locator(".global-search-result").first.click()
+        page.locator(".game-detail").first.wait_for(timeout=10000)
+        assert "Unique test game" in page.locator(".games-view").inner_text()
+        page.evaluate("location.hash='#overview'")
+        page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # The decrypted private journal must close on navigation, not merely
         # disappear visually while its plaintext remains in memory.
         page.evaluate("location.hash='#diary'")
