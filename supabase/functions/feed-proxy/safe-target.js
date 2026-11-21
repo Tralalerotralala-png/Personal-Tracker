@@ -1,10 +1,10 @@
 // Pure host/address rules shared by the Edge proxy and offline security tests.
 // The Edge handler must ALSO pin checked addresses to its socket lookup.
 export function blockedHost(host) {
- const h=host.toLowerCase().replace(/\\.$/,'').replace(/^\\[|\\]$/g,'');
+ const h=host.toLowerCase().replace(/\.$/,'').replace(/^\[|\]$/g,'');
  if(!h||h==='localhost'||h.endsWith('.localhost')||h.endsWith('.local')||
     h.endsWith('.internal')||h.endsWith('.test')||h.endsWith('.invalid'))return true;
- if(h.includes(':')||/^\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(h)||/^0x/i.test(h)||
+ if(h.includes(':')||/^\d+\.\d+\.\d+\.\d+$/.test(h)||/^0x/i.test(h)||
     !/^[a-z0-9.-]+$/.test(h)||!h.includes('.'))return true;
  return false;
 }
