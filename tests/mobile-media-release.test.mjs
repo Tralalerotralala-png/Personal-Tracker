@@ -20,9 +20,12 @@ test('fog and clouds have movable inner layers and honor reduced motion',()=>{
   assert.match(css,/@keyframes ptFogDrift/);
   assert.match(css,/prefers-reduced-motion:reduce/);
 });
-test('media have original case animation and search/status filters',()=>{
-  assert.match(css,/@keyframes ptCaseOpen/);
-  assert.match(css,/@keyframes ptDiscSlide/);
+test('media use improved DVD, book and vinyl cases with no legacy flat disc effects',()=>{
+  assert.match(css,/@keyframes mediaDvdCoverReveal/);
+  assert.match(css,/@keyframes mediaOpticalDiscReveal/);
+  assert.match(css,/@keyframes mediaBookCover/);
+  assert.match(css,/@keyframes mediaVinylReveal/);
+  assert.doesNotMatch(css,/@keyframes pt(?:CaseOpen|BookOpen|DiscSlide|GameDiscSlide)/);
   assert.match(games,/media-case-game/);
   assert.match(media,/media-case-\$\{active\}/);
   assert.match(games,/game-filter-results/);
