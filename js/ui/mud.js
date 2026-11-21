@@ -197,7 +197,7 @@ export function createMudView({ store, weather }) {
   function skyPanel(state) {
     const events=upcomingSkyEvents(new Date(),6);
     return h('details',{class:'wx-sky-events'},h('summary',{},t('Upcoming sky events')+` (${events.length})`),
-      h('p',{class:'wx-history-note'},t('Dates are approximate. Visibility at your location is not guaranteed; check the source before planning.')),
+
       ...events.map(event=>{
         const exact=skyEventOnDate(event.date);
         const kind=event.kind==='moon'?'moon':exact?.kind||'meteor';
@@ -220,11 +220,12 @@ export function createMudView({ store, weather }) {
             es?`Guía para ${place}: `:`Guide for ${place}: `,
             clouds===null?(es?'Sin datos actuales de nubes.':'No current cloud data.')
               : (es?`Nubosidad actual: ${clouds}%. `:`Current cloud cover: ${clouds}%. `),
-            isNear?(es?'Consulta las condiciones esta noche y busca un lugar oscuro con el horizonte despejado.':'Check conditions tonight and choose a dark location with a clear horizon.')
-              : (es?'El cielo puede cambiar antes del evento.':'Clouds may change before the event.'),
+            isNear?(es?'Busca un lugar oscuro con horizonte despejado.':'Choose a dark location with a clear horizon.')
+              : null,
             ' ',
-            es?'La dirección exacta, el horario máximo y la visibilidad deben verificarse en la fuente.':'Confirm viewing direction, peak time, and local visibility with the event source.'),
-          h('p',{class:'hint'},es?'No se supone que un eclipse sea visible desde este lugar.':'An eclipse is not assumed visible from this location.'),
+            (kind==='solar_eclipse'||kind==='lunar_eclipse')?(es?'Consulta la ruta de visibilidad.':'Check the visibility path.'):null),
+          (kind==='solar_eclipse'||kind==='lunar_eclipse')
+            ? h('p',{class:'hint'},es?'La trayectoria determina dónde será visible el eclipse.':'Eclipse visibility depends on the event path.'):null,
           h('a',{href:event.url,target:'_blank',rel:'noopener noreferrer'},es?'Consultar fuente y visibilidad':'Check source and visibility'));
       }));
   }
