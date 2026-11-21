@@ -77,19 +77,41 @@ export function calculateBill({subtotal=0,taxPercent=0,tipPercent=0,people=1}={}
   const taxAmount=round(price*tax/100), tipAmount=round(price*tip/100), total=round(price+taxAmount+tipAmount);
   return {taxAmount,tipAmount,total,perPerson:round(total/parties),people:parties};
 }
-// CSV parser supports quoted multiline values and escaped double quotes.
+// Strict CSV parser: quoted multiline fields and escaped double quotes are
+// allowed; stray quotes outside quoted fields must never silently change the
+// meaning of financial records.
 export function parseCsv(content) {
-  if (content.length>2_000_000) throw new Error('CSV too large');
-  const rows=[]; let row=[],cell='',quoted=false;
+  if (typeof content!=='string'||content.length>2_000_000) throw new Error('CSV too large or invalid');
+  const rows=[];let row=[],cell='',state='start';
+  const cellEnd=()=>{row.push(cell);cell='';state='start';};
+  const rowEnd=()=>{cellEnd();if(row.some(value=>value.trim()))rows.push(row);row=[];};
   for(let i=0;i<content.length;i++){
     const ch=content[i];
-    if(ch==='"'){if(quoted && content[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}
-    else if(ch===','&&!quoted){row.push(cell);cell='';}
-    else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&content[i+1]==='\n')i++;row.push(cell);if(row.some(v=>v.trim()))rows.push(row);row=[];cell='';}
-    else cell+=ch;
+    if(state==='quoted'){
+      if(ch==='"'){
+        if(content[i+1]==='"'){cell+='"';i++;}
+        else state='afterQuote';
+      }else cell+=ch;
+      continue;
+    }
+    if(ch===','){cellEnd();continue;}
+    if(ch==='\n'||ch==='\r'){
+      if(ch==='\r'&&content[i+1]==='\n')i++;
+      rowEnd();continue;
+    }
+    if(state==='afterQuote'){
+      // Ordinary spreadsheet exports may add whitespace after a closing quote.
+      if(ch===' '||ch==='\t')continue;
+      throw new Error('Invalid CSV characters after quoted field');
+    }
+    if(ch==='"'){
+      if(state!=='start')throw new Error('Invalid CSV quote in unquoted field');
+      state='quoted';continue;
+    }
+    cell+=ch;state='plain';
   }
-  if(quoted)throw new Error('Unclosed CSV quote');
-  row.push(cell);if(row.some(v=>v.trim()))rows.push(row);
+  if(state==='quoted')throw new Error('Unclosed CSV quote');
+  rowEnd();
   return rows;
 }
 const csvCell = value => {let v=String(value??''); if(/^[\s]*[=+@-]/.test(v))v="'"+v;return `"${v.replaceAll('"','""')}"`;};
@@ -99,10 +121,12 @@ export function exportTransactionsCsv(entries) {
 }
 export function importTransactionsCsv(text) {
   const rows=parseCsv(text);if(!rows.length)return [];
-  const header=rows.shift().map(x=>x.trim().toLowerCase());
+  const header=rows.shift().map(x=>x.trim().toLowerCase().replace(/^\ufeff/,''));
+  if(new Set(header).size!==header.length)throw new Error('Duplicate CSV column name');
   const must=['date','title','amount','currency'];for(const name of must)if(!header.includes(name))throw new Error(`Missing CSV column: ${name}`);
   if(rows.length>250)throw new Error('Import limited to 250 records at a time');
   return rows.map((cols,i)=>{
+    if(cols.length!==header.length)throw new Error(`Invalid row ${i+2}: incorrect column count`);
     const obj=Object.fromEntries(header.map((key,index)=>[key,cols[index]||'']));
     const amount=Number(obj.amount);
     const rawType=String(obj.type||'').trim().toLowerCase();
