@@ -152,10 +152,10 @@ jobs:
           # even on plain upstream PostgreSQL. The standard Supabase image
           # bootstraps it, whereas this stripped-down disposable fixture does not.
           psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test <<'SQL'
-          DO $ BEGIN
+          DO $enum$ BEGIN
             CREATE TYPE auth.factor_type AS ENUM ('totp','webauthn');
           EXCEPTION WHEN duplicate_object THEN NULL;
-          END $;
+          END $enum$;
           SQL
           docker run --rm --network host --env-file tests/fixtures/gotrue-ci.env \
             supabase/auth:v2.176.0 gotrue migrate
