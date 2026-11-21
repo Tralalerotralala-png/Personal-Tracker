@@ -11,7 +11,7 @@
 const DAY_MS = 86_400_000;
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 const FREQS = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
-const MAX_SCAN_DAYS = 20_000; // about 55 years from the first occurrence
+const MAX_SCAN_DAYS = 20_000; // defensive cap per requested window
 
 const pad = (n) => String(n).padStart(2, '0');
 export const keyOf = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;                 // m is 1-12
@@ -144,8 +144,12 @@ export function occurrencesOf(event, fromKey, toKey) {
   const baseWeek = weekStart(baseKey);
   let produced = 0;
 
-  const lastScan = Math.min(MAX_SCAN_DAYS, daysBetweenKeys(baseKey, toKey));
-  for (let n = 0; n <= lastScan; n += 1) {
+  // For unlimited series we can jump straight to the first day that might
+  // overlap the visible window. Keep the original anchor for frequency maths.
+  // COUNT rules still scan from their first occurrence to count accurately.
+  const firstScan = rule.count ? 0 : Math.max(0,daysBetweenKeys(baseKey,fromKey)-span);
+  const lastScan = Math.min(daysBetweenKeys(baseKey,toKey),firstScan+MAX_SCAN_DAYS);
+  for (let n = firstScan; n <= lastScan; n += 1) {
     const key = addDaysKey(baseKey, n);
     if (rule.until && key > rule.until) break;
     const { y, m, d } = parseKey(key);
