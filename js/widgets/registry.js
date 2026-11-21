@@ -180,7 +180,7 @@ function mountCalendar(el, { store, weather }) {
         const key=dm.date,dayTitle=`${dayLong(key)} ${dayMonth(key)}`;
         const occurrences=byDay.get(key),shown=occurrences.slice(0,2);
         const peak=uvMeter(dm.raw?.uvMax,{peak:true,stale:state.status==='stale'});
-        return h('section',{class:'w-day w-cal-day'},
+        return h('section',{class:'w-day w-cal-day',dataset:{date:key}},
           h('header',{},
             h('button',{class:'w-agenda-date',type:'button',title:dayTitle,
               'aria-label':`${language()==='es'?'Abrir día':'Open day'}: ${dayTitle}`,
@@ -206,7 +206,7 @@ function mountCalendar(el, { store, weather }) {
             language()==='es'?`+${occurrences.length-2} eventos`:`+${occurrences.length-2} more events`):null);
       }),
       h('button',{type:'button',class:'w-cal-overflow',hidden:true,
-        onclick:()=>openCalendarSelection({dateKey:days[0].date})},
+        onclick:()=>openCalendarSelection({dateKey:el.querySelector('.w-cal-day[hidden]')?.dataset.date||days[0].date})},
         language()==='es'?'Ver más en Calendario':'View more in Calendar')));
     fit.refresh();
   };
