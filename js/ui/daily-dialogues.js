@@ -1,5 +1,7 @@
 import {B2_SPANISH,B2_WHY_ES} from './daily-dialogues-es.js';
 import {B2_LITERAL} from './daily-dialogue-literal.js';
+import {B2_LITERAL_PINYIN} from './daily-dialogue-pinyin.js';
+import {B2_UI_ES} from './daily-dialogue-ui-es.js';
 // Curated B2-level everyday dialogue practice for both Mandarin and German.
 // Distinct two-turn scenarios focus on negotiation, concessions, indirectness,
 // interpersonal nuance and conversational repair. The English paraphrase
@@ -198,11 +200,19 @@ export const B2_DIALOGUES=[
 ];
 
 if(B2_SPANISH.length!==B2_DIALOGUES.length||B2_WHY_ES.length!==B2_DIALOGUES.length||
- B2_LITERAL.length!==B2_DIALOGUES.length)throw Error('Daily dialogue translations and glosses must cover every lesson.');
+ B2_LITERAL.length!==B2_DIALOGUES.length||B2_LITERAL_PINYIN.length!==B2_DIALOGUES.length||
+ B2_UI_ES.length!==B2_DIALOGUES.length)throw Error('Daily dialogue translations and glosses must cover every lesson.');
 for(let i=0;i<B2_DIALOGUES.length;i++){
  const lesson=B2_DIALOGUES[i];
  lesson.es=B2_SPANISH[i][0];
  lesson.reply.es=B2_SPANISH[i][1];
  lesson.whyEs=B2_WHY_ES[i];
  lesson.literal=B2_LITERAL[i];
+ [lesson.topicEs,lesson.settingEs,...lesson.expressionEs]=B2_UI_ES[i];
+ for(const turn of ['a','b']){
+  const glosses=lesson.literal[turn].zh,pinyin=B2_LITERAL_PINYIN[i][turn];
+  if(!Array.isArray(pinyin)||pinyin.length!==glosses.length)
+   throw Error('Missing Mandarin pinyin glosses: '+lesson.topic+' '+turn);
+  glosses.forEach((gloss,index)=>{gloss.py=pinyin[index];});
+ }
 }
