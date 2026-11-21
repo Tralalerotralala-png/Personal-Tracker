@@ -182,6 +182,7 @@ export async function restorePortableArchive({store,client,archive,inspected=nul
   throw Error('This archive belongs to another account or storage mode. Import only into the matching account.');
  // All file contents and structured records were validated before any writes.
  const uploaded=[];
+ let committed=false;
  try{
   for(const asset of manifest.assets.filter(x=>x.kind!=='audio'&&x.sourcePath&&!x.sourcePath.startsWith('local/'))) {
    if(!client)throw Error('Cloud media requires a signed-in Supabase connection');
@@ -200,11 +201,16 @@ export async function restorePortableArchive({store,client,archive,inspected=nul
    } else uploaded.push({bucket,path:asset.sourcePath});
   }
   const summary=await importAll(store,manifest.backup,{mode:'merge'});
+  committed=true;
   // Media is restored after the atomic structured merge. Storage failures
   // here are explicitly reported; the original archive remains recoverable.
   let restored=0;
   for(const asset of manifest.assets){
    if(asset.kind==='photos'){
+    // A newer local item can win the structured merge. Do not write a stale
+    // image into its local cache if its current photo path has since changed.
+    const current=await store.get('items',asset.id);
+    if(current?.photo_path!==asset.sourcePath)continue;
     await store.meta.set('photo:'+asset.id,{path:asset.sourcePath,
       dataUrl:await blobToDataUrl(index.get(asset.path).blob)});restored++;
    }else if(asset.kind==='audio'){
@@ -217,7 +223,7 @@ export async function restorePortableArchive({store,client,archive,inspected=nul
  }catch(error){
   // Do not remove uploaded files if local structured records have already been
   // committed; instead surface a retryable partial restore to the operator.
-  if(error.code==='PRECOMMIT')for(const object of uploaded)
+  if(!committed&&client)for(const object of uploaded)
    await client.storage.from(object.bucket).remove([object.path]).catch(()=>{});
   throw error;
  }
