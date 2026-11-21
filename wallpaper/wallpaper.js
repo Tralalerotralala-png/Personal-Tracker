@@ -1679,11 +1679,9 @@ function localizedMudWhy(why){
 const localizedWeather = text => language()==='es' ? t(text) : text;
 
 function uvMeter(value, { stale = false, peak = false } = {}) {
+  if (!Number.isFinite(value) || value < 0) return null;
   const es = language() === 'es';
   const label = peak ? (es ? 'UV máximo' : 'Peak UV') : (es ? 'Índice UV' : 'UV index');
-  if (!Number.isFinite(value) || value < 0) {
-    return null; // Missing UV data should not create a misleading placeholder.
-  }
   const score = Math.round(value);
   const band = [3, 6, 8, 11].filter(threshold => score >= threshold).length;
   const levels = es ? ['Bajo', 'Moderado', 'Alto', 'Muy alto', 'Extremo']
@@ -4308,6 +4306,16 @@ function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
   used+=size;visible++;
  }
  rows.forEach((row,i)=>{row.hidden=i>=visible;});
+ more.hidden=visible===rows.length;
+ // Actual DOM dimensions include grid gaps, padding and type metrics that
+ // estimates cannot predict exactly. Remove one full day when the whole card
+ // would otherwise need internal scrolling. Never cut a row in half.
+ while(visible>1&&Number.isFinite(body.clientHeight)&&body.clientHeight>0&&
+       body.scrollHeight>body.clientHeight+1){
+  visible--;
+  rows[visible].hidden=true;
+  more.hidden=false;
+ }
  const hidden=rows.length-visible;
  more.hidden=hidden===0;
  more.dataset.hiddenCount=String(hidden);
