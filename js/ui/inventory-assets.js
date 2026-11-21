@@ -46,7 +46,7 @@ export function inventoryAssetSvg(preset,{style='stack'}={}) {
   }
   const thickness={tools:3,electronics:4,outdoor:4,clothing:2,household:5,keepsakes:3,pharmacy:4}[asset.group]||4;
   const specialThin=/^(asset:phone|asset:tablet-device|asset:laptop|asset:letter|asset:postcard|asset:book|asset:mask|asset:blade)$/.test(preset);
-  const stack=renderLayeredSprite(front,{depth:specialThin?2:thickness});
+  const stack=style==='flat'?'':renderLayeredSprite(front,{depth:specialThin?2:thickness});
   if(style!=='flat'&&stack){
     const svg=stack.replace('class="sprite-stacked-asset"','class="sprite-inventory-depth sprite-stacked-asset"');
     cache.set(cacheKey,svg);
