@@ -55,6 +55,14 @@ async function scanTar(archive) {
    if(cursor+BLOCK*2>archive.size)throw Error('Truncated TAR end marker');
    const second=new Uint8Array(await archive.slice(cursor+BLOCK,cursor+BLOCK*2).arrayBuffer());
    if(!second.every(x=>x===0))throw Error('Damaged TAR end marker');
+   // TAR archives may have extra all-zero volume padding, but nonzero bytes
+   // after the end marker are not part of a declared file and are unsafe to
+   // silently ignore during a verified restore.
+   if(archive.size%BLOCK)throw Error('Misaligned TAR ending');
+   for(let tail=cursor+BLOCK*2;tail<archive.size;tail+=CHUNK){
+    const extra=new Uint8Array(await archive.slice(tail,Math.min(tail+CHUNK,archive.size)).arrayBuffer());
+    if(extra.some(x=>x!==0))throw Error('Unexpected data after TAR end marker');
+   }
    ended=true;break;
   }
   const given=tarNumber(data,148,8);
@@ -66,8 +74,14 @@ async function scanTar(archive) {
   if(index.has(name)||index.size>=MAX_FILES)throw Error('Duplicate or excessive TAR entries');
   const start=cursor+BLOCK,end=start+size;
   if(end>archive.size||!Number.isSafeInteger(end))throw Error('Truncated archive entry');
+  const paddedEnd=end+padding(size);
+  if(paddedEnd>archive.size)throw Error('Truncated TAR padding');
+  if(paddedEnd!==end) {
+   const pad=new Uint8Array(await archive.slice(end,paddedEnd).arrayBuffer());
+   if(pad.some(x=>x!==0))throw Error('Nonzero TAR file padding');
+  }
   index.set(name,{blob:archive.slice(start,end),size});
-  cursor=end+padding(size);
+  cursor=paddedEnd;
  }
  if(!ended||index.size===0||!index.has('manifest.json'))throw Error('Missing archive manifest or end marker');
  return index;
