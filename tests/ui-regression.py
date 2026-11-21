@@ -432,6 +432,32 @@ for width,height in [(390,844),(1280,900)]:
         assert page.evaluate("location.hash")=="#mud","Search did not route to a section"
         # Each media collection must start without the previous shelf's filters.
         page.evaluate("location.hash='#games'")
+        game_toolbar=page.locator(".games-view .media-collection-toolbar")
+        game_toolbar.wait_for(state="visible",timeout=10000)
+        game_bounds=game_toolbar.bounding_box()
+        assert game_toolbar.locator(".media-collection-actions button").count()==3
+        assert game_toolbar.locator(".media-pixel-icon svg.sprite-stacked-asset").count()>=1
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        books_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
+        books_toolbar.wait_for(state="visible",timeout=10000)
+        books_bounds=books_toolbar.bounding_box()
+        assert books_toolbar.locator(".media-collection-actions button").count()==2
+        assert abs(game_bounds["x"]-books_bounds["x"])<=4,(game_bounds,books_bounds)
+        assert abs(game_bounds["width"]-books_bounds["width"])<=4,(game_bounds,books_bounds)
+        book_card=page.locator(".media-library-view .game-book",has_text="Johnny the Homicidal Maniac")
+        book_card.wait_for(state="visible",timeout=10000)
+        book_card.click()
+        assert page.locator(".media-case-books .media-page-flip").count()==2
+        assert page.locator(".media-case-books .media-case-disc").count()==0
+        assert "mediaBookCover" in page.locator(".media-case-books .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        page.locator(".media-case-stage .media-replay").click()
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
+        series_card=page.locator(".media-library-view .game-book",has_text="Invader Zim")
+        series_card.wait_for(state="visible",timeout=10000)
+        series_card.click()
+        assert page.locator(".media-case-films .media-case-disc").count()==1
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         media_search=page.locator(".media-library-view .media-search-filters input")
         media_search.fill("unmatched title")
@@ -439,6 +465,14 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-library-view .hub-tabs button",has_text="Albums").click()
         assert page.locator(".media-library-view .media-search-filters input").input_value()==""
         assert page.locator(".media-library-view .media-search-filters select").input_value()=="all"
+        page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
+        page.locator(".media-editor input[type=text]").first.fill("Example Album")
+        page.locator(".media-editor + .btn.primary").click()
+        assert page.locator(".media-case-albums .media-vinyl-record").count()==1
+        assert page.locator(".media-case-albums .media-case-disc").count()==0
+        assert "mediaSleeveReveal" in page.locator(".media-case-albums .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        page.locator(".media-case-stage .media-replay").click()
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.evaluate("location.hash='#overview'")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # Search deep links must open the exact saved note and expense,
