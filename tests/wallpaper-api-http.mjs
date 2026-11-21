@@ -37,7 +37,8 @@ statusOneOf('anon cannot create wallpaper keys',anonymousWrite,401,403,404);
 
 const anonymousRead=await call('/rpc/wallpaper_snapshot',{method:'POST',body:{p_key:'test-secret-capability'}});
 statusOneOf('anonymous bearer reader is callable',anonymousRead,200);
-assert.equal(anonymousRead.data,false,'No key exists before owner setup');
+// The preceding SQL integration assertions created one synthetic owner key.
+assert.equal(anonymousRead.data,true,'Anonymous bearer read should work for the fixture key');
 
 const secondWrite=await call('/rpc/create_wallpaper_key',{token:other,method:'POST',body:{p_show_places:false}});
 statusOneOf('nonowner cannot call privileged wallpaper RPC',secondWrite,401,403);
