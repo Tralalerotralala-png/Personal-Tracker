@@ -53,6 +53,15 @@ export async function initData() {
   let previouslyCloud = false;
   try { previouslyCloud = localStorage.getItem(CLOUD_CONFIG_MARKER) === 'yes'; } catch {}
   const storageMode = resolveStorageMode({config:cfg,previouslyCloud});
+  // A few early installations used one unverified database for all accounts.
+  // If it exists, purge only the retired private Logs key and its pending
+  // copies; never import or otherwise inspect that owner's old cache.
+  try{
+    if(globalThis.indexedDB?.databases&&
+       (await indexedDB.databases()).some(db=>db.name==='personal-tracker-cloud'))
+      await purgeLegacyJournalCache(await openIdbAdapter('personal-tracker-cloud'));
+  }catch(err){console.warn('Could not complete old Logs cache cleanup',err?.message);}
+
 
   // ---- local-only mode ----------------------------------------------------
   if (storageMode === 'local') {
