@@ -224,26 +224,32 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
     if (autoKick) kick();
   }
 
+  // Stable callbacks: stop() removes them, and repeated start/stop is safe.
+  const onOnline = () => { if(started&&!stopped)void syncNow(); };
+  const onOffline = () => { if(started&&!stopped)setStatus({state:'offline'}); };
+  const onVisibility = () => {
+    if(started&&!stopped&&document.visibilityState==='visible')void syncNow();
+  };
   function start() {
-    if (started || typeof window === 'undefined') return;
+    if(started||typeof window==='undefined')return;
     stopped=false;
-    started = true;
-    window.addEventListener('online', () => syncNow());
-    window.addEventListener('offline', () => setStatus({ state: 'offline' }));
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') syncNow();
-    });
-    interval = setInterval(() => {
-      if (document.visibilityState === 'visible') syncNow();
-    }, 60_000);
-    syncNow();
+    started=true;
+    window.addEventListener('online',onOnline);
+    window.addEventListener('offline',onOffline);
+    document.addEventListener('visibilitychange',onVisibility);
+    interval=setInterval(onVisibility,60_000);
+    void syncNow();
   }
-
   function stop() {
     stopped=true;
-    if (interval) clearInterval(interval);
-    if (kickTimer) clearTimeout(kickTimer);
-    interval = null; kickTimer = null; started = false;
+    if(interval)clearInterval(interval);
+    if(kickTimer)clearTimeout(kickTimer);
+    if(started&&typeof window!=='undefined'){
+      window.removeEventListener('online',onOnline);
+      window.removeEventListener('offline',onOffline);
+      document.removeEventListener('visibilitychange',onVisibility);
+    }
+    interval=null;kickTimer=null;started=false;
   }
 
   // Forget the pull cursors so the next sync re-downloads everything.
