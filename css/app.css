@@ -2652,3 +2652,96 @@ button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var
 }
 .reduce-animations :is(.media-case-books .media-case-front,.media-case-books .media-page-flip,.media-comic-panel,
  .media-case-albums .media-case-front,.media-case-albums .media-vinyl-record){animation:none!important;transform:none!important}
+
+
+/* Library detail: the media prop owns an actual column; its rotating surface
+   can never cover journal/edit controls. This overrides the original generic
+   case layout, which predated the separate book/vinyl artwork. */
+.media-library-view .media-detail{
+ display:grid;grid-template-columns:minmax(290px,360px) minmax(0,1fr);
+ gap:clamp(22px,2.5vw,44px);align-items:start;overflow:visible;
+ padding:clamp(16px,2vw,26px);min-width:0}
+.media-library-view .media-detail > :last-child{
+ position:relative;z-index:2;min-width:0;overflow-wrap:anywhere;
+ padding-inline-start:5px}
+.media-library-view .media-detail > :last-child h2{margin-top:0;line-height:1.2}
+.media-library-view .media-case-stage{
+ box-sizing:border-box;width:100%;max-width:350px;min-width:0;
+ min-height:365px;display:flex;flex-direction:column;align-items:center;
+ justify-content:flex-start;gap:18px;padding:19px 46px 8px 19px;
+ position:relative;z-index:1}
+.media-library-view .media-case-stage .media-case{
+ flex:0 0 auto;position:relative;width:218px;max-width:100%;margin:0;
+ filter:drop-shadow(6px 9px 6px #0008)}
+.media-library-view .media-case-stage .media-case-albums{
+ width:218px;aspect-ratio:1;min-height:0;margin:0 22px 0 0}
+.media-library-view .media-case-stage .media-replay{
+ position:relative;z-index:6;flex:0 0 auto;margin:0;min-height:39px}
+.media-library-view .media-case-stage .media-case-books{margin:0 0 0 16px}
+.media-library-view .media-case-stage .media-case-films{margin:0 16px 0 0}
+/* Both a DVD/TV box and the game jewel case use the new holographic
+   optical disc; no original flat-colored 'ptDiscSlide' media in these views. */
+.media-case-films .media-case-disc,.media-case-game .media-case-disc{
+ top:14%;left:9%;width:87%;aspect-ratio:1;border-radius:50%;
+ border:3px solid #7697ab;background:
+ radial-gradient(circle at center,#080c12 0 5.7%,#daf6ff 6% 8.5%,#21374b 9% 11%,
+  #a0cde5 11.5% 14%,transparent 14.5%),
+ repeating-radial-gradient(circle at center,#f4faff11 0 2px,#0003 2px 3px,#ffffff1a 4px 5px),
+ conic-gradient(from 25deg,#243752 0deg,#a5ddf8 34deg,#6e81ab 74deg,
+  #e2bde0 96deg,#7e6796 136deg,#224c6b 178deg,
+  #b7c7ec 228deg,#667e9f 265deg,#b9e1f3 314deg,#243752 360deg);
+ box-shadow:inset 0 0 0 2px #f2fbff7f,inset 0 0 16px #0d1f37aa,6px 8px 8px #0009;
+ transform:translateX(0) rotate(0);
+ animation:mediaOpticalDiscReveal 1.2s .18s cubic-bezier(.16,.74,.2,1) both;
+ z-index:1}
+.media-case-films .media-case-front,.media-case-game .media-case-front{
+ animation:mediaDvdCoverReveal 1.12s cubic-bezier(.22,.72,.22,1) both}
+.media-case-films .media-case-front::after,.media-case-game .media-case-front::after{
+ content:'';position:absolute;inset:0 0 auto auto;width:9px;height:100%;
+ background:linear-gradient(90deg,#111925,#63819b,#182030);
+ border-inline:1px solid #a1b4c1;transform:translateX(3px)}
+@keyframes mediaOpticalDiscReveal{
+ 0%{transform:translateX(0) rotate(0)}
+ 100%{transform:translateX(50%) rotate(146deg)}}
+@keyframes mediaDvdCoverReveal{
+ 0%{transform:rotateY(0)}
+ 100%{transform:rotateY(-44deg)}}
+.media-library-view .media-case-films .media-case-badge{border-color:#88acc0}
+.media-empty-shelf{
+ grid-column:1/-1;min-height:82px;margin:0;padding:17px 12px;
+ display:flex;align-items:center;justify-content:center;
+ color:var(--ink-dim);border:1px dashed var(--edge);font-size:.82rem}
+.media-library-view .game-shelves{min-width:0}
+.media-library-view .game-shelf .game-cover-grid{min-width:0}
+.media-collection-toolbar .media-collection-actions .btn{
+ min-height:42px;padding:8px 13px;font-size:.9rem;border-radius:2px}
+.media-collection-toolbar .media-collection-actions .btn.primary{
+ min-width:116px;font-weight:700}
+.media-library-view .games-view .media-collection-toolbar,
+.media-library-view > .media-collection-toolbar{
+ width:100%;box-sizing:border-box;margin:0}
+@media(max-width:850px){
+ .media-library-view .media-detail{
+  grid-template-columns:1fr;gap:18px}
+ .media-library-view .media-case-stage{
+  width:100%;max-width:none;min-height:0;padding:14px 16px 8px;
+  align-items:center}
+ .media-library-view .media-case-stage .media-case{width:min(54vw,205px)}
+ .media-library-view .media-case-stage .media-case-albums{width:min(54vw,205px)}
+}
+@media(max-width:480px){
+ .media-library-view .media-collection-toolbar .media-collection-actions{display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+ .media-library-view .media-collection-toolbar .media-collection-actions .btn{
+  min-width:0;padding:8px 6px;white-space:normal}
+ .media-library-view .media-collection-toolbar .media-collection-actions .btn.primary{
+  grid-column:1/-1}
+}
+@media(prefers-reduced-motion:reduce){
+ .media-case-films .media-case-front,.media-case-game .media-case-front,
+ .media-case-films .media-case-disc,.media-case-game .media-case-disc{
+  animation:none!important;transform:none!important}
+}
+.reduce-animations :is(.media-case-films .media-case-front,
+ .media-case-game .media-case-front,.media-case-films .media-case-disc,
+ .media-case-game .media-case-disc){animation:none!important;transform:none!important}
