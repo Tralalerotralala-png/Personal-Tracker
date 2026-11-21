@@ -53,9 +53,22 @@ export function createMemoryAdapter() {
       s('meta').set(key,{key,value:{path,dataUrl}});return true;
     },
     async clear(name) { s(name).clear(); },
+    async clearAll() {
+      for(const name of [...TABLE_NAMES,'outbox','meta'])s(name).clear();
+    },
     async putWithOutbox(name,value,entry) {
       s(name).set(keyOf(name,value),clone(value));
       s('outbox').set(entry.key,clone(entry));
+    },
+    // One synchronous transaction for a record, its pending upload, and
+    // associated device metadata (e.g. a selected image and retry marker).
+    async putWithMeta(name,value,entry,changes) {
+      s(name).set(keyOf(name,value),clone(value));
+      if(entry)s('outbox').set(entry.key,clone(entry));
+      for(const change of changes){
+        if(change.remove)s('meta').delete(change.key);
+        else s('meta').set(change.key,{key:change.key,value:clone(change.value)});
+      }
     },
     async putBatchWithOutbox(changes) {
       // Memory adapter's synchronous loop cannot be interrupted by a browser task.
@@ -125,6 +138,15 @@ export async function openIdbAdapter(dbName) {
     putWithOutbox:(name,value,entry)=>atomic([name,'outbox'],tx=>{
       tx.objectStore(name).put(value);tx.objectStore('outbox').put(entry);
     }),
+    putWithMeta:(name,value,entry,changes)=>atomic([name,'meta',...(entry?['outbox']:[])],tx=>{
+      tx.objectStore(name).put(value);
+      if(entry)tx.objectStore('outbox').put(entry);
+      const meta=tx.objectStore('meta');
+      for(const change of changes){
+        if(change.remove)meta.delete(change.key);
+        else meta.put({key:change.key,value:change.value});
+      }
+    }),
     putBatchWithOutbox:changes=>changes.length?atomic([...changes.map(c=>c.table),'outbox'],tx=>{
       for(const {table,row,entry} of changes){
         tx.objectStore(table).put(row);tx.objectStore('outbox').put(entry);
@@ -184,5 +206,11 @@ export async function openIdbAdapter(dbName) {
     putMany: (name, values) => run(name, 'readwrite', (s) => { for (const v of values) s.put(v); }),
     del: (name, key) => run(name, 'readwrite', (s) => s.delete(key)),
     clear: (name) => run(name, 'readwrite', (s) => s.clear()),
+    clearAll:()=>atomic([...TABLE_NAMES,'outbox','meta'],tx=>{
+      // One transaction: erasing an account cannot leave behind decrypted
+      // photo bytes, conflict copies, feed caches or cloud retry metadata.
+      for(const name of [...TABLE_NAMES,'outbox','meta'])
+        tx.objectStore(name).clear();
+    }),
   };
 }

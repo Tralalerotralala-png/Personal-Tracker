@@ -8,6 +8,7 @@
 // Other devices fetch it through a short-lived signed link and cache it too.
 
 const MAX_DIM = 800;
+const MAX_PHOTO_BYTES = 1024 * 1024; // Matches the private Supabase Storage bucket
 const BUCKET = 'item-photos';
 
 // Pure: the size to scale a w x h image down to so its longest side is <= max.
@@ -50,13 +51,27 @@ export async function downscaleImage(file, { max = MAX_DIM } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  canvas.getContext('2d').drawImage(bmp, 0, 0, width, height);
+  const ctx=canvas.getContext('2d');
+  if(!ctx)throw new Error('Could not prepare this photo on your device.');
+  ctx.drawImage(bmp, 0, 0, width, height);
   bmp.close?.();
   // Safari quietly returns PNG when asked for WebP; PNGs of photos are far
   // too big for the 1 MB bucket limit, so fall back to JPEG.
   let blob = await canvasToBlob(canvas, 'image/webp', 0.8);
   if (!blob || blob.type !== 'image/webp') blob = await canvasToBlob(canvas, 'image/jpeg', 0.82);
   if (!blob) throw new Error('Could not compress that image.');
+  if(blob.size>MAX_PHOTO_BYTES){
+    // Busy/photographic images sometimes remain larger than Storage allows
+    // even at 800 px. Try stronger compression before giving up.
+    for(const [type,quality] of [['image/webp',0.62],['image/jpeg',0.68],['image/jpeg',0.46]]){
+      const smaller=await canvasToBlob(canvas,type,quality);
+      if(smaller&&['image/webp','image/jpeg'].includes(smaller.type)&&smaller.size<blob.size)
+        blob=smaller;
+      if(blob.size<=MAX_PHOTO_BYTES)break;
+    }
+  }
+  if(blob.size>MAX_PHOTO_BYTES)
+    throw new Error('This photo is too large after compression. Choose a smaller image.');
   return blob;
 }
 
@@ -75,6 +90,14 @@ export function createPhotos({ store, client }) {
   const queueKey = (id) => `photoq:${id}`;
   const cleanupPrefix='photo-cleanup:';
   const CLEANUP_GRACE_MS=7*24*60*60*1000;
+  const observers=new Set();
+  let uploadRun=null,uploadError=null;
+  const signal=()=>{for(const listener of [...observers]){try{listener();}catch(err){console.warn('Photo status listener failed',err);}}};
+  const subscribe=fn=>{observers.add(fn);return()=>observers.delete(fn);};
+  async function queueStatus(){
+    const rows=await store.adapter.getAll('meta');
+    return {pending:rows.filter(r=>r.key.startsWith('photoq:')).length,error:uploadError};
+  }
 
   // Image decoding and IndexedDB writes are asynchronous. Without ordering,
   // an older slow selection could overwrite a later image or resurrect one
@@ -167,8 +190,9 @@ export function createPhotos({ store, client }) {
     }
   }
 
-  async function flushQueue() {
+  async function flushQueueWork() {
     if (!client) return 0;
+    uploadError=null;
     const uid = await userId();
     if (!uid) return 0;
     const queued = (await store.adapter.getAll('meta')).filter((m) => m.key.startsWith('photoq:'));
@@ -196,11 +220,24 @@ export function createPhotos({ store, client }) {
         const cleared=await store.adapter.deleteMetaIfPath(q.key,q.value.path);
         if(cleared && q.value.replaces)
           await queueOldPhotoCleanup(itemId,q.value.replaces);
+        if(!cleared)await queueOldPhotoCleanup(itemId,q.value.path);
         done += 1;
-      } catch { /* still offline or signed out; the entry stays queued */ }
+      } catch (err) {
+        // A failed image upload is not part of the structured-record outbox.
+        // Surface the problem rather than showing an unqualified "Synced".
+        uploadError=String(err?.message||err||'Photo upload failed');
+      }
     }
     await flushOldPhotoCleanup(uid);
+    signal();
     return done;
+  }
+  function flushQueue(){
+    if(uploadRun)return uploadRun;
+    const run=flushQueueWork();
+    uploadRun=run;
+    run.finally(()=>{if(uploadRun===run)uploadRun=null;signal();}).catch(()=>{});
+    return run;
   }
 
   async function setPhoto(itemId, file) {
@@ -218,18 +255,20 @@ export function createPhotos({ store, client }) {
       const previous = item.photo_path && !item.photo_path.startsWith('local/') ? item.photo_path : null;
 
       let path;
-      if (!client) {
-        path = `local/${itemId}`;
-      } else {
+      if (!client) path = `local/${itemId}`;
+      else {
         const uid = await userId();
         if (!uid) throw new Error('Sign in first so the photo can be stored.');
         path = photoPath(uid, itemId, blob.type);
-        await store.meta.set(queueKey(itemId), { path, replaces: previous });
       }
-      await store.meta.set(cacheKey(itemId), { path, dataUrl });
-      memory.set(`${itemId}|${path}`, dataUrl);
-      await store.upsert('items', { ...item, photo_path: path });
-      flushQueue();
+      const changes=[
+        {key:cacheKey(itemId),value:{path,dataUrl}},
+        client?{key:queueKey(itemId),value:{path,replaces:previous}}:{key:queueKey(itemId),remove:true},
+      ];
+      await store.upsertWithMeta('items',{id:itemId,photo_path:path},changes);
+      memory.set(`${itemId}|${path}`,dataUrl);
+      signal();
+      void flushQueue().catch(err=>{uploadError=String(err?.message||err);signal();});
       return path;
     });
   }
@@ -240,9 +279,11 @@ export function createPhotos({ store, client }) {
       const item = await store.get('items', itemId);
       if (!item?.photo_path) return;
       const old = item.photo_path;
-      await store.upsert('items', { ...item, photo_path: null });
-      await store.adapter.del('meta', cacheKey(itemId));
-      await store.adapter.del('meta', queueKey(itemId));
+      await store.upsertWithMeta('items',{id:itemId,photo_path:null},[
+        {key:cacheKey(itemId),remove:true},
+        {key:queueKey(itemId),remove:true},
+      ]);
+      signal();
       if (client && !old.startsWith('local/'))
         await queueOldPhotoCleanup(itemId,old);
     });
@@ -254,5 +295,5 @@ export function createPhotos({ store, client }) {
     const url=await urlFor(item);
     return url ? (await fetch(url)).blob() : null;
   }
-  return { urlFor, readBlob, setPhoto, removePhoto, flushQueue };
+  return { urlFor, readBlob, setPhoto, removePhoto, flushQueue, subscribe, queueStatus };
 }

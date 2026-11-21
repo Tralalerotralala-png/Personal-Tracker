@@ -11,4 +11,9 @@ export const CONFIG = {
   // Keep true for your first sign-in (it creates your account). Then set it
   // to false AND turn off new signups in the Supabase dashboard.
   ALLOW_NEW_USER: true,
+
+  // Optional Edge Functions are disabled by default. Set true ONLY after you
+  // deploy and configure the corresponding function in your own Supabase project.
+  ENABLE_AI_ICONS: false,
+  ENABLE_FEED_PROXY: false,
 };

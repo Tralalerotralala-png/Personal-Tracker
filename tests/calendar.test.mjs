@@ -65,6 +65,15 @@ test('monthly: skips months that lack the day; yearly: leap day', () => {
   assert.deepEqual(keys(occurrencesOf(leap, '2024-01-01', '2032-12-31')), ['2024-02-29', '2028-02-29', '2032-02-29']);
 });
 
+test('an unlimited recurrence still appears after 55 years without scanning its history', () => {
+  const old=allDay('Annual anniversary','1990-06-15',{rrule:'FREQ=YEARLY'});
+  assert.deepEqual(keys(occurrencesOf(old,'2095-06-01','2095-06-30')),['2095-06-15']);
+  const weekly=allDay('Long-running weekly routine','1980-01-07',{rrule:'FREQ=WEEKLY;INTERVAL=2'});
+  const occurrences=occurrencesOf(weekly,'2090-05-01','2090-05-31');
+  assert.ok(occurrences.length>=1);
+  assert.ok(occurrences.every(entry=>entry.key>='2090-05-01'&&entry.key<='2090-05-31'));
+});
+
 test('COUNT and UNTIL end a series (counting from the very first occurrence)', () => {
   const counted = timed('Course', 2026, 9, 1, 18, 0, { rrule: 'FREQ=WEEKLY;COUNT=4' }); // 1, 8, 15, 22 Sept
   assert.deepEqual(keys(occurrencesOf(counted, '2026-09-01', '2026-12-31')), ['2026-09-01', '2026-09-08', '2026-09-15', '2026-09-22']);

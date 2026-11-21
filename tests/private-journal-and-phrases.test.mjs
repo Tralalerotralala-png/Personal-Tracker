@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
-import {encryptJournal,decryptJournal,validPin,validNewJournalKey,emptyJournal} from '../js/ui/private-journal-crypto.js';
+import {encryptJournal,decryptJournal,validPin,validNewJournalKey,emptyJournal,bytesToBase64} from '../js/ui/private-journal-crypto.js';
 import {LESSONS,lessonForDate} from '../js/ui/daily-phrases.js';
 if(!globalThis.crypto) globalThis.crypto=webcrypto;
 test('PIN requires exactly four decimal digits',()=>{
@@ -31,6 +31,16 @@ test('journal encryption randomizes ciphertext and can rekey',async()=>{
  const changed=await encryptJournal('2222',await decryptJournal('1111',first));
  assert.deepEqual(await decryptJournal('2222',changed),emptyJournal());
  await assert.rejects(decryptJournal('1111',changed));
+});
+test('large journal illustrations and vault entries encrypt, decrypt and rekey safely',async()=>{
+ const image='data:image/png;base64,'+'a'.repeat(137000);
+ const original={...emptyJournal(),dreams:[{id:'a',title:'Illustrated dream',art:image,body:'Remember everything'}],
+  vault:[{id:'b',title:'Very long note',body:'long'.repeat(25000)}]};
+ const first=await encryptJournal('a long private passphrase',original);
+ assert.deepEqual(await decryptJournal('a long private passphrase',first),original);
+ const rotated=await encryptJournal('another long private passphrase',await decryptJournal('a long private passphrase',first));
+ assert.deepEqual(await decryptJournal('another long private passphrase',rotated),original);
+ assert.ok(bytesToBase64(new Uint8Array(300000)).length>300000);
 });
 test('daily language lessons align Hanzi and German word glosses',()=>{
  for(const lesson of LESSONS){

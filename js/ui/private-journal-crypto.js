@@ -4,7 +4,17 @@
 export const JOURNAL_KEY = 'private_journal_v1';
 export const emptyJournal = () => ({ dreams:[], sleep:[], moods:[], habits:[], vault:[] });
 const enc = new TextEncoder(), dec = new TextDecoder();
-const b64 = bytes => btoa(String.fromCharCode(...bytes));
+// Passing a large Uint8Array to String.fromCharCode(...bytes) overflows the
+// JavaScript argument stack. Journal illustrations and multi-entry vaults can
+// exceed that limit despite respecting the individual file-size limit.
+export function bytesToBase64(bytes) {
+ const chunkSize=8192;
+ let binary='';
+ for(let i=0;i<bytes.length;i+=chunkSize)
+  binary+=String.fromCharCode(...bytes.subarray(i,i+chunkSize));
+ return btoa(binary);
+}
+const b64 = bytesToBase64;
 const unb64 = str => Uint8Array.from(atob(str), c=>c.charCodeAt(0));
 export function validPin(pin){return typeof pin==='string'&&(/^\d{4}$/.test(pin)||(pin.length>=12&&pin.length<=128&&pin.trim()===pin));}
 // New journals and key rotations require a passphrase, but decrypting an

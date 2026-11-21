@@ -547,6 +547,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         }finally{URL.revokeObjectURL(url);}
       }catch(err){toast(err.message||'AI image generation failed.');}finally{aiButton.disabled=false;aiButton.textContent=old;}
     }},t('Generate with AI'));
+    aiButton.hidden = config?.ENABLE_AI_ICONS !== true;
     const desc = h('textarea', { id: 'it-desc', rows: 3, placeholder: 'e.g. 16x16 pixel art icon of an orange headlamp, 8 colours, transparent background' }, existing?.pixel_description ?? '');
     const suggest = () => {
       const nm = name.value.trim() || 'the item';
@@ -563,7 +564,9 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
     const lost = h('input', { type: 'checkbox', id: 'it-lost', checked: Boolean(existing?.is_lost) });
     const error = h('p', { class: 'form-error', role: 'alert' });
 
+    let savingItem=false;
     async function save() {
+      if(savingItem)return;
       error.textContent = '';
       const nm = name.value.trim();
       let q = Number(qty.value);
@@ -591,15 +594,27 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
         is_lost: isLost,
         lost_since: isLost ? (wasLost ? existing.lost_since : new Date().toISOString()) : null,
       };
+      savingItem=true;
+      saveButton.disabled=true;
+      let detailsSaved=false;
       try {
-        await store.upsert('items', row);
-        await store.setSetting(TRACKING_KEY(id), { overrides, durability: Number(durability.value), max_quantity: max, extra_boxes: extraBoxes, quantity_percent: quantityPercent.checked, show_max_quantity: showMaximum.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() });
-        if (place.value) await store.meta.set('last_place', place.value);
-        if (draft.photoFile) await photos.setPhoto(id, draft.photoFile);
-        else if (draft.removePhoto && existing?.photo_path) await photos.removePhoto(id);
+        const tracking={ overrides, durability: Number(durability.value), max_quantity: max, extra_boxes: extraBoxes, quantity_percent: quantityPercent.checked, show_max_quantity: showMaximum.checked, icon_preset: draft.iconPreset, icon_color: medicineColor(draft.iconColor), icon_body_color: draft.iconBodyColor, icon_paper_color: draft.iconPaperColor, icon_dose_color: draft.iconDoseColor, condition: condition.value, expiration_date: expiration.value, low_stock_threshold: stockMin, purchase_price: price.value === '' ? null : Number(price.value), currency: currency.value, purchase_date: purchaseDate.value, warranty_date: warrantyDate.value, maintenance_date: maintenanceDate.value, maintenance_notes: maintenanceNotes.value.trim() };
+        // Item and tracking settings must be committed together; no half-saved
+        // inventory record if a settings validation or storage write fails.
+        await store.applyRestorePlan([
+          {kind:'import',table:'items',row},
+          {kind:'import',table:'settings',row:{key:TRACKING_KEY(id),value:tracking}}
+        ]);
+        detailsSaved=true;
+        if(place.value)await store.meta.set('last_place',place.value).catch(()=>{});
+        if(draft.photoFile)await photos.setPhoto(id,draft.photoFile);
+        else if(draft.removePhoto && existing?.photo_path)await photos.removePhoto(id);
       } catch (err) {
-        error.textContent = err.message;
+        error.textContent=(detailsSaved?'Item details were saved, but the photo could not be updated: ':'Could not save item: ')+(err?.message||err);
         return;
+      } finally {
+        savingItem=false;
+        saveButton.disabled=false;
       }
       sheet.close();
       toast(isEdit ? 'Item saved' : 'Added to your pack');
@@ -630,6 +645,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       h('div',{class:'place-pick'},place,h('button',{class:'btn small',type:'button',onclick:()=>openPlaceSheet({
         store,locations:data.locations,onSaved:async(row)=>{await load();place.replaceChildren(...placeOptions(data.locations));place.value=row.id;}
       })},'New place')));
+    const saveButton=h('button',{class:'btn primary',type:'button',onclick:save},isEdit?'Save changes':'Add to pack');
     const sheet = openSheet({
       title: isEdit ? 'Edit item' : 'Add item',
       size:'item-editor',
@@ -645,7 +661,7 @@ export function createInventoryView({ store, photos, auth = null, config = {} })
       footer: [
         isEdit ? h('button', { class: 'btn danger', type: 'button', onclick: remove }, 'Delete') : null,
         h('span', { class: 'spacer' }),
-        h('button', { class: 'btn primary', type: 'button', onclick: save }, isEdit ? 'Save changes' : 'Add to pack'),
+        saveButton,
       ],
     });
     if (!isEdit) setTimeout(() => name.focus(), 60);

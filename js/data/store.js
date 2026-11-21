@@ -96,6 +96,30 @@ export function createStore({
     });
   }
 
+  // Update a record together with its associated device-local metadata in a
+  // single IndexedDB transaction. This prevents half-saved photo selections:
+  // the cache bytes, retry marker, item reference and cloud outbox commit or
+  // roll back together if a write fails.
+  async function upsertWithMeta(table,input,metaChanges=[]) {
+    assertWritable();
+    const def=tableDef(table),id=input[def.pk]??(def.pk==='id'?uuid():undefined);
+    if(id===undefined)throw new Error(table+'.'+def.pk+' is required');
+    if(!adapter.putWithMeta)throw new Error('Atomic metadata writes are unavailable.');
+    if(!Array.isArray(metaChanges)||metaChanges.some(m=>typeof m.key!=='string'||!m.key||(!m.remove&&!Object.hasOwn(m,'value'))))
+      throw new Error('Invalid atomic metadata changes.');
+    return serialize(table,id,async()=>{
+      const existing=await adapter.get(table,id);
+      const now=nextTimestamp(clock,existing?.updated_at);
+      const row=normalizeRow(table,{...existing,...input,[def.pk]:id,
+        created_at:existing?.created_at??now,updated_at:now,deleted_at:input.deleted_at??null});
+      const entry=sync?{key:table+':'+id,table,id,queuedAt:clock()}:null;
+      await adapter.putWithMeta(table,row,entry,metaChanges);
+      if(sync)sync.noteLocalWrite();
+      emit({type:'change',tables:[table],ids:[id],source:'local'});
+      return row;
+    });
+  }
+
   // Soft delete (a tombstone, so other devices learn about it).
   async function remove(table,id){
     assertWritable();tableDef(table);
@@ -190,6 +214,15 @@ export function createStore({
     return changes.length;
   }
 
+  // A deliberate device-privacy wipe is different from a resync reset. It
+  // must include every metadata entry: photo bytes, queue, and conflict copies.
+  async function eraseDeviceCache() {
+    assertWritable();
+    if(!adapter.clearAll)throw new Error('Atomic device erasure is unavailable.');
+    await adapter.clearAll();
+    emit({type:'change',tables:[...TABLE_NAMES],source:'erase'});
+  }
+
   // Wipe the cache (rows, outbox, pull cursors) but keep 'meta' flags.
   async function resetCache() {
     for (const t of TABLE_NAMES) await adapter.clear(t);
@@ -212,8 +245,8 @@ export function createStore({
     sync,
     meta,
     subscribe,
-    list, get, upsert, remove, removeLocation, removeCategory,
+    list, get, upsert, upsertWithMeta, remove, removeLocation, removeCategory,
     getSetting, setSetting,
-    importRow, applyRestorePlan, resetCache,
+    importRow, applyRestorePlan, resetCache, eraseDeviceCache,
   };
 }

@@ -105,6 +105,6 @@ export function createAuth(client, { allowNewUser = true } = {}) {
       const { data } = client.auth.onAuthStateChange((event, session) => cb(event, session));
       return () => data.subscription.unsubscribe();
     },
-    async signOut() { await client.auth.signOut(); },
+    async signOut(options) { await client.auth.signOut(options); },
   };
 }

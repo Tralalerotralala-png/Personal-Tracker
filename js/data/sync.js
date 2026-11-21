@@ -31,6 +31,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
   let kickTimer = null;
   let interval = null;
   let started = false;
+  let stopped = false;
 
   const isOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false;
 
@@ -166,6 +167,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
 
   function syncNow() {
     if (running) return running;
+    if(stopped)return Promise.resolve(status);
 
     const p = (async () => {
       try {
@@ -212,6 +214,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
   }
 
   function kick(delay = 800) {
+    if(stopped)return;
     if (kickTimer) clearTimeout(kickTimer);
     kickTimer = setTimeout(() => { kickTimer = null; syncNow(); }, delay);
   }
@@ -223,6 +226,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
 
   function start() {
     if (started || typeof window === 'undefined') return;
+    stopped=false;
     started = true;
     window.addEventListener('online', () => syncNow());
     window.addEventListener('offline', () => setStatus({ state: 'offline' }));
@@ -236,6 +240,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
   }
 
   function stop() {
+    stopped=true;
     if (interval) clearInterval(interval);
     if (kickTimer) clearTimeout(kickTimer);
     interval = null; kickTimer = null; started = false;
@@ -249,6 +254,7 @@ export function createSync({ adapter, remote, emit, clock, autoKick = true }) {
 
   return {
     syncNow, start, stop, kick, fullResync, noteLocalWrite,
+    whenIdle:()=>running||Promise.resolve(),
     getStatus: () => ({ ...status }),
   };
 }

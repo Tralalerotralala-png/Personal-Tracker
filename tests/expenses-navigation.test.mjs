@@ -20,7 +20,7 @@ test('legacy hub expenses are still valid expense rows and currencies do not mix
   assert.equal(summary.spent,120);assert.equal(summary.received,1000);assert.equal(summary.balance,880);
 });
 test('bill calculator tracks tip and tax separately and splits',()=>{
-  assert.deepEqual(calculateBill({subtotal:200,taxPercent:16,tipPercent:10,people:2}),{taxAmount:32,tipAmount:20,total:252,perPerson:126,people:2});
+  assert.deepEqual(calculateBill({subtotal:200,taxPercent:16,tipPercent:10,people:2}),{taxAmount:32,tipAmount:20,total:252,perPerson:126,people:2,shares:[126,126]});
   assert.throws(()=>calculateBill({people:0}));
 });
 test('CSV escaping, export and import for old and new transactions',()=>{

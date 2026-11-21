@@ -70,12 +70,15 @@ export function summarizeTransactions(entries, month, currency) {
   const categories=[...categoryMinor].map(([name,minor])=>({name,amount:minor/scale})).sort((a,b)=>b.amount-a.amount);
   return {rows,spent:spentMinor/scale,received:receivedMinor/scale,balance:(receivedMinor-spentMinor)/scale,categories,transactions:rows.length};
 }
-export function calculateBill({subtotal=0,taxPercent=0,tipPercent=0,people=1}={}) {
+export function calculateBill({subtotal=0,taxPercent=0,tipPercent=0,people=1,currency='MXN'}={}) {
   const price = Number(subtotal), tax = Number(taxPercent), tip = Number(tipPercent), parties = Number(people);
   if (![price,tax,tip,parties].every(Number.isFinite) || price<0 || tax<0 || tax>100 || tip<0 || tip>100 || !Number.isInteger(parties) || parties<1 || parties>1000) throw new Error('Invalid bill inputs');
   const round=n=>Math.round((n+Number.EPSILON)*100)/100;
   const taxAmount=round(price*tax/100), tipAmount=round(price*tip/100), total=round(price+taxAmount+tipAmount);
-  return {taxAmount,tipAmount,total,perPerson:round(total/parties),people:parties};
+  // Distribute the leftover cents/yen instead of giving everybody a rounded
+  // estimate whose total can be one or more minor units short.
+  const shares=splitAmountExactly(total,parties,currency);
+  return {taxAmount,tipAmount,total,perPerson:round(total/parties),people:parties,shares};
 }
 // Strict CSV parser: quoted multiline fields and escaped double quotes are
 // allowed; stray quotes outside quoted fields must never silently change the
@@ -300,8 +303,9 @@ export function createExpensesView({store}) {
   function renderCalculator(){
     const subtotal=number('0'),tax=number('0'),tip=number('0'),people=h('input',{type:'number',min:1,max:1000,step:1,value:1});
     const result=h('div',{class:'expense-calculator-result'});
-    const calc=()=>{try{const r=calculateBill({subtotal:subtotal.value,taxPercent:tax.value,tipPercent:tip.value,people:people.value});
-      replace(result,makeStat(label('Tax','Impuesto'),money(r.taxAmount,currency)),makeStat(label('Tip','Propina'),money(r.tipAmount,currency)),makeStat(label('Total bill','Total de la cuenta'),money(r.total,currency)),makeStat(label('Per person','Por persona'),money(r.perPerson,currency)));
+    const calc=()=>{try{const r=calculateBill({subtotal:subtotal.value,taxPercent:tax.value,tipPercent:tip.value,people:people.value,currency});
+      replace(result,makeStat(label('Tax','Impuesto'),money(r.taxAmount,currency)),makeStat(label('Tip','Propina'),money(r.tipAmount,currency)),makeStat(label('Total bill','Total de la cuenta'),money(r.total,currency)),makeStat(label('Per person (approx.)','Por persona (aprox.)'),money(r.perPerson,currency)),
+        h('p',{class:'hint'},label('Exact split','División exacta')+': '+[...new Set(r.shares)].map(amount=>r.shares.filter(x=>x===amount).length+' × '+money(amount,currency)).join(' + ')));
     }catch(e){replace(result,h('p',{class:'form-error'},label('Check the amounts, percentages, and number of people.','Revisa los importes, porcentajes y número de personas.')));}};
     for(const x of [subtotal,tax,tip,people])x.addEventListener('input',calc);
     const content=h('div',{class:'expense-content'},sectionHeading(label('Tax, tip & split calculator','Calculadora de impuestos, propinas y cuenta dividida')),
