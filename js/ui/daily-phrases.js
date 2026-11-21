@@ -103,21 +103,29 @@ export function phraseHistory(until=new Date(), max=30) {
 // Tapping or focusing a chunk reveals its direct English and Spanish meaning.
 // Unlike A1 character glosses, B2 syntax often cannot be explained by each
 // isolated Hanzi without giving a misleading translation.
+// Tone-marked, word-level pronunciation and exactly one interface translation.
+export function b2GlossDetail(gloss,{mandarin=false,spanish=false}={}){
+ const pronunciation=mandarin&&gloss.py?` (${gloss.py})`:'';
+ return `${gloss.word}${pronunciation} — ${spanish?gloss.es:gloss.en}`;
+}
 function createB2Literal(lesson,part,es){
  const turn=lesson.literal?.[part];
  if(!turn)return null;
  const note=h('p',{class:'phrase-b2-literal-note','aria-live':'polite'},
-  es?'Selecciona una palabra o expresión para ver su significado literal.':
-     'Select a word or expression to see its literal meaning.');
+  es?'Selecciona una palabra o expresión para ver su significado.':
+     'Select a word or expression to see its meaning.');
  const column=(items,lang,label)=>h('div',{class:'phrase-b2-literal-column',lang},
   h('small',{},label),
   h('div',{class:'phrase-b2-literal-chips'},
-   ...items.map(({word,en,es:spanish})=>{
-    const explanation=`${word} — EN: ${en} · ES: ${spanish}`;
+   ...items.map(gloss=>{
+    const mandarin=lang==='zh-Hans';
+    const explanation=b2GlossDetail(gloss,{mandarin,spanish:es});
     const show=()=>{note.textContent=explanation;};
     return h('button',{type:'button',class:'phrase-b2-gloss-chip',
       title:explanation,'aria-label':explanation,
-      onclick:show,onmouseenter:show,onfocus:show},word);
+      onclick:show,onmouseenter:show,onfocus:show},
+       h('span',{},gloss.word),
+       mandarin?h('small',{class:'phrase-b2-chip-pinyin',lang:'zh-Latn-pinyin'},gloss.py):null);
    })));
  return h('section',{class:'phrase-b2-literal'},
   h('div',{class:'phrase-b2-literal-head'},h('strong',{},
@@ -128,10 +136,7 @@ function createB2Literal(lesson,part,es){
     column(turn.de,'de',es?'ALEMÁN':'GERMAN')),
   note);
 }
-function b2Meaning(turn,{es,all=false}){
- if(all)return h('div',{class:'phrase-b2-translations'},
-  h('p',{lang:'en'},h('strong',{},'EN · '),turn.en),
-  h('p',{lang:'es'},h('strong',{},'ES · '),turn.es));
+function b2Meaning(turn,{es}){
  return h('p',{class:'phrase-b2-english',lang:es?'es':'en'},
   h('strong',{},es?'ES · ':'EN · '),es?turn.es:turn.en);
 }
