@@ -40,7 +40,7 @@ export function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
  const gap=Number.parseFloat(getComputedStyle(host).rowGap)||0;
  const budget=widgetFitBudget(body);
  const moreSize=more.getBoundingClientRect().height||24;
- let used=fixed+moreSize+gap*2,visible=0;
+ let used=fixed+gap*2,visible=0;
  for(let i=0;i<rows.length;i++){
   const size=Math.max(25,rects[i])+gap;
   if(visible>0&&used+size>budget)break;
