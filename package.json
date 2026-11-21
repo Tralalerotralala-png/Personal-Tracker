@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build:wallpaper": "node scripts/build-wallpaper.mjs",
+    "verify": "npm test && npm run build:wallpaper"
   }
 }

@@ -10,7 +10,16 @@ for width,height in [(390,844),(1280,900)]:
         page.on("pageerror",lambda e: errors.append(str(e)))
         page.route("**/config.js",lambda route: route.fulfill(status=200,content_type="text/javascript",body="export const CONFIG=null;"))
         page.goto(BASE,wait_until="domcontentloaded")
-        page.locator(".top .gear").wait_for(timeout=25000)
+        try:
+            page.locator(".top .gear").wait_for(timeout=25000)
+        except Exception:
+            print("Bootstrap page errors:", errors)
+            print("Bootstrap visible body:", page.locator("body").inner_text()[:1800])
+            print("Bootstrap failed imports:", page.evaluate("""() => [...performance.getEntriesByType('resource')]
+                .filter(entry => entry.responseStatus >= 400).map(entry => ({
+                    url: entry.name, status: entry.responseStatus
+                }))"""))
+            raise
         assert page.locator(".widget").count()>=3,"Dashboard widgets missing"
         first_widget=page.locator(".overview .widget").first
         first_widget.wait_for(state="visible",timeout=10000)
@@ -73,7 +82,7 @@ for width,height in [(390,844),(1280,900)]:
           return {before,after};
         }""")
         assert dialogue_ui["before"]=={"oldChar":True,"b2":True,"speech":True,"turns":1,"pinyin":True,"replyHidden":True},dialogue_ui
-        assert dialogue_ui["after"]=={"sheet":True,"reply":True,"notes":True,"vocab":2,"pinyin":2},dialogue_ui
+        assert dialogue_ui["after"]["sheet"] and dialogue_ui["after"]["reply"] and dialogue_ui["after"]["notes"] and dialogue_ui["after"]["vocab"]==2 and dialogue_ui["after"]["pinyin"]>=3,dialogue_ui
 
         # The weather city must precede the live weather icon, never live in
         # a trailing sliver that splits the final character onto another line.
@@ -81,7 +90,7 @@ for width,height in [(390,844),(1280,900)]:
           const {mountWidget}=await import('./js/widgets/registry.js');
           const store={getSetting:async()=>({}),subscribe:()=>()=>{}};
           const weather={getState:()=>({
-            status:'ok',place:{name:'Irapuato'},
+            status:'ok',place:{name:'Example City'},
             current:{temperature_2m:14,weather_code:2},rows:[],summary:null
           }),subscribe:()=>()=>{}};
           const results=[];
@@ -103,7 +112,52 @@ for width,height in [(390,844),(1280,900)]:
           }
           return results;
         }""")
-        assert len(city_layout)==2 and all(x["text"]=="Irapuato" and x["whitespace"]=="nowrap" and not x["wraps"] and x["beforeIcon"] and x["allTextFits"] for x in city_layout),city_layout
+        assert len(city_layout)==2 and all(x["text"]=="Example City" and x["whitespace"]=="nowrap" and not x["wraps"] and x["beforeIcon"] and x["allTextFits"] for x in city_layout),city_layout
+
+        # A partial forecast must occupy the entire row, never reserve a
+        # blank seventh column; wrapped mobile rows must fill their own width.
+        forecast_widths=page.evaluate("""async () => {
+          const {mountWidget}=await import('./js/widgets/registry.js');
+          const store={getSetting:async()=>({}),subscribe:()=>()=>{}};
+          const sizes=window.innerWidth>=900
+            ?[[1270,1],[1270,3],[1270,6],[1270,7],[900,6],[620,6]]
+            :[[390,6],[320,7],[390,3],[320,1]];
+          const results=[];
+          for(const [width,count] of sizes){
+            const weather={getState:()=>({
+              status:'ok',place:{name:'Example City'},
+              current:{temperature_2m:24,weather_code:3,uv_index:2},
+              summary:null,
+              rows:Array.from({length:count},(_,i)=>({
+                date:new Date(Date.UTC(2026,10,21+i)).toISOString().slice(0,10),
+                phase:i===0?'today':'future',
+                raw:{weather_code:3,tmax:24,precip:.3},
+                label:'Dry',index:i
+              }))
+            }),subscribe:()=>()=>{}};
+            const widget=document.createElement('section');
+            widget.className='widget wd-mud';
+            widget.style.cssText='position:fixed;top:4px;left:4px;width:'+width+'px;height:420px;z-index:9999';
+            const body=document.createElement('div');
+            body.className='widget-body';widget.append(body);document.body.append(widget);
+            const instance=mountWidget('mud',body,{weather,store,interactive:true});
+            await new Promise(resolve=>setTimeout(resolve,80));
+            const grid=body.querySelector('.w-forecast-cards');
+            const cards=[...body.querySelectorAll('.w-forecast-day')];
+            if(grid&&cards.length){
+              const g=grid.getBoundingClientRect(),bounds=cards.map(x=>x.getBoundingClientRect());
+              results.push({width,count,rendered:cards.length,display:getComputedStyle(grid).display,
+                leftGap:Math.round(Math.min(...bounds.map(x=>x.left))-g.left),
+                rightGap:Math.round(g.right-Math.max(...bounds.map(x=>x.right))),
+                overflow:grid.scrollWidth>grid.clientWidth+2});
+            }else results.push({width,count,rendered:cards.length,missing:true});
+            instance.destroy();widget.remove();
+          }
+          return results;
+        }""")
+        assert all(x["rendered"]==x["count"] and not x.get("missing") and
+                   abs(x["leftGap"])<=4 and abs(x["rightGap"])<=4 and
+                   not x["overflow"] for x in forecast_widths),forecast_widths
         # Spanish translations and literal word chunks work from a compact
         # dashboard widget, and history lists both target languages and their
         # English/Spanish meanings.
@@ -128,11 +182,11 @@ for width,height in [(390,844),(1280,900)]:
             sheet?.querySelector('.phrase-b2-toggle')?.click();
             const both=sheet?.querySelectorAll('.phrase-b2-translations p')||[];
             const response=sheet?.querySelector('.phrase-b2-answer');
-            const detail={spanish:translated.includes('Si aplazamos'),
+            const detail={spanish:translated.includes('En principio'),
               beginnerSpanish:beginner.textContent.includes('Significado:'),
-              glossary:glossCount>=10&&note.includes('EN:')&&note.includes('ES:'),
+              glossary:glossCount>=10&&note.includes('—')&&!note.includes('EN:')&&!note.includes('ES:'),
               response:!!response&&!response.hidden,
-              bilingualReply:both.length===2&&both[0].textContent.includes('EN')&&both[1].textContent.includes('ES')};
+              singleLanguageReply:both.length===0&&!!response?.querySelector('.phrase-b2-english')?.textContent?.includes('ES')};
             sheet?.close();compact.remove();
             openPhraseHistory();
             const history=[...document.querySelectorAll('dialog.sheet[open]')].at(-1);
@@ -140,7 +194,7 @@ for width,height in [(390,844),(1280,900)]:
             detail.history=!!first?.querySelector('[lang="zh-Hans"]')&&
               !!first?.querySelector('[lang="de"]')&&
               !!first?.querySelector('.phrase-history-meaning [lang="es"]')&&
-              !!first?.querySelector('.phrase-history-meaning [lang="en"]');
+              !first?.querySelector('.phrase-history-meaning [lang="en"]');
             history?.close();
             return detail;
           }finally{
@@ -149,7 +203,7 @@ for width,height in [(390,844),(1280,900)]:
           }
         }""")
         assert spanish_ui=={"spanish":True,"beginnerSpanish":True,"glossary":True,"response":True,
-                          "bilingualReply":True,"history":True},spanish_ui
+                          "singleLanguageReply":True,"history":True},spanish_ui
 
         # Actual Chromium integration: forecast-only days, meter, current UV,
         # and daily peak UV. Unavailable later dates now carry estimated wetness.
@@ -378,6 +432,32 @@ for width,height in [(390,844),(1280,900)]:
         assert page.evaluate("location.hash")=="#mud","Search did not route to a section"
         # Each media collection must start without the previous shelf's filters.
         page.evaluate("location.hash='#games'")
+        game_toolbar=page.locator(".games-view .media-collection-toolbar")
+        game_toolbar.wait_for(state="visible",timeout=10000)
+        game_bounds=game_toolbar.bounding_box()
+        assert game_toolbar.locator(".media-collection-actions button").count()==3
+        assert game_toolbar.locator(".media-pixel-icon svg.sprite-stacked-asset").count()>=1
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        books_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
+        books_toolbar.wait_for(state="visible",timeout=10000)
+        books_bounds=books_toolbar.bounding_box()
+        assert books_toolbar.locator(".media-collection-actions button").count()==2
+        assert abs(game_bounds["x"]-books_bounds["x"])<=4,(game_bounds,books_bounds)
+        assert abs(game_bounds["width"]-books_bounds["width"])<=4,(game_bounds,books_bounds)
+        book_card=page.locator(".media-library-view .game-book",has_text="Johnny the Homicidal Maniac")
+        book_card.wait_for(state="visible",timeout=10000)
+        book_card.click()
+        assert page.locator(".media-case-books .media-page-flip").count()==2
+        assert page.locator(".media-case-books .media-case-disc").count()==0
+        assert "mediaBookCover" in page.locator(".media-case-books .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        page.locator(".media-case-stage .media-replay").click()
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
+        series_card=page.locator(".media-library-view .game-book",has_text="Invader Zim")
+        series_card.wait_for(state="visible",timeout=10000)
+        series_card.click()
+        assert page.locator(".media-case-films .media-case-disc").count()==1
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         media_search=page.locator(".media-library-view .media-search-filters input")
         media_search.fill("unmatched title")
@@ -385,6 +465,15 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-library-view .hub-tabs button",has_text="Albums").click()
         assert page.locator(".media-library-view .media-search-filters input").input_value()==""
         assert page.locator(".media-library-view .media-search-filters select").input_value()=="all"
+        page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
+        page.locator(".media-editor input[type=text]").first.fill("Example Album")
+        page.locator(".media-editor + .btn.primary").click()
+        page.locator(".media-case-albums .media-vinyl-record").wait_for(state="visible",timeout=10000)
+        assert page.locator(".media-case-albums .media-vinyl-record").count()==1
+        assert page.locator(".media-case-albums .media-case-disc").count()==0
+        assert "mediaSleeveReveal" in page.locator(".media-case-albums .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        page.locator(".media-case-stage .media-replay").click()
+        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.evaluate("location.hash='#overview'")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # Search deep links must open the exact saved note and expense,

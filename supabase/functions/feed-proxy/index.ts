@@ -11,6 +11,10 @@
 //
 // Then in the app: Feed -> Sources and keywords -> Feed proxy -> "Use my Supabase address".
 import { createClient } from 'npm:@supabase/supabase-js@2';
+// Undici's connection-time lookup pins the validated address to the actual
+// socket. A separate DNS check followed by normal fetch is rebinding-prone.
+import { Agent, fetch as guardedFetch } from 'npm:undici@6.21.2';
+import { blockedHost, blockedAddress, allowedUrl } from './safe-target.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,22 +26,21 @@ const MAX_BYTES = 2 * 1024 * 1024;
 const reply = (status: number, body: string, type = 'text/plain; charset=utf-8') =>
   new Response(body, { status, headers: { ...CORS, 'Content-Type': type, 'Cache-Control':'no-store' } });
 
-// Keeps out localhost, private ranges, link-local and cloud metadata hosts.
-// (A name that RESOLVES to a private address is not caught here; that is why access
-// is limited to your signed-in account.)
-function blockedHost(host: string): boolean {
-  const h = host.toLowerCase().replace(/\.$/,'');
-  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (h === '::1' || h.startsWith('[')) return true;
-  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    return a===0||a===10||a===127||a>=224||(a===100&&b>=64&&b<=127)||
-      (a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&(b===0||b===168))||
-      (a===198&&(b===18||b===19));
-  }
-  return false;
-}
+// Reject literals, private hosts, internal domains, alternate ports and
+// addresses that would reach non-public services. Hosts resolve again INSIDE
+// Undici's socket lookup, so the checked answer is the connected answer.
+const connectLookup=(hostname:string,_options:unknown,callback:(error:Error|null,address?:string,family?:number)=>void)=>{
+ (async()=>{
+   if(blockedHost(hostname))throw Error('Host not allowed');
+   const results=await Promise.allSettled([Deno.resolveDns(hostname,'A'),Deno.resolveDns(hostname,'AAAA')]);
+   const addresses=results.flatMap((r,i)=>r.status==='fulfilled'
+    ?r.value.map(ip=>({ip,family:i===0?4:6})):[]);
+   if(!addresses.length||addresses.some(x=>blockedAddress(x.ip)))throw Error('Private or unresolved feed address');
+   // Select a validated answer, never asking the TCP stack to resolve again.
+   return addresses.find(x=>x.family===4)||addresses[0];
+ })().then(result=>callback(null,result.ip,result.family),error=>callback(error instanceof Error?error:Error('Feed DNS rejected')));
+};
+const feedAgent=new Agent({connect:{lookup:connectLookup},connections:3,pipelining:1});
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -56,17 +59,19 @@ Deno.serve(async (req) => {
   const target = new URL(req.url).searchParams.get('url');
   let url: URL;
   try { url = new URL(target ?? ''); } catch { return reply(400, 'Missing or invalid url'); }
-  if (!['http:', 'https:'].includes(url.protocol)) return reply(400, 'Only http and https addresses are allowed');
-  if (url.username||url.password||blockedHost(url.hostname)) return reply(400, 'That address is not allowed');
+  if (!allowedUrl(url)) return reply(400, 'That address is not allowed');
 
   // 3. Fetch with a time limit and a size limit.
   try {
     // Validate every redirect target: fetch(...redirect:'follow') silently
     // bypasses a check performed only on the original URL.
     let res:Response|null=null;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),12000);
+    try{
     for(let hop=0;hop<4;hop++){
-      const candidate=await fetch(url,{
-        redirect:'manual',signal:AbortSignal.timeout(8000),
+      const candidate=await guardedFetch(url,{
+        dispatcher:feedAgent,redirect:'manual',signal:controller.signal,
         headers:{'User-Agent':'PersonalTracker/1.0 (feed reader)',Accept:'application/rss+xml, application/atom+xml, application/xml, text/xml, */*'},
       });
       if(candidate.status<300||candidate.status>=400){res=candidate;break;}
@@ -74,8 +79,7 @@ Deno.serve(async (req) => {
       const location=candidate.headers.get('Location');
       if(!location)return reply(502,'Redirect without location');
       let next:URL;try{next=new URL(location,url);}catch{return reply(400,'Invalid redirect');}
-      if(!['http:','https:'].includes(next.protocol)||next.username||next.password||blockedHost(next.hostname))
-        return reply(400,'Redirect target not allowed');
+      if(!allowedUrl(next))return reply(400,'Redirect target not allowed');
       url=next;
     }
     if(!res)return reply(502,'Feed redirect failed');
@@ -95,6 +99,7 @@ Deno.serve(async (req) => {
     let offset = 0;
     for (const c of chunks) { body.set(c, offset); offset += c.length; }
     return reply(200, new TextDecoder().decode(body), 'application/xml; charset=utf-8');
+    }finally{clearTimeout(timer);}
   } catch {
     return reply(504, 'Could not fetch that feed in time');
   }

@@ -283,7 +283,7 @@ exact error message is all I need to fix it.
 
 ## Updating the app
 
-The update archive contains project files at its root. Upload them to the GitHub repository root, replacing matching files. Keep your existing `config.js` and do not publish Supabase secret/service-role keys. GitHub's web uploader does not delete old files automatically. The only required top-level Markdown documentation is `README.md` and `SETUP.md`; old upgrade-note Markdown files may be removed. Existing Supabase records and widget layouts are not reset.
+The update archive contains project files at its root. Upload them to the GitHub repository root, replacing matching files. Keep your existing `config.js` and do not publish Supabase secret/service-role keys. GitHub's web uploader does not delete old files automatically. Prefer updating `README.md`, `SETUP.md`, or the existing security audit over adding dated Markdown reports. Never put personal details, locations, account exports, private keys, or user screenshots in this public repository. Existing Supabase records and widget layouts are not reset.
 
 
 ## Optional real AI pixel-art generator

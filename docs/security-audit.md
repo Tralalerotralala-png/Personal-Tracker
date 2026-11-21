@@ -1,2 +1,13 @@
-# Account security hardening
-Private single-owner deployment. Server-side restrictive policies require the original confirmed account as well as existing row ownership. Client verifies access before opening an account-specific cache. Sync binds to a fixed user and explicitly filters pulls. Sign-out/account changes reload the document. Legacy shared cache and audio files are retained but not automatically imported because their ownership cannot be established; synced records are fetched from the server. Browser profile access is not protected by account namespaces or encryption. Auth signup configuration requires dashboard access. Wallpaper access remains a revocable bearer capability. No data deletion performed.
+# Security and release checks
+
+This is a public codebase. Do not commit passwords, service-role/secret API keys, private records, personal addresses, account exports, logs, or user screenshots. Browser project URLs and **publishable** Supabase keys are not secrets; privileged keys belong only in server-side secrets. Avoid account-specific examples in tests or documentation.
+
+Account data is protected by owner-scoped database policies. Local browser storage and Wallpaper Engine's optional offline snapshot are **not encrypted by those policies**; protect shared devices and use the wallpaper clear-data option when needed. Wallpaper access keys can be revoked from the app.
+
+## Code review and deployment
+
+The November 2026 review led to changes in the feed proxy's outbound URL/DNS guard, sync/event cleanup, asynchronous weather/dashboard updates, wallpaper privacy controls, and widget fitting. Verify the generated wallpaper bundle with `npm run build:wallpaper` and run `npm test`; CI also checks mobile/desktop browser behavior and isolated database authentication/policies.
+
+**Release gate:** The feed proxy's outbound-network protection still requires end-to-end checks in a disposable Supabase Edge deployment before it is enabled in production. Other manual gates are mobile weather-day navigation, 1/3/6/7-day forecast layout at multiple widths, PWA update, and Wallpaper Engine/privacy settings.
+
+Do not treat a passing client-side test as a production security audit. If any real secret has ever been committed, revoke or rotate it; deleting a file in a later commit does not erase public Git history.
