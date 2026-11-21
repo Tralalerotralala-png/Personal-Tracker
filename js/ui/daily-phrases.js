@@ -179,7 +179,7 @@ function createB2Dialogue({lesson,date,onHistory,expanded=false}){
     openSheet({title:lesson.topic,body:createB2Dialogue({lesson,date,onHistory:null,expanded:false})});
    }else{
     const panel=seeWords.closest('.phrase-b2-panel')?.querySelector('.phrase-b2-literal');
-    if(panel){panel.scrollIntoView?.({block:'nearest',behavior:'instant'});
+    if(panel){panel.scrollIntoView?.({block:'nearest',behavior:'auto'});
       panel.querySelector('button')?.focus();}
    }
   }},es?'Significado literal':'Word-by-word meaning');
@@ -233,9 +233,15 @@ export function openPhraseHistory() {
  }
  datePicker.addEventListener('change',()=>showKey(datePicker.value));
  const recent=h('div',{class:'phrase-history-list'},history.map(({date,lesson})=>
-  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},h('time',{datetime:date},date),h('span',{class:lesson.level==='B2'?'phrase-history-topic':''},
-   lesson.level==='B2'?'B2 · '+lesson.topic:lesson.zh),
-  h('span',{},lesson.level==='B2'?lesson.zh:lesson.de))));
+  h('button',{class:'phrase-history-row',type:'button',onclick:()=>showKey(date)},
+   h('time',{datetime:date},date),
+   h('span',{class:'phrase-history-target'},
+    lesson.level==='B2'?h('strong',{class:'phrase-history-topic'},'B2 · '+lesson.topic):null,
+    h('span',{lang:'zh-Hans'},lesson.zh),
+    h('span',{lang:'de'},lesson.de)),
+   h('span',{class:'phrase-history-meaning'},
+    h('span',{lang:es?'es':'en'},(es?'ES · ':'EN · ')+(es?lesson.es:lesson.en)),
+    h('small',{lang:es?'en':'es'},(es?'EN · ':'ES · ')+(es?lesson.en:lesson.es))))));
  const body=h('div',{class:'phrase-archive'},h('p',{class:'hint'},es?'Todas las frases desde el lanzamiento, incluso los días en que no abriste la aplicación.':'Every dated lesson since launch, including days when the app was closed.'),
   h('label',{class:'phrase-date-picker'},es?'Ver fecha':'Jump to date',datePicker),detail,
   h('h3',{},es?'Días anteriores':'Previous days'),history.length?recent:h('p',{class:'hint'},es?'El historial empieza mañana.':'Previous lessons will appear tomorrow.'));
