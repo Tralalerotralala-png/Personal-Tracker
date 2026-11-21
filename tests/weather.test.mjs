@@ -213,7 +213,7 @@ test('open-meteo: request URLs use the documented variables', () => {
   const soil = new URL(buildForecastUrl({ lat: 1, lon: 2 }, 'soil'));
   assert.deepEqual(soil.searchParams.get('hourly').split(','), SOIL_VARS);
   assert.equal(soil.searchParams.get('daily'), null);
-  assert.ok(PAST_DAYS >= 8 && FORECAST_DAYS === 6);
+  assert.ok(PAST_DAYS >= 8 && FORECAST_DAYS === 7);
   const g = new URL(buildGeocodeUrl('  Bad Ischl, Austria '));
   assert.equal(g.searchParams.get('name'), 'Bad Ischl, Austria');
   assert.equal(g.origin, 'https://geocoding-api.open-meteo.com');
