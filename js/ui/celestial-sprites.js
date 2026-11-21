@@ -1,3 +1,4 @@
+import {pixelStackIconSvg} from './sprite-stack.js';
 // Original layered procedural 32-pixel planetary sprites. Surface markings and
 // ring tilt are illustrative, not a claim of current telescope orientation.
 const palette={
@@ -77,5 +78,5 @@ export function celestialSprite(name,{kind='body',phase=null}={}){
  if(cache.size>160)cache.clear();cache.set(k,art);return art;
 }
 export function celestialSpriteSvg(name,opts={}){
- return '<svg class="celestial-sprite" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+celestialSprite(name,opts)+'</svg>';
+ return pixelStackIconSvg('<svg class="celestial-sprite" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+celestialSprite(name,opts)+'</svg>');
 }
