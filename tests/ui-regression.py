@@ -137,11 +137,11 @@ for width,height in [(390,844),(1280,900)]:
             sheet?.querySelector('.phrase-b2-toggle')?.click();
             const both=sheet?.querySelectorAll('.phrase-b2-translations p')||[];
             const response=sheet?.querySelector('.phrase-b2-answer');
-            const detail={spanish:translated.includes('Si aplazamos'),
+            const detail={spanish:translated.includes('En principio'),
               beginnerSpanish:beginner.textContent.includes('Significado:'),
-              glossary:glossCount>=10&&note.includes('EN:')&&note.includes('ES:'),
+              glossary:glossCount>=10&&note.includes('—')&&!note.includes('EN:')&&!note.includes('ES:'),
               response:!!response&&!response.hidden,
-              bilingualReply:both.length===2&&both[0].textContent.includes('EN')&&both[1].textContent.includes('ES')};
+              singleLanguageReply:both.length===0&&!!response?.querySelector('.phrase-b2-english')?.textContent?.includes('ES')};
             sheet?.close();compact.remove();
             openPhraseHistory();
             const history=[...document.querySelectorAll('dialog.sheet[open]')].at(-1);
@@ -149,7 +149,7 @@ for width,height in [(390,844),(1280,900)]:
             detail.history=!!first?.querySelector('[lang="zh-Hans"]')&&
               !!first?.querySelector('[lang="de"]')&&
               !!first?.querySelector('.phrase-history-meaning [lang="es"]')&&
-              !!first?.querySelector('.phrase-history-meaning [lang="en"]');
+              !first?.querySelector('.phrase-history-meaning [lang="en"]');
             history?.close();
             return detail;
           }finally{
@@ -158,7 +158,7 @@ for width,height in [(390,844),(1280,900)]:
           }
         }""")
         assert spanish_ui=={"spanish":True,"beginnerSpanish":True,"glossary":True,"response":True,
-                          "bilingualReply":True,"history":True},spanish_ui
+                          "singleLanguageReply":True,"history":True},spanish_ui
 
         # Actual Chromium integration: forecast-only days, meter, current UV,
         # and daily peak UV. Unavailable later dates now carry estimated wetness.
