@@ -318,8 +318,8 @@ test('bundle: a classic script with no module syntax, and no interactive or sign
     assert.ok(!modules.includes(banned), `${banned} should not be in the wallpaper`);
   }
   assert.ok(modules.includes('js/widgets/registry.js') && modules.includes('js/weather/service.js'));
-  // Includes the offline B2 conversation corpus and shared visual renderers (under 335 KiB raw).
-  assert.ok(code.length < 335 * 1024, `bundle is ${(code.length / 1024).toFixed(0)} KB`);
+  // Includes curated B2 Spanish and literal glosses and the original visual modules (under 375 KiB raw).
+  assert.ok(code.length < 375 * 1024, `bundle is ${(code.length / 1024).toFixed(0)} KB`);
   assert.equal(ENTRY, 'js/wallpaper/main.js');
 });
 
