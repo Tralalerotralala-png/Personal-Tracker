@@ -1,4 +1,5 @@
 import { stackSprite } from './pixel-icon.js';
+import { renderLayeredSprite } from './sprite-stack.js';
 // Hand-authored, pixel-aligned inventory sprites. Each recipe is a distinct object;
 // a shared shaded palette and one-pixel outline match the pharmacy item artwork.
 const PALETTE = {d:'#342419',a:'#756c64',s:'#a8a6a0',i:'#f8e8c9',h:'#dfba86',w:'#93613a',o:'#c77b38',y:'#e6b84d',r:'#b45449',g:'#498d70',l:'#90bd83',b:'#496e9e',c:'#91bdd3',p:'#a483b4'};
@@ -29,6 +30,28 @@ const cache=new Map();
 export function inventoryAssetSvg(preset) {
   if(cache.has(preset))return cache.get(preset);
   const asset=byId.get(preset);if(!asset)return '';
+  // Derive a stack of actual horizontal slices from the catalog's authored
+  // pixel silhouette. We cannot infer hidden geometry without four separate
+  // orthographic views, so use a bounded group-specific depth approximation.
+  // Every catalog entry uses the same crisp projection and final outline.
+  const front=Array.from({length:16},()=>Array(16).fill(null));
+  for(const cmd of asset.recipe.split(';')){
+    const [sx,sy,sw,sh,key]=cmd.split(' ');
+    const x=Number(sx),y=Number(sy),w=Number(sw),h=Number(sh),color=RAMP[key]?.[1];
+    if(!color)continue;
+    for(let py=y;py<Math.min(16,y+h);py++)
+      for(let px=x;px<Math.min(16,x+w);px++)
+        if(px>=0&&py>=0)front[py][px]=color;
+  }
+  const thickness={tools:3,electronics:4,outdoor:4,clothing:2,household:5,keepsakes:3,pharmacy:4}[asset.group]||4;
+  const specialThin=/^(asset:phone|asset:tablet-device|asset:laptop|asset:letter|asset:postcard|asset:book|asset:mask|asset:blade)$/.test(preset);
+  const stack=renderLayeredSprite(front,{depth:specialThin?2:thickness});
+  if(stack){
+    const svg=stack.replace('class="sprite-stacked-asset"','class="sprite-inventory-depth sprite-stacked-asset"');
+    cache.set(preset,svg);
+    return svg;
+  }
+  // Keep the original carefully shaded flat renderer as a safe fallback.
   const pixels=Array.from({length:34},()=>Array(34).fill(null));
   for(const cmd of asset.recipe.split(';')){
     const [x,y,w,h,key]=cmd.split(' '),color=RAMP[key]?key:null;
