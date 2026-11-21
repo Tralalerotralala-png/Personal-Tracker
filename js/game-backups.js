@@ -59,7 +59,8 @@ export function createGameBackupService({client, store}) {
     // different records without overwriting each other's metadata index.
     const [legacy, records] = await Promise.all([
       store.getSetting(META_KEY, []),
-      store.list('settings', {where: row => row.key.startsWith(ENTRY_PREFIX) || row.key.startsWith(REMOVED_PREFIX)}),
+      store.list('settings', {where: row => row.key.startsWith(ENTRY_PREFIX) ||
+        row.key.startsWith(REMOVED_PREFIX) || row.key.startsWith(DELETE_PENDING_PREFIX)}),
     ]);
     const valid = record => record && typeof record.id === 'string'
       && typeof record.path === 'string' && typeof record.gameId === 'string';
@@ -67,7 +68,7 @@ export function createGameBackupService({client, store}) {
     for (const rec of Array.isArray(legacy) ? legacy : []) {
       if (valid(rec)) byId.set(rec.id, rec);
     }
-    const removed=new Set();
+    const removed=new Set(),pending=new Set();
     for (const row of records) {
       const rec = row.value;
       // Require metadata to match its key; a malformed row cannot impersonate
@@ -75,10 +76,13 @@ export function createGameBackupService({client, store}) {
       if (valid(rec) && row.key === ENTRY_PREFIX + rec.id) byId.set(rec.id, rec);
       if (rec?.deleted===true && typeof rec.id==='string' &&
           row.key === REMOVED_PREFIX + rec.id) removed.add(rec.id);
+      if (rec?.pending===true && typeof rec.id==='string' &&
+          row.key === DELETE_PENDING_PREFIX + rec.id) pending.add(rec.id);
     }
-    // A deletion on one device must win over copies of the old shared index
-    // still held or subsequently synchronized by another device.
-    return [...byId.values()].filter(rec=>!removed.has(rec.id));
+    // Pending deletion is still visible (and retryable) on other devices.
+    // Only a confirmed final tombstone hides the record.
+    return [...byId.values()].filter(rec=>!removed.has(rec.id))
+      .map(rec=>pending.has(rec.id)?{...rec,deletionPending:true}:rec);
   }
   async function list(gameId) {
     return (await listAll()).filter(x => x.gameId === gameId).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
