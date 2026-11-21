@@ -214,6 +214,15 @@ export function createStore({
     return changes.length;
   }
 
+  // A deliberate device-privacy wipe is different from a resync reset. It
+  // must include every metadata entry: photo bytes, queue, and conflict copies.
+  async function eraseDeviceCache() {
+    assertWritable();
+    if(!adapter.clearAll)throw new Error('Atomic device erasure is unavailable.');
+    await adapter.clearAll();
+    emit({type:'change',tables:[...TABLE_NAMES],source:'erase'});
+  }
+
   // Wipe the cache (rows, outbox, pull cursors) but keep 'meta' flags.
   async function resetCache() {
     for (const t of TABLE_NAMES) await adapter.clear(t);
@@ -238,6 +247,6 @@ export function createStore({
     subscribe,
     list, get, upsert, upsertWithMeta, remove, removeLocation, removeCategory,
     getSetting, setSetting,
-    importRow, applyRestorePlan, resetCache,
+    importRow, applyRestorePlan, resetCache, eraseDeviceCache,
   };
 }
