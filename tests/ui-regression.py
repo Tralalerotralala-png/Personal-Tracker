@@ -106,6 +106,11 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".pixel-search-toggle").click()
         page.locator(".global-search-input").fill("Unique test game")
         page.locator(".global-search-result").first.click()
+        page.wait_for_timeout(500)
+        print("GAME_DEBUG",page.evaluate("location.hash"),"detail",page.locator(".game-detail").count(),
+              "games",page.locator(".games-view").count(),
+              "visible",page.locator(".games-view").first.is_visible() if page.locator(".games-view").count() else False,
+              "excerpt",page.locator(".media-library-view").inner_text()[:450])
         page.locator(".game-detail").first.wait_for(timeout=10000)
         assert "Unique test game" in page.locator(".games-view").inner_text()
         page.evaluate("location.hash='#overview'")
