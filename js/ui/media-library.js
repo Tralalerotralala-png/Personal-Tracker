@@ -109,12 +109,68 @@ export function createMediaLibraryView({store,backups=null}) {
    }},L().replay);
   return h('div',{class:'media-case-stage'},casing,replay);
  }
- function renderDetail(row){const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
+ function renderDetail(row){
+  const kind=active;
+  const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
   const journalPanel=h('div',{class:'game-journal'},h('h3',{},L().journal),journal,
-    h('button',{class:'btn small',onclick:async()=>{if(!journal.value.trim())return;row.journal=[{id:uuid(),date:new Date().toISOString(),text:clamp(journal.value.trim(),5000)},...(row.journal||[])];await save();show(row);}},L().entry),
-    ...(row.journal||[]).map(e=>h('p',{class:'game-journal-entry'},h('small',{},new Date(e.date).toLocaleDateString()),' ',e.text)));
-  return h('section',{class:'media-detail game-detail'},caseArt(row),h('div',{},h('h2',{},row.title),h('p',{},row.creator||'—'),h('p',{},`${L().status}: ${row.status||'—'}`),h('p',{},`${L().rating}: ${row.rating??'—'}`),h('p',{class:'media-notes'},row.notes||''),journalPanel,
-    h('div',{class:'inline-actions'},h('button',{class:'btn primary',onclick:()=>edit(row)},L().edit),h('button',{class:'btn danger',onclick:async()=>{if(!await confirmDialog({title:L().delete,message:row.title,confirmLabel:L().delete,danger:true}))return;await markRequestedMediaRemoved(store,active,row.title);data[active]=list(active).filter(x=>x.id!==row.id);await save();back();}},L().delete))));
+   h('button',{class:'btn small',type:'button',onclick:async()=>{
+    const note=journal.value.trim();if(!note)return;
+    try{
+     await commit(draft=>{
+      const saved=draft[kind].find(x=>x.id===row.id);
+      if(!saved)throw Error('Media entry was deleted on another screen.');
+      saved.journal=[{id:uuid(),date:new Date().toISOString(),text:clamp(note,5000)},...(saved.journal||[])];
+     });
+     show(data[kind].find(x=>x.id===row.id));
+    }catch(error){console.warn('Could not save media journal',error);toast(language()==='es'?'No se pudo guardar la nota.':'Could not save note.');}
+   }},L().entry),
+   ...(row.journal||[]).map(e=>h('p',{class:'game-journal-entry'},h('small',{},new Date(e.date).toLocaleDateString()),' ',e.text)));
+  const info=h('div',{class:'media-detail-info'},h('h2',{},row.title),h('p',{},row.creator||'—'),
+   h('p',{},`${L().status}: ${row.status||'—'}`),
+   h('p',{},`${L().rating}: ${row.rating??'—'}`),
+   h('p',{class:'media-notes'},row.notes||''),journalPanel);
+  if(kind==='books'){
+   const spread=h('div',{class:'media-inner-spread'});
+   const previous=h('button',{class:'btn small',type:'button'},language()==='es'?'Anterior':'Previous');
+   const next=h('button',{class:'btn small',type:'button'},language()==='es'?'Siguiente':'Next');
+   const counter=h('small',{class:'media-inner-counter'});
+   const gallery=h('section',{class:'media-interiors'},
+    h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
+    h('p',{class:'media-inner-privacy'},language()==='es'?
+     'Imágenes guardadas solo en este dispositivo. No se suben a la nube.':
+     'Images stay on this device; they are not uploaded to the cloud.'),
+    spread,h('div',{class:'media-interior-controls'},previous,counter,next));
+   let pages=[],index=0;
+   const draw=()=>{
+    const visible=pages.slice(index,index+2);
+    replace(spread,visible.length?visible.map((item,n)=>
+     h('figure',{class:'media-inner-page'},
+      h('img',{src:item.src,alt:item.caption||`${row.title}, page ${index+n+1}`,loading:'lazy'}),
+      item.caption?h('figcaption',{},item.caption):null)):
+     h('p',{class:'media-inner-empty'},language()==='es'?
+      'Añade imágenes desde Editar para verlas aquí de dos en dos.':
+      'Add your own images in Edit to view two pages side by side.'));
+    previous.disabled=index===0;next.disabled=index+2>=pages.length;
+    counter.textContent=pages.length?`${index+1}–${Math.min(index+2,pages.length)} / ${pages.length}`:'0 / 0';
+   };
+   previous.addEventListener('click',()=>{index=Math.max(0,index-2);draw();});
+   next.addEventListener('click',()=>{index=Math.min(Math.max(0,pages.length-1),index+2);draw();});
+   draw();
+   pagesFor(row.id).then(saved=>{pages=saved;draw();})
+    .catch(error=>console.warn('Could not load private book images',error));
+   info.append(gallery);
+  }
+  info.append(h('div',{class:'inline-actions'},
+   h('button',{class:'btn primary',type:'button',onclick:()=>edit(row)},L().edit),
+   h('button',{class:'btn danger',type:'button',onclick:async()=>{
+    if(!await confirmDialog({title:L().delete,message:row.title,confirmLabel:L().delete,danger:true}))return;
+    try{
+     await commit(draft=>{draft[kind]=draft[kind].filter(x=>x.id!==row.id);});
+     if(kind==='books')await store.meta.delete(localPagesKey(row.id));
+     dirty=false;page=null;render();
+    }catch(error){console.error('Could not delete media entry',error);toast(language()==='es'?'No se pudo eliminar.':'Could not delete entry.');}
+   }},L().delete)));
+  return h('section',{class:'media-detail game-detail'},caseArt(row),info);
  }
  function renderEditor(row){const field=(label,el)=>h('label',{class:'media-field'},h('span',{},label),el);
    const title=h('input',{type:'text',maxlength:120,value:row?.title||''});const creator=h('input',{type:'text',maxlength:150,value:row?.creator||''});
