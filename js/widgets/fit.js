@@ -63,6 +63,16 @@ export function fitWidgetRows(body,{rowSelector,moreSelector,staticSelector}){
   used+=size;visible++;
  }
  rows.forEach((row,i)=>{row.hidden=i>=visible;});
+ more.hidden=visible===rows.length;
+ // Actual DOM dimensions include grid gaps, padding and type metrics that
+ // estimates cannot predict exactly. Remove one full day when the whole card
+ // would otherwise need internal scrolling. Never cut a row in half.
+ while(visible>1&&Number.isFinite(body.clientHeight)&&body.clientHeight>0&&
+       body.scrollHeight>body.clientHeight+1){
+  visible--;
+  rows[visible].hidden=true;
+  more.hidden=false;
+ }
  const hidden=rows.length-visible;
  more.hidden=hidden===0;
  more.dataset.hiddenCount=String(hidden);
