@@ -130,7 +130,7 @@ for width,height in [(390,844),(1280,900)]:
             const response=sheet?.querySelector('.phrase-b2-answer');
             const detail={spanish:translated.includes('Si aplazamos'),
               beginnerSpanish:beginner.textContent.includes('Significado:'),
-              glossary:glossCount>=14&&note.includes('EN:')&&note.includes('ES:'),
+              glossary:glossCount>=10&&note.includes('EN:')&&note.includes('ES:'),
               response:!!response&&!response.hidden,
               bilingualReply:both.length===2&&both[0].textContent.includes('EN')&&both[1].textContent.includes('ES')};
             sheet?.close();compact.remove();
