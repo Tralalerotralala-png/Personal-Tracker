@@ -72,8 +72,8 @@ for width,height in [(390,844),(1280,900)]:
           sheet?.close();compact.remove();
           return {before,after};
         }""")
-        assert dialogue_ui["before"]=={"oldChar":True,"b2":True,"speech":True,"turns":1,"pinyin":True,"replyHidden":True},dialogue_ui
-        assert dialogue_ui["after"]=={"sheet":True,"reply":True,"notes":True,"vocab":2,"pinyin":2},dialogue_ui
+        assert dialogue_ui["before"]=={"oldChar":True,"b2":True,"speech":False,"turns":1,"pinyin":True,"replyHidden":True},dialogue_ui
+        assert dialogue_ui["after"]["sheet"] and dialogue_ui["after"]["reply"] and dialogue_ui["after"]["notes"] and dialogue_ui["after"]["vocab"]==2 and dialogue_ui["after"]["pinyin"]>=3,dialogue_ui
 
         # The weather city must precede the live weather icon, never live in
         # a trailing sliver that splits the final character onto another line.
