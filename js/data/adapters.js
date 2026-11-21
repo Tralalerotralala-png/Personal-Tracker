@@ -57,6 +57,16 @@ export function createMemoryAdapter() {
       s(name).set(keyOf(name,value),clone(value));
       s('outbox').set(entry.key,clone(entry));
     },
+    // One synchronous transaction for a record, its pending upload, and
+    // associated device metadata (e.g. a selected image and retry marker).
+    async putWithMeta(name,value,entry,changes) {
+      s(name).set(keyOf(name,value),clone(value));
+      if(entry)s('outbox').set(entry.key,clone(entry));
+      for(const change of changes){
+        if(change.remove)s('meta').delete(change.key);
+        else s('meta').set(change.key,{key:change.key,value:clone(change.value)});
+      }
+    },
     async putBatchWithOutbox(changes) {
       // Memory adapter's synchronous loop cannot be interrupted by a browser task.
       for(const {table,row,entry} of changes) {
@@ -124,6 +134,15 @@ export async function openIdbAdapter(dbName) {
     kind: 'indexeddb',
     putWithOutbox:(name,value,entry)=>atomic([name,'outbox'],tx=>{
       tx.objectStore(name).put(value);tx.objectStore('outbox').put(entry);
+    }),
+    putWithMeta:(name,value,entry,changes)=>atomic([name,'meta',...(entry?['outbox']:[])],tx=>{
+      tx.objectStore(name).put(value);
+      if(entry)tx.objectStore('outbox').put(entry);
+      const meta=tx.objectStore('meta');
+      for(const change of changes){
+        if(change.remove)meta.delete(change.key);
+        else meta.put({key:change.key,value:change.value});
+      }
     }),
     putBatchWithOutbox:changes=>changes.length?atomic([...changes.map(c=>c.table),'outbox'],tx=>{
       for(const {table,row,entry} of changes){
