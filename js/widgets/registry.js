@@ -5,6 +5,7 @@
 //   mountWidget(id, bodyEl, ctx) -> { destroy() }      ctx = { store, weather, feed }
 import { h, replace, daysSince, openSheet, toast } from '../ui/dom.js';
 import { WIDGET_DEFS } from './defs.js';
+import {forecastAgendaDays,fitWidgetRows,observeWidgetFit} from './fit.js';
 import { mountCurrency } from './currency.js';
 import { uvMeter, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
@@ -138,38 +139,79 @@ function openCalendarSelection(detail) {
   if (location.hash !== '#calendar') location.hash = '#calendar';
 }
 function mountCalendar(el, { store, weather }) {
-  const render = async () => {
-    const events = await store.list('events');
-    const from = todayKeyLocal();
-    const to = addDaysKey(from, 6);
-    const byDay = groupByDay(events, from, to);
-    const mud = new Map(weather.getState().rows.map((r) => [r.date, r]));
-    const days = [...byDay.keys()].sort();
-    if (!days.length) return replace(el, note(language()==='es' ? 'No hay eventos previstos esta semana.' : 'Nothing planned this week.'));
-    replace(el, h('div', { class: 'w-cal' }, days.map((key) => {
-      const dm = mud.get(key);
-      const dayTitle = `${dayLong(key)} ${dayMonth(key)}`;
-      return h('section', { class: 'w-day' },
-        h('header', {},
-          h('button', { class: 'w-agenda-date', type: 'button', title: dayTitle,
-            'aria-label': `${language()==='es' ? 'Abrir día' : 'Open day'}: ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) },
-            h('b', {}, key === from ? t('Today') : dayShort(key)), h('span', {}, dayMonth(key))),
-          dm ? h('button', { type:'button', class: 'w-agenda-ground',
-            title: `${localizedMudLabel(dm.label)} ${dm.index}/100`,
-            'aria-label': `${localizedMudLabel(dm.label)} ${dm.index} ${language()==='es' ? 'de' : 'out of'} 100. ${language()==='es' ? 'Abrir día' : 'Open day'} ${dayTitle}`,
-            onclick: () => openCalendarSelection({ dateKey: key }) },
-            h('span', { class: 'w-agenda-weather', 'aria-hidden': 'true', html: weatherIconSvg(dm.raw?.weather_code, { date: new Date(key + 'T12:00:00') }) }), mudBar(dm)) : null),
-        byDay.get(key).map((o) => h('button', { type: 'button', class: 'w-ev w-event-link',
-          title: `${language()==='es' ? 'Abrir evento' : 'Open event'}: ${o.event.title}`,
-          'aria-label': `${language()==='es' ? 'Abrir evento' : 'Open event'} ${o.event.title} · ${dayTitle}`,
-          onclick: () => openCalendarSelection({ dateKey: key, eventId: o.event.id }) },
-          h('span', { class: 'dot', style: `background:${o.event.color || '#43b9ad'}` }),
-          h('span', { class: 'w-time' }, o.allDay ? t('All day') : `${String(o.start.getHours()).padStart(2, '0')}:${String(o.start.getMinutes()).padStart(2, '0')}`),
-          h('span', { class: 'w-event-name' }, o.event.title))));
-    })));
+  // Respect the actual six-day weather horizon: events outside a day with
+  // a reliable wetness meter belong to Calendar, not this short forecast tile.
+  const fit=observeWidgetFit(el,()=>{
+    const result=fitWidgetRows(el,{
+      rowSelector:'.w-cal-day',
+      moreSelector:'.w-cal-overflow',
+      staticSelector:'.w-cal-uv,.w-cal-overflow',
+    });
+    const more=el.querySelector('.w-cal-overflow');
+    if(more&&result.hidden)more.textContent=language()==='es'
+      ?`Ver ${result.hidden} día(s) más en Calendario`
+      :`View ${result.hidden} more day(s) in Calendar`;
+  });
+  const render=async()=>{
+    const events=await store.list('events');
+    const from=todayKeyLocal();
+    const state=weather.getState(),available=forecastAgendaDays(state.rows,from);
+    const uv=h('div',{class:'w-cal-uv','data-widget-static':'true'},
+      uvMeter(state.current?.uv_index,{stale:state.status==='stale'}));
+    if(!available.length){
+      replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
+        note(language()==='es'
+          ?'No hay pronóstico de humedad del suelo disponible. Abre Clima para actualizarlo.'
+          :'No soil-wetness forecast is available. Open Weather to refresh it.')));
+      fit.refresh();return;
+    }
+    const last=available.at(-1).date,byDay=groupByDay(events,from,last);
+    const days=available.filter(r=>byDay.has(r.date));
+    if(!days.length){
+      replace(el,h('div',{class:'w-cal w-cal-empty'},uv,
+        note(language()==='es'
+          ?'No hay eventos durante los días con pronóstico del suelo.'
+          :'No events during the available ground-forecast days.')));
+      fit.refresh();return;
+    }
+    replace(el,h('div',{class:'w-cal'},
+      uv,
+      ...days.map(dm=>{
+        const key=dm.date,dayTitle=`${dayLong(key)} ${dayMonth(key)}`;
+        const occurrences=byDay.get(key),shown=occurrences.slice(0,2);
+        const peak=uvMeter(dm.raw?.uvMax,{peak:true,stale:state.status==='stale'});
+        return h('section',{class:'w-day w-cal-day'},
+          h('header',{},
+            h('button',{class:'w-agenda-date',type:'button',title:dayTitle,
+              'aria-label':`${language()==='es'?'Abrir día':'Open day'}: ${dayTitle}`,
+              onclick:()=>openCalendarSelection({dateKey:key})},
+              h('b',{},key===from?t('Today'):dayShort(key)),h('span',{},dayMonth(key))),
+            h('button',{type:'button',class:'w-agenda-ground',
+              title:`${localizedMudLabel(dm.label)} ${dm.index}/100`,
+              'aria-label':`${localizedMudLabel(dm.label)} ${dm.index}/100. ${dayTitle}`,
+              onclick:()=>openCalendarSelection({dateKey:key})},
+              h('span',{class:'w-agenda-weather','aria-hidden':'true',
+                html:weatherIconSvg(dm.raw?.weather_code,{date:new Date(key+'T12:00:00')})}),
+              mudBar(dm)),
+            h('span',{class:'w-agenda-uv'},peak)),
+          ...shown.map(o=>h('button',{type:'button',class:'w-ev w-event-link',
+            title:`${language()==='es'?'Abrir evento':'Open event'}: ${o.event.title}`,
+            'aria-label':`${language()==='es'?'Abrir evento':'Open event'} ${o.event.title} · ${dayTitle}`,
+            onclick:()=>openCalendarSelection({dateKey:key,eventId:o.event.id})},
+            h('span',{class:'dot',style:`background:${o.event.color||'#43b9ad'}`}),
+            h('span',{class:'w-time'},o.allDay?t('All day'):`${String(o.start.getHours()).padStart(2,'0')}:${String(o.start.getMinutes()).padStart(2,'0')}`),
+            h('span',{class:'w-event-name'},o.event.title))),
+          occurrences.length>2?h('button',{type:'button',class:'w-cal-extra',
+            onclick:()=>openCalendarSelection({dateKey:key})},
+            language()==='es'?`+${occurrences.length-2} eventos`:`+${occurrences.length-2} more events`):null);
+      }),
+      h('button',{type:'button',class:'w-cal-overflow',hidden:true,
+        onclick:()=>openCalendarSelection({dateKey:days[0].date})},
+        language()==='es'?'Ver más en Calendario':'View more in Calendar')));
+    fit.refresh();
   };
-  return live(render, (run) => [storeTables(store, ['events'], run), weather.subscribe(run)]);
+  const inst=live(render,run=>[storeTables(store,['events'],run),weather.subscribe(run)]);
+  return {destroy(){fit.destroy();inst.destroy();},refresh:inst.refresh};
 }
 
 // ---- loot and lost quests --------------------------------------------------------------------
