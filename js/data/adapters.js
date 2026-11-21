@@ -53,6 +53,9 @@ export function createMemoryAdapter() {
       s('meta').set(key,{key,value:{path,dataUrl}});return true;
     },
     async clear(name) { s(name).clear(); },
+    async clearAll() {
+      for(const name of [...TABLE_NAMES,'outbox','meta'])s(name).clear();
+    },
     async putWithOutbox(name,value,entry) {
       s(name).set(keyOf(name,value),clone(value));
       s('outbox').set(entry.key,clone(entry));
@@ -203,5 +206,11 @@ export async function openIdbAdapter(dbName) {
     putMany: (name, values) => run(name, 'readwrite', (s) => { for (const v of values) s.put(v); }),
     del: (name, key) => run(name, 'readwrite', (s) => s.delete(key)),
     clear: (name) => run(name, 'readwrite', (s) => s.clear()),
+    clearAll:()=>atomic([...TABLE_NAMES,'outbox','meta'],tx=>{
+      // One transaction: erasing an account cannot leave behind decrypted
+      // photo bytes, conflict copies, feed caches or cloud retry metadata.
+      for(const name of [...TABLE_NAMES,'outbox','meta'])
+        tx.objectStore(name).clear();
+    }),
   };
 }
