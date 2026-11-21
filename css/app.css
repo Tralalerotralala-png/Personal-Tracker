@@ -2741,3 +2741,91 @@ button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var
 .reduce-animations :is(.media-case-films .media-case-front,
  .media-case-game .media-case-front,.media-case-films .media-case-disc,
  .media-case-game .media-case-disc){animation:none!important;transform:none!important}
+
+
+/* Compact media controls: no category/count panel beside Cover grid. */
+.media-library-view .media-collection-toolbar.media-collection-toolbar-compact{
+ display:flex;justify-content:flex-end;align-items:center;min-height:0;
+ padding:0;margin:0;box-shadow:none;background:none;border:0;width:100%;max-width:100%}
+.media-library-view .media-collection-toolbar-compact .media-collection-actions{
+ margin-left:auto;justify-content:flex-end;gap:9px;width:auto}
+.media-library-view .media-collection-toolbar-compact .btn{min-height:42px}
+/* Category icons use front-on voxels at rest, large enough to read. Only
+   hover/focus rotates; there is no incessant movement on touchscreens. */
+.media-library-view .media-category-tabs{gap:9px;align-items:center;flex-wrap:wrap}
+.media-library-view .media-category-tabs .btn{
+ display:inline-flex;align-items:center;justify-content:center;gap:11px;
+ font-size:.98rem;min-height:54px;padding:9px 15px;white-space:nowrap;
+ perspective:560px}
+.media-library-view .media-category-tabs .media-pixel-icon{
+ width:34px;height:34px;flex:0 0 34px;transform:rotateX(0) rotateY(0) rotateZ(0)}
+.media-library-view .media-category-tabs .media-pixel-icon>svg{display:block;width:100%;height:100%;
+ image-rendering:pixelated;transform-origin:center center;transform:rotateX(0) rotateY(0) rotateZ(0)}
+@keyframes mediaTabTumble{
+ 0%{transform:rotateX(0) rotateY(0) rotateZ(0) scale(1)}
+ 28%{transform:rotateX(12deg) rotateY(-25deg) rotateZ(-9deg) scale(1.13)}
+ 57%{transform:rotateX(-12deg) rotateY(24deg) rotateZ(8deg) scale(1.12)}
+ 78%{transform:rotateX(6deg) rotateY(-12deg) rotateZ(-4deg) scale(1.08)}
+ 100%{transform:rotateX(0) rotateY(0) rotateZ(0) scale(1)}}
+@media(hover:hover) and (pointer:fine){
+ .media-library-view .media-category-tabs .btn:hover .media-pixel-icon>svg,
+ .media-library-view .media-category-tabs .btn:focus-visible .media-pixel-icon>svg{
+  animation:mediaTabTumble .75s cubic-bezier(.19,.73,.2,1) both}
+}
+/* Bigger covers keep their natural front-facing artwork until hovered. */
+.media-library-view .game-cover-grid{grid-template-columns:repeat(auto-fill,minmax(136px,166px));
+ gap:24px 20px;justify-content:start}
+.media-library-view .game-book{min-width:0;max-width:166px;perspective:820px}
+.media-library-view .game-book .library-cover-art{
+ transform:rotateX(0) rotateY(0) rotateZ(0);object-fit:cover;transform-origin:center;
+ width:100%;max-width:100%;transition:box-shadow .25s ease,filter .25s ease}
+.media-library-view .game-book .library-cover-art>img{object-fit:cover}
+@keyframes mediaCoverTumble{
+ 0%{transform:rotateX(0) rotateY(0) rotateZ(0) translateY(0) scale(1)}
+ 34%{transform:rotateX(8deg) rotateY(-13deg) rotateZ(-3deg) translateY(-7px) scale(1.06)}
+ 68%{transform:rotateX(-5deg) rotateY(10deg) rotateZ(3deg) translateY(-10px) scale(1.07)}
+ 100%{transform:rotateX(3deg) rotateY(-5deg) rotateZ(-1deg) translateY(-7px) scale(1.06)}}
+@media(hover:hover) and (pointer:fine){
+ .media-library-view .game-book:hover .library-cover-art,
+ .media-library-view .game-book:focus-visible .library-cover-art{
+  animation:mediaCoverTumble .56s cubic-bezier(.2,.75,.2,1) both;
+  box-shadow:8px 13px 18px #0008,0 0 0 2px var(--accent)}
+}
+/* Optical hub: accurate larger through-hole, silver-clear molded plastic rim,
+   and moderate violet interference bands around the cool silver/blue surface. */
+.media-case-films .media-case-disc,.media-case-game .media-case-disc{position:absolute;
+ background:
+  repeating-radial-gradient(circle at center,#f6f8ff17 0 2px,#11182726 3px 4px,#c0ccff16 5px 6px),
+  conic-gradient(from 17deg,#293b5b 0deg,#accbe5 35deg,#9984b5 69deg,#d4b4e5 97deg,
+   #6b6b9e 124deg,#244f73 170deg,#bbcee7 225deg,#8877ad 267deg,
+   #cfebf9 314deg,#293b5b 360deg)}
+.media-case-game .media-case-disc{background:
+ repeating-radial-gradient(circle at center,#f6f8ff16 0 2px,#10182730 3px 4px,#ddd4ff1a 5px 6px),
+ conic-gradient(from 22deg,#283c64 0deg,#abd6ee 35deg,#9170b5 70deg,
+  #d9b5e9 94deg,#7b5aab 131deg,#2a527a 169deg,#bec9e9 217deg,
+  #9c7bbc 270deg,#d7ebf7 319deg,#283c64 360deg)}
+.media-case-films .media-case-disc::before,.media-case-game .media-case-disc::before{
+ content:'';position:absolute;z-index:1;top:50%;left:50%;width:36%;height:36%;
+ transform:translate(-50%,-50%);border-radius:50%;background:
+ radial-gradient(circle,#090d15 0 30%,#dceaf2 31% 43%,#8c9faf 44% 52%,
+  #eaf4fc 53% 60%,#425a79 61% 75%,#14223e 76% 100%);
+ box-shadow:inset 0 0 0 1px #fff9,0 0 0 1px #111b2a,0 1px 5px #0009}
+.media-case-films .media-case-disc::after,.media-case-game .media-case-disc::after{
+ content:'';position:absolute;z-index:2;top:50%;left:50%;width:21%;height:21%;
+ transform:translate(-50%,-50%);border-radius:50%;
+ background:radial-gradient(circle,#070b12 0 62%,#101d2c 70%,#cbdce8 95%);
+ box-shadow:inset 0 0 0 1px #273c53,0 0 0 1px #deecfa80}
+@media(max-width:700px){
+ .media-library-view .game-cover-grid{grid-template-columns:repeat(auto-fill,minmax(112px,148px));
+  gap:19px 13px}
+ .media-library-view .media-category-tabs .btn{gap:7px;min-height:46px;font-size:.85rem;padding:7px 11px}
+ .media-library-view .media-category-tabs .media-pixel-icon{width:28px;height:28px;flex-basis:28px}
+ .media-library-view .media-collection-toolbar-compact .media-collection-actions{
+  width:100%;justify-content:flex-end}
+}
+@media(prefers-reduced-motion:reduce){
+ .media-library-view .media-category-tabs .media-pixel-icon>svg,
+ .media-library-view .game-book .library-cover-art{animation:none!important;transform:none!important}
+}
+.reduce-animations .media-library-view .media-category-tabs .media-pixel-icon>svg,
+.reduce-animations .media-library-view .game-book .library-cover-art{animation:none!important;transform:none!important}
