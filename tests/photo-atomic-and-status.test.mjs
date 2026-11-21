@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPhotos} from '../js/photos.js';
+import {createPhotos,downscaleImage} from '../js/photos.js';
 import {createStore} from '../js/data/store.js';
 import {createMemoryAdapter} from '../js/data/adapters.js';
 
@@ -28,6 +28,27 @@ async function withImageMock(run){
   globalThis.FileReader=previous.reader;
  }
 }
+
+test('large compressed photos are retried at lower quality before saving',async()=>{
+ const previous={bitmap:globalThis.createImageBitmap,doc:globalThis.document};
+ globalThis.createImageBitmap=async()=>({width:800,height:800,close(){}});
+ const attempts=[];
+ globalThis.document={createElement:()=>({
+  getContext:()=>({drawImage(){}}),
+  toBlob:(callback,type,quality)=>{
+   attempts.push([type,quality]);
+   callback(new Blob([new Uint8Array(quality>=.8?1_200_000:120_000)],{type}));
+  },
+ })};
+ try{
+  const result=await downscaleImage(new Blob(['image']));
+  assert.ok(result.size<1024*1024);
+  assert.ok(attempts.length>=2);
+ }finally{
+  globalThis.createImageBitmap=previous.bitmap;
+  globalThis.document=previous.doc;
+ }
+});
 
 test('photo commit keeps the original item and metadata when the transaction fails',()=>withImageMock(async()=>{
  const base=createMemoryAdapter();
