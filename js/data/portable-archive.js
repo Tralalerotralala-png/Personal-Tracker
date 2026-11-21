@@ -49,7 +49,14 @@ async function scanTar(archive) {
  const index=new Map();let cursor=0,ended=false;
  while(cursor+BLOCK<=archive.size) {
   const data=new Uint8Array(await archive.slice(cursor,cursor+BLOCK).arrayBuffer());
-  if(data.every(x=>x===0)){ended=true;break;}
+  if(data.every(x=>x===0)){
+   // TAR ends with TWO zero-filled blocks. Accepting one would allow a
+   // truncated download to pass integrity checks when no assets follow.
+   if(cursor+BLOCK*2>archive.size)throw Error('Truncated TAR end marker');
+   const second=new Uint8Array(await archive.slice(cursor+BLOCK,cursor+BLOCK*2).arrayBuffer());
+   if(!second.every(x=>x===0))throw Error('Damaged TAR end marker');
+   ended=true;break;
+  }
   const given=tarNumber(data,148,8);
   const computed=data.reduce((s,v,i)=>s+(i>=148&&i<156?32:v),0);
   if(given!==computed)throw Error('Damaged TAR entry header');
