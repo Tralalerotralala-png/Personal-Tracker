@@ -156,6 +156,17 @@ jobs:
             CREATE TYPE auth.factor_type AS ENUM ('totp','webauthn');
           EXCEPTION WHEN duplicate_object THEN NULL;
           END $enum$;
+          -- The historical MFA migration defines three enum types inside one
+          -- exception handler. Since factor_type already exists, it skips the
+          -- other two unless this isolated fixture bootstraps them as well.
+          DO $status_enum$ BEGIN
+            CREATE TYPE auth.factor_status AS ENUM ('unverified','verified');
+          EXCEPTION WHEN duplicate_object THEN NULL;
+          END $status_enum$;
+          DO $aal_enum$ BEGIN
+            CREATE TYPE auth.aal_level AS ENUM ('aal1','aal2','aal3');
+          EXCEPTION WHEN duplicate_object THEN NULL;
+          END $aal_enum$;
           -- GoTrue's historical 20221208 migration contains the expression
           -- "id = user_id::text", where this old fixture has uuid identities.
           -- Add a disposable compatibility operator for migration only.
