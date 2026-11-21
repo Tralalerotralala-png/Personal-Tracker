@@ -9,6 +9,7 @@ import { exportAll, importAll, inspectBackup, downloadBackup } from '../data/bac
 import {exportPortableArchive, inspectPortableTar, restorePortableArchive, downloadPortableArchive} from '../data/portable-archive.js';
 import {legacyCacheExists,exportUnverifiedLegacyCache} from '../data/legacy-recovery.js';
 import {getSyncConflicts,exportSyncConflicts} from '../data/conflicts.js';
+import {eraseLocalAudio} from './audio-player.js';
 import { openPlaceSearchSheet } from './place-search.js';
 import { openMudSettings } from './mud-settings.js';
 import { openSourcesSheet } from './feed.js';
@@ -71,10 +72,33 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
      }catch(e){toast(e.message);}
    }},'Export conflicting edits'),
    mode==='cloud'?h('button',{class:'btn small danger',type:'button',onclick:async()=>{
-      const s=store.sync.getStatus();if(s.pending||s.failed){toast('Unsynced changes exist. Export and sync before erasing this device.');return;}
-      const ok=await confirmDialog({title:'Erase account cache?',message:'This permanently erases this account’s local database on this device. Verify your cloud backup first.',confirmLabel:'Erase local cache and sign out',danger:true});
-      if(!ok)return;store.sync.stop();await store.resetCache();await auth.signOut();location.reload();
-   }},'Erase account cache from device'):null));
+      try{
+        const s=store.sync.getStatus();
+        if(s.pending||s.failed){toast('Unsynced records exist. Export and sync before erasing this device.');return;}
+        const photoQueue=await ctx.photos?.queueStatus?.();
+        if(photoQueue?.pending){toast(photoQueue.pending+' photos have not uploaded. Keep this device until the photo queue is empty.');return;}
+        const conflicts=await getSyncConflicts(store);
+        if(conflicts.length){
+          const exportFirst=await confirmDialog({title:'Preserve conflict recovery copies?',
+            message:conflicts.length+' recovered revisions exist only on this device. Download them before erasing; otherwise these versions will be permanently lost.',
+            confirmLabel:'Export conflict copies'});
+          if(!exportFirst)return;
+          downloadBackup(await exportSyncConflicts(store),'personal-tracker-sync-conflicts-before-erase.json');
+        }
+        const ok=await confirmDialog({title:'Erase ALL account data from this device?',
+          message:'This erases locally stored records, photos, pending markers, conflict recovery, feeds, imported audio and audio preferences for this account. It does not delete Supabase cloud records. Close other Tracker tabs and verify your cloud backup first.',
+          confirmLabel:'Erase device data and sign out',danger:true});
+        if(!ok)return;
+        // The audio library is a separate IndexedDB database: erase it before
+        // the main account DB so a blocked delete cannot leave a partial wipe.
+        await eraseLocalAudio(ctx.accountId);
+        store.sync.stop();
+        await store.eraseDeviceCache();
+        try{localStorage.removeItem('tracker-verified-owner:'+new URL(ctx.config.SUPABASE_URL).host);}catch{}
+        await auth.signOut({scope:'local'});
+        location.reload();
+      }catch(error){toast('Device erase could not finish: '+String(error?.message||error));}
+   }},'Erase account data from device'):null));
   // -- mud forecast
   const hasPlace = place && typeof place.lat === 'number';
   const mudBlock = h('section', { class: 'set-block' },
