@@ -115,15 +115,19 @@ export function createPhotos({ store, client }) {
       const item = await store.get('items', itemId);
       // Skip (and drop) uploads that were replaced or whose item is gone.
       if (!cached || !item || cached.path !== q.value.path || item.photo_path !== q.value.path) {
-        await store.adapter.del('meta', q.key);
+        await store.adapter.deleteMetaIfPath(q.key,q.value.path);
         continue;
       }
       try {
         const blob = await dataUrlToBlob(cached.dataUrl);
         const { error } = await client.storage.from(BUCKET).upload(q.value.path, blob, { contentType: blob.type, upsert: true });
         if (error) throw error;
-        await store.adapter.del('meta', q.key);
-        if (q.value.replaces) await client.storage.from(BUCKET).remove([q.value.replaces]).catch(() => {});
+        // The network request can finish AFTER a user selects a newer photo.
+        // Only acknowledge this exact queued path; deleting the whole key
+        // would lose the newer photo's only retry marker while offline.
+        const cleared=await store.adapter.deleteMetaIfPath(q.key,q.value.path);
+        if(cleared && q.value.replaces)
+          await client.storage.from(BUCKET).remove([q.value.replaces]).catch(() => {});
         done += 1;
       } catch { /* still offline or signed out; the entry stays queued */ }
     }
