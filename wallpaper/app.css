@@ -1060,10 +1060,10 @@ html[data-layout-width="compact"] main{max-width:1100px}
    Artwork is user-owned or user-supplied; all geometry is original CSS. */
 .media-case{width:min(100%,230px);aspect-ratio:3/4;position:relative;perspective:920px;isolation:isolate;align-self:start;margin:4px 20px 16px 4px;filter:drop-shadow(4px 5px 3px #0007)}
 .media-case::before{content:'';position:absolute;inset:0;border:3px solid var(--edge-hi);background:linear-gradient(120deg,var(--panel-2),var(--panel));z-index:-1;}
-.media-case-front{position:absolute;inset:0;z-index:2;transform-origin:0% 50%;transform-style:preserve-3d;animation:ptCaseOpen .82s cubic-bezier(.17,.67,.3,1) both;backface-visibility:hidden;}
+.media-case-front{position:absolute;inset:0;z-index:2;transform-origin:0% 50%;transform-style:preserve-3d;animation:mediaDvdCoverReveal 1.12s cubic-bezier(.22,.72,.22,1) both;backface-visibility:hidden;}
 .media-case-front>img,.media-case-front>.game-placeholder{width:100%;height:100%;aspect-ratio:auto;object-fit:cover;border:3px solid var(--edge-hi);display:block;}
-.media-case-disc{position:absolute;top:16%;left:13%;width:74%;aspect-ratio:1/1;border-radius:50%;border:4px solid var(--edge-hi);background:radial-gradient(circle at center,var(--panel) 0 11%,var(--ink-dim) 12% 14%,var(--accent) 15% 17%,#586472 18% 37%,#222a35 38% 42%,#9c8aa5 43% 65%,#333844 66%);box-shadow:inset 0 0 12px #000a,3px 3px 0 #0006;transform:translateX(0);animation:ptDiscSlide .9s .24s cubic-bezier(.18,.72,.2,1) both;z-index:1;}
-.media-case-books .media-case-front{transform-origin:left center;animation:ptBookOpen .85s ease-out both;}
+.media-case-disc{position:absolute;top:16%;left:13%;width:74%;aspect-ratio:1/1;border-radius:50%;border:4px solid var(--edge-hi);background:radial-gradient(circle at center,var(--panel) 0 11%,var(--ink-dim) 12% 14%,var(--accent) 15% 17%,#586472 18% 37%,#222a35 38% 42%,#9c8aa5 43% 65%,#333844 66%);box-shadow:inset 0 0 12px #000a,3px 3px 0 #0006;transform:translateX(0);animation:mediaOpticalDiscReveal 1.2s .18s cubic-bezier(.16,.74,.2,1) both;z-index:1;}
+.media-case-books .media-case-front{transform-origin:left center;animation:mediaBookCover 1.3s cubic-bezier(.24,.8,.26,1) both;}
 .media-case-books .media-book-pages{position:absolute;inset:5% 7% 4% 8%;border:3px solid var(--edge-hi);background:repeating-linear-gradient(to bottom,var(--panel-2) 0 8px,var(--edge) 9px 10px);z-index:0;}
 /* Book and comic art: an actual two-page flip, never a DVD disc. */
 .media-case-books .media-book-pages{overflow:visible;transform-style:preserve-3d;background:repeating-linear-gradient(90deg,#f0e6cb 0 3px,#c6b998 3px 5px);}
@@ -1086,9 +1086,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
 @media(prefers-reduced-motion:reduce){.media-page-flip,.media-vinyl-record{animation:none!important;transform:none!important}}
 .reduce-animations .media-page-flip,.reduce-animations .media-vinyl-record{animation:none!important;transform:none!important}
 
-@keyframes ptCaseOpen{from{transform:rotateY(0)}to{transform:rotateY(-34deg)}}
-@keyframes ptBookOpen{from{transform:rotateY(0)}to{transform:rotateY(-52deg)}}
-@keyframes ptDiscSlide{from{transform:translateX(0)}to{transform:translateX(47%)}}
 .game-detail,.media-detail{position:relative;background:radial-gradient(ellipse at 10% 35%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 70%);padding:12px;min-width:0;}
 .game-detail>div:last-child,.media-detail>div:last-child{min-width:0;}
 @media(max-width:650px){.media-case{width:min(42vw,160px);margin-bottom:8px;} .game-detail,.media-detail{gap:8px;}}
@@ -1690,9 +1687,8 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
  top:12%;left:10%;width:96%;border:3px solid #6b8aa9;
  background:radial-gradient(circle at center,#121923 0 8%,#9cc5ed 8.5% 10%,#233d59 10.5% 13%,#c0d9e7 13.5% 15%,#486d94 15.5% 17%,transparent 17.5%),repeating-radial-gradient(circle at center,transparent 0 4px,#d4eaff22 4px 5px,transparent 5px 7px),conic-gradient(from 28deg,#426b9d 0deg,#a8d7f6 42deg,#c8a9ed 68deg,#6378bd 94deg,#38638c 128deg,#85b3d8 169deg,#ad8cdb 201deg,#dfc0f4 220deg,#5a69aa 255deg,#c5e7f8 302deg,#426b9d 360deg);
  box-shadow:inset 0 0 0 2px #c5e2f488,inset 0 0 14px #0a1f43aa,4px 5px 0 #0006;
- animation:ptGameDiscSlide .9s .24s cubic-bezier(.18,.72,.2,1) both;
+ animation:mediaOpticalDiscReveal 1.2s .18s cubic-bezier(.16,.74,.2,1) both;
 }
-@keyframes ptGameDiscSlide{from{transform:translateX(0)}to{transform:translateX(37%)}}
 @media(max-width:650px){.game-detail:has(>.media-case-game){grid-template-columns:1fr;gap:18px;}.media-case-game{width:min(56vw,210px);margin-right:0;}}
 .game-backups .backup-upload{margin:0 0 14px;padding:12px;border:1px solid var(--edge);background:var(--panel-2);}
 .game-backups [hidden]{display:none!important;}
@@ -2680,7 +2676,7 @@ button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var
 .media-library-view .media-case-stage .media-case-books{margin:0 0 0 16px}
 .media-library-view .media-case-stage .media-case-films{margin:0 16px 0 0}
 /* Both a DVD/TV box and the game jewel case use the new holographic
-   optical disc; no original flat-colored 'ptDiscSlide' media in these views. */
+   optical disc rather than the discontinued flat disc animation. */
 .media-case-films .media-case-disc,.media-case-game .media-case-disc{
  top:14%;left:9%;width:87%;aspect-ratio:1;border-radius:50%;
  border:3px solid #7697ab;background:
