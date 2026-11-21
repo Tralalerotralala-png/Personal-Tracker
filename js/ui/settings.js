@@ -361,7 +361,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   const typography = h('section', { class: 'set-block' }, h('h3', {}, 'Typography'),
     h('p', { class: 'hint' }, 'Choose a sharper font and a comfortable text size. Saved on this device.'),
     h('label', {}, 'Font'), fontSelect, h('label', {}, 'Text size'), sizeSelect);
-  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Weather', calendar: 'Calendar', feed: 'Feed', diary: 'Logs', games: 'Library' };
+  const navNames = { overview: 'Overview', inventory: 'Pack', mud: 'Weather', calendar: 'Calendar', feed: 'Feed', diary: 'Logs', games: 'Library', hub: 'Personal Hub', expenses: 'Expenses' };
   const navOrder = h('div');
   function renderNavOrder() {
     const order = (() => { try { return JSON.parse(localStorage.getItem('tracker-nav-order-v1') || 'null'); } catch { return null; } })();
@@ -373,7 +373,8 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   }
   renderNavOrder();
   const navigation = h('section', { class: 'set-block' }, h('h3', {}, 'Navigation order'),
-    h('p', { class: 'hint' }, 'Drag tabs on desktop, or use these buttons on desktop or phone. Saved on this device.'), navOrder);
+    h('p', { class: 'hint' }, 'Drag tabs on desktop, or use these buttons on desktop or phone. Saved on this device.'), navOrder,
+    h('button',{class:'btn small',type:'button',onclick:()=>window.dispatchEvent(new Event('tracker-customize-nav-icons'))},'Customize navigation icons'));
 
   // -- backup
   const file = h('input', { type: 'file', accept: 'application/json', 'aria-label': 'Backup file' });
