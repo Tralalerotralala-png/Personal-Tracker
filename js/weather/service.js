@@ -12,6 +12,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
   const listeners = new Set();
   let running = null;
   let placeVersion = 0; // invalidates in-flight requests when the selected place changes
+  let recomputeRevision = 0; // invalidates superseded settings/weather re-scores
 
   const emit = () => { for (const fn of [...listeners]) { try { fn({ ...state }); } catch (e) { console.error(e); } } };
   const set = (patch) => { state = { ...state, ...patch }; emit(); };
@@ -34,6 +35,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
 
   async function refresh({ force = false } = {}) {
     if (running) return running;
+    ++recomputeRevision;
     const version = placeVersion;
     running = (async () => {
       const place = await loadPlace();
@@ -131,11 +133,16 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
     finally { if (hourlyPending?.promise === promise) hourlyPending = null; }
   }
   async function recompute() {
-    const place = await loadPlace();
-    const cached = await store.meta.get(CACHE_KEY);
-    if (!place || !cached || cached.key !== placeKey(place)) return state;
-    const c = await compute(cached.raw);
-    if (c.todayFound) set({ ...c });
+    const revision=++recomputeRevision,version=placeVersion;
+    const place=await loadPlace();
+    if(!place||revision!==recomputeRevision||version!==placeVersion)return state;
+    const cached=await store.meta.get(CACHE_KEY);
+    if(!cached||cached.key!==placeKey(place)||revision!==recomputeRevision||version!==placeVersion)return state;
+    const c=await compute(cached.raw);
+    if(revision!==recomputeRevision||version!==placeVersion||
+       (state.place&&placeKey(state.place)!==placeKey(place))||
+       (state.fetchedAt&&cached.raw.fetchedAt&&Date.parse(state.fetchedAt)>Date.parse(cached.raw.fetchedAt)))return state;
+    if(c.todayFound)set({...c});
     return state;
   }
 
@@ -150,6 +157,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
 
   async function setPlace(place) {
     const version = ++placeVersion;
+    ++recomputeRevision;
     await store.setSetting('location', {
       name: place.name, label: place.label ?? place.name, lat: place.lat, lon: place.lon,
       elevation_m: place.elevation_m ?? null, timezone: place.timezone ?? null,
@@ -163,7 +171,7 @@ export function createWeatherService({ store, fetchImpl = globalThis.fetch, now 
   // Retuning or changing the place in settings takes effect immediately.
   store.subscribe((e) => {
     if (e.type !== 'change' || !e.tables?.includes('settings')) return;
-    if (e.source === 'local' || e.source === 'sync') { recompute().then(() => {}); }
+    if (e.source === 'local' || e.source === 'sync') { void recompute().catch(error=>console.warn('Weather recompute failed',error)); }
   });
 
   return {
