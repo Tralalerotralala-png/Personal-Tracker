@@ -117,6 +117,17 @@ export function importTransactionsCsv(text) {
   });
 }
 
+// Commit a validated CSV import and its sync outbox in one IndexedDB
+// transaction. A single invalid/quota-failing row must not leave a partial
+// financial ledger on this device.
+export async function saveImportedTransactionsBatch(store,entries) {
+ if(!Array.isArray(entries)||entries.length>250)throw Error('Import limited to 250 records at a time');
+ const plan=entries.map(row=>({kind:'import',table:'settings',row:{
+  key:'hub_expense:'+uuid(),value:row
+ }}));
+ return store.applyRestorePlan(plan);
+}
+
 export function createExpensesView({store}) {
   const el=h('section',{class:'view expense-view'});
   let entries=[],budgets={},currency='MXN',month=stamp().slice(0,7),search='',typeFilter='all',panel='transactions',editing=null,ready=false,showOnlyMonth=true;
@@ -165,7 +176,7 @@ export function createExpensesView({store}) {
         const unique=imported.filter(x=>!existing.has([x.due,x.type,x.title,x.amount,x.currency,x.category].join('|')));
         if(!unique.length){toast(label('All records are already present','Los registros ya existen'));return;}
         if(!await confirmDialog({title:label('Import transactions?','¿Importar movimientos?'),message:`${unique.length} ${label('new rows will be saved. Review your CSV before importing.','se guardarán nuevos registros. Revisa tu CSV antes de importar.')}`,confirmLabel:label('Import','Importar')}))return;
-        for(const row of unique)await store.setSetting(`hub_expense:${uuid()}`,row);
+        await saveImportedTransactionsBatch(store,unique);
         toast(label('Transactions imported','Movimientos importados'));await load();
       }catch(err){toast(err.message);}finally{upload.value='';}
     }});
