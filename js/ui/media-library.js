@@ -74,15 +74,21 @@ export function createMediaLibraryView({store,backups=null}) {
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
- return {el,mount:load,show:()=>{
+ return {el,mount:load,show:async()=>{
    if(pendingSearch){
     const {kind,id}=pendingSearch;pendingSearch=null;
     dirty=false;query='';statusFilter='all';page=null;
     if(kind==='game'){
+     // This view may already be mounted when another device adds a game.
+     // Reload authoritative account-scoped settings before resolving its ID.
+     await games.mount();
      active='games';render();
      games.openById(id);
      return;
     }
+    const latest=await store.getSetting(KEY);
+    if(latest&&typeof latest==='object')
+     data=Object.fromEntries(KINDS.map(k=>[k,Array.isArray(latest[k])?latest[k]:[]]));
     const row=data[kind]?.find(item=>item.id===id);
     if(row){active=kind;page={entry:row,editing:false};render();return;}
    }
