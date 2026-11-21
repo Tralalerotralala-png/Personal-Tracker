@@ -213,16 +213,17 @@ export function createMediaLibraryView({store,backups=null}) {
    const interiorUpload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp',multiple:true,
     'aria-label':language()==='es'?'Añadir páginas interiores':'Add interior pages',
     onchange:async event=>{
+     // currentTarget is cleared after the first await; keep the input reference.
+     const chooser=event.currentTarget,chosen=[...chooser.files];
      error.textContent='';
      try{
       await ready;
-      const chosen=[...event.currentTarget.files];
       if(interiorPages.length+chosen.length>8)
        throw Error(language()==='es'?'Máximo 8 imágenes.':'Maximum 8 interior images.');
       const images=await Promise.all(chosen.map(convertInteriorImage));
       interiorPages.push(...images);dirty=true;drawPages();
      }catch(e){error.textContent=e.message||'Could not add pages.';}
-     finally{event.currentTarget.value='';}
+     finally{chooser.value='';}
     }});
    fields.push(h('section',{class:'media-interior-editor'},
     h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
