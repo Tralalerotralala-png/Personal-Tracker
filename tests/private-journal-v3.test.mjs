@@ -5,7 +5,7 @@ import {createMemoryAdapter} from '../js/data/adapters.js';
 import {createStore} from '../js/data/store.js';
 import {encryptJournal,JOURNAL_KEY} from '../js/ui/private-journal-crypto.js';
 import {JOURNAL_V3_HEADER,JOURNAL_V3_ENTRY,JOURNAL_V3_DRAFT,
- createJournalV3,unlockJournalV3,reloadJournalV3,saveJournalV3,changeJournalV3Passphrase}
+ createJournalV3,unlockJournalV3,reloadJournalV3,saveJournalV3,changeJournalV3Passphrase,listJournalV3Conflicts}
  from '../js/ui/private-journal-v3.js';
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 const FIRST='a private long journal key',SECOND='another long journal passphrase';
@@ -169,4 +169,37 @@ test('two offline devices editing different encrypted Logs entries merge without
  }
  assert.ok(rows.has('settings:'+JOURNAL_V3_ENTRY+idA));
  assert.ok(rows.has('settings:'+JOURNAL_V3_ENTRY+idB));
+});
+
+test('conflicted journal edits can be decrypted for user review and marked recovered',async()=>{
+ const store=makeStore(),session=await createJournalV3(store,FIRST);
+ const id='aaaaaaa1-0000-4000-8000-000000000001';
+ session.data.dreams.push(entry(id,'Original private dream'));
+ await saveJournalV3(store,session,structuredClone(session.data));
+ const value=await store.getSetting(JOURNAL_V3_ENTRY+id);
+ const key='sync-conflict:settings:'+JOURNAL_V3_ENTRY+id+':sample';
+ await store.meta.set(key,{table:'settings',id:JOURNAL_V3_ENTRY+id,
+  local:{key:JOURNAL_V3_ENTRY+id,value},savedAt:'2026-11-21T01:00:00Z',
+  reason:'Server kept a newer version'});
+ let found=await listJournalV3Conflicts(store,session);
+ assert.equal(found.readable.length,1);
+ assert.equal(found.readable[0].entry.body,'Personal journal content: Original private dream');
+ assert.equal(found.unreadable,0);
+ await store.meta.set('journal-v3-recovered:'+key,{savedAt:'2026-11-21T02:00:00Z'});
+ found=await listJournalV3Conflicts(store,session);
+ assert.deepEqual(found,{readable:[],unreadable:0});
+});
+test('conflicts encrypted with an older key remain archived rather than being misread after rotation',async()=>{
+ const store=makeStore(),session=await createJournalV3(store,FIRST);
+ const id='aaaaaaa1-0000-4000-8000-000000000001';
+ session.data.sleep.push(entry(id,'Earlier sleep note'));
+ await saveJournalV3(store,session,structuredClone(session.data));
+ const encrypted=await store.getSetting(JOURNAL_V3_ENTRY+id);
+ await store.meta.set('sync-conflict:settings:old-generation',{
+  table:'settings',id:JOURNAL_V3_ENTRY+id,local:{value:encrypted},
+  savedAt:'2026-11-21T02:00:00Z'});
+ await changeJournalV3Passphrase(store,session,SECOND);
+ const found=await listJournalV3Conflicts(store,session);
+ assert.equal(found.readable.length,0);
+ assert.equal(found.unreadable,1);
 });
