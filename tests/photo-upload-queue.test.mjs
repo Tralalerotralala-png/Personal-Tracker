@@ -48,7 +48,8 @@ test('a delayed photo upload cannot delete a newer photo upload marker',async()=
  assert.equal(await photos.flushQueue(),1);
  assert.equal(await store.meta.get('photoq:'+ITEM),undefined);
  assert.deepEqual(uploaded,[OLD,NEW]);
- assert.deepEqual(removed,[OLD]);
+ assert.deepEqual(removed,[],'The replaced source must remain recoverable until server sync is confirmed');
+ assert.equal((await store.meta.get('photo-cleanup:'+ITEM+':'+OLD)).path,OLD);
 });
 
 test('compare-and-delete refuses a stale photo marker and removes exact matches only',async()=>{
