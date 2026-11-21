@@ -6,7 +6,7 @@ import {updateReading,readingIndex} from '../js/feed/reading.js';
 test('all navigation sprites use a shared 32 pixel canvas and depth',()=>{
  for(const name of ['board','pack','weather','calendar','feed','moon','games','hub','expenses','gear']){const svg=navGlyphSvg(name);assert.match(svg,/viewBox="0 0 32 32"/);assert.match(svg,/sprite-stack-back/);}
  assert.deepEqual(packAppearance({shape:'invalid',color:'javascript:'}),{shape:'classic',color:'#d84d54'});
- assert.equal(new Set(PACK_SHAPES.map(shape=>navGlyphSvg('pack',{shape}))).size,4);
+ assert.equal(new Set(PACK_SHAPES.map(shape=>navGlyphSvg('pack',{shape}))).size,PACK_SHAPES.length);
  assert.notEqual(navGlyphSvg('pack',{color:'#112233'}),navGlyphSvg('pack'));
 });
 test('history preserves valid observed rates, inversions and dated ratios',()=>{
