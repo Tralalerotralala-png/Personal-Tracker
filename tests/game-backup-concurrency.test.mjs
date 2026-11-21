@@ -131,3 +131,56 @@ test('new backup metadata cannot resurrect when its deletion marker arrives firs
   await adapterB.put('settings',oldRow);
   assert.deepEqual(await b.listAll(),[]);
 });
+
+
+test('a failed deletion-intent write must not destroy a recoverable game save',async()=>{
+ const {client,objects,adapter}=fixture();
+ const store=createStore({adapter}),original=createGameBackupService({client,store});
+ const entry=await original.upload(GAME,new File(['important save'],'slot.sav'));
+ const fault={...store,setSetting:async(key,value)=>{
+  if(key.startsWith('game_backup_delete_pending_v3:'))throw Error('Disk quota exceeded');
+  return store.setSetting(key,value);
+ }};
+ await assert.rejects(createGameBackupService({client,store:fault}).remove(entry),/Disk quota exceeded/);
+ assert.equal(objects.has(entry.path),true,'bytes must not be deleted without durable intent');
+ assert.deepEqual((await original.listAll()).map(x=>x.id),[entry.id]);
+ await original.remove(entry);
+ assert.equal(objects.has(entry.path),false);
+});
+
+test('network deletion failure retains backup metadata and retryable pending intent',async()=>{
+ const {client,objects,adapter}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['save data'],'slot.sav'));
+ const api=client.storage.from();
+ const remove=api.remove;let fail=true;
+ api.remove=async paths=>fail?(fail=false,{error:{message:'Offline'}}):remove(paths);
+ await assert.rejects(service.remove(entry),/remains listed; retry/);
+ assert.equal(objects.has(entry.path),true);
+ assert.deepEqual((await service.listAll()).map(x=>x.id),[entry.id]);
+ assert.equal((await store.getSetting('game_backup_delete_pending_v3:'+entry.id)).pending,true);
+ await service.remove(entry);
+ assert.equal(objects.has(entry.path),false);
+ assert.deepEqual(await service.listAll(),[]);
+ assert.equal(await store.getSetting('game_backup_delete_pending_v3:'+entry.id,null),null);
+});
+
+test('metadata finalization failure after object deletion remains retryable',async()=>{
+ const {client,objects,adapter}=fixture();
+ const store=createStore({adapter}),service=createGameBackupService({client,store});
+ const entry=await service.upload(GAME,new File(['save data'],'slot.sav'));
+ let fail=true;
+ const fault={...store,setSetting:async(key,value)=>{
+  if(fail&&key==='game_backup_removed_v2:'+entry.id){fail=false;throw Error('Storage quota exceeded');}
+  return store.setSetting(key,value);
+ }};
+ await assert.rejects(createGameBackupService({client,store:fault}).remove(entry),/Storage quota exceeded/);
+ assert.equal(objects.has(entry.path),false);
+ assert.deepEqual((await service.listAll()).map(x=>x.id),[entry.id]);
+ assert.equal((await store.getSetting('game_backup_delete_pending_v3:'+entry.id)).pending,true);
+ // Storage.remove is idempotent in this test, just as deleting a missing
+ // object from the real bucket is. Retry writes the final tombstone.
+ await service.remove(entry);
+ assert.deepEqual(await service.listAll(),[]);
+ assert.equal(await store.getSetting('game_backup_delete_pending_v3:'+entry.id,null),null);
+});

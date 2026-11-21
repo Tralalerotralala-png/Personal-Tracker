@@ -8,6 +8,7 @@ export const GAME_BACKUP_LIMIT = 25 * 1024 * 1024; // reliable simple uploads on
 const META_KEY = 'game_backup_index_v1'; // Legacy index: read only for existing records.
 const ENTRY_PREFIX = 'game_backup_entry_v2:'; // One independently synced setting per backup.
 const REMOVED_PREFIX = 'game_backup_removed_v2:'; // Independent deletion marker, including legacy backups.
+const DELETE_PENDING_PREFIX = 'game_backup_delete_pending_v3:'; // Durable intent BEFORE deleting bytes.
 const cleanFilename = name => String(name ?? '').split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g,'').slice(0,160);
 export function validateBackupFile(file) {
   if (!file || !file.name || !Number.isFinite(file.size) || file.size <= 0) throw new Error('Choose a non-empty backup file.');
@@ -106,15 +107,25 @@ export function createGameBackupService({client, store}) {
   }
   async function remove(entry) {
     const uid=await userId();
-    if (!entry?.path?.startsWith(`${uid}/`)) throw new Error('This backup is not owned by your account.');
+    if (!entry?.path?.startsWith(`${uid}/`) || typeof entry.id !== 'string' || !entry.id)
+      throw new Error('This backup is not owned by your account.');
+    // A separate, durable intent prevents an unavailable settings store from
+    // causing permanent loss of the only indexed copy after deleting its bytes.
+    // Do not reuse REMOVED_PREFIX here: another device's "pending" update must
+    // never overwrite an already-synced final deletion tombstone.
+    const pendingKey=DELETE_PENDING_PREFIX + entry.id;
+    await store.setSetting(pendingKey,
+      {id:entry.id,path:entry.path,pending:true,requestedAt:new Date().toISOString()});
     const {error}=await client.storage.from(GAME_BACKUP_BUCKET).remove([entry.path]);
-    if(error)throw new Error(`Could not delete backup: ${error.message}`);
-    // Never rewrite the legacy shared index. A concurrent update from another
-    // device could be lost by a read-modify-write of the whole array. Instead,
-    // a per-ID deletion marker masks the old index on every synced device.
+    if(error)throw new Error(`Could not delete backup: ${error.message}. The backup remains listed; retry to finish deletion.`);
+    // Never rewrite the legacy shared index. Independent tombstones hide a
+    // deleted backup even if a stale device later uploads its old metadata.
     await store.setSetting(REMOVED_PREFIX + entry.id,
       {id:entry.id,path:entry.path,deleted:true,deletedAt:new Date().toISOString()});
     await store.remove('settings', ENTRY_PREFIX + entry.id);
+    // If cleanup fails the final tombstone still wins, and the pending marker
+    // does not change backup visibility. A future cleanup may remove it.
+    await store.remove('settings',pendingKey).catch(()=>{});
   }
   return {userId,list,listAll,checkReady,upload,download,remove,storageUsed:async()=> (await listAll()).reduce((s,x)=>s+(Number(x.size)||0),0)};
 }
