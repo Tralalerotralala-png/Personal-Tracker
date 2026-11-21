@@ -75,6 +75,7 @@ test('all categories use the exact same three-action component and category shel
  assert.match(css,/@keyframes mediaVinylReveal/);
  assert.match(css,/@keyframes mediaDvdCoverReveal/);
  assert.match(css,/@keyframes mediaOpticalDiscReveal/);
+ assert.doesNotMatch(css,/@keyframes pt(?:CaseOpen|BookOpen|DiscSlide|GameDiscSlide)/);
  assert.match(css,/\.media-empty-shelf/);
  assert.match(css,/\.media-category-tabs/);
  assert.match(css,/prefers-reduced-motion:reduce/);
