@@ -16,8 +16,8 @@ test('all weather and ground meters use three proportional segments', () => {
 test('Coming Up date and event rows send distinct calendar selections', () => {
   const widgets = source('js/widgets/registry.js');
   const calendar = source('js/ui/calendar.js');
-  assert.match(widgets, /openCalendarSelection\(\{ dateKey: key \}\)/);
-  assert.match(widgets, /openCalendarSelection\(\{ dateKey: key, eventId: o\.event\.id \}\)/);
+  assert.match(widgets, /openCalendarSelection\(\{\s*dateKey:\s*key\s*\}\)/);
+  assert.match(widgets, /openCalendarSelection\(\{\s*dateKey:\s*key,\s*eventId:\s*o\.event\.id\s*\}\)/);
   assert.match(widgets, /tracker-calendar-open/);
   assert.match(calendar, /window\.addEventListener\('tracker-calendar-open'/);
   assert.match(calendar, /openEventSheet\(\{ event: selected, occurrenceKey: dateKey \}\)/);
