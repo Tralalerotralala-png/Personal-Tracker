@@ -39,3 +39,41 @@ jobs:
         run: |
           python -m http.server 8099 --bind 127.0.0.1 >/tmp/tracker-http.log 2>&1 &
           python tests/ui-regression.py
+
+  database-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: tracker_test
+          POSTGRES_USER: tracker_test
+          POSTGRES_PASSWORD: test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracker_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGPASSWORD: test_only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL test client
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Test owner-only RLS and privileged wallpaper RPC in disposable Postgres
+        run: |
+          set -euo pipefail
+          for sql in \
+            tests/sql/owner-guard-fixture.sql \
+            supabase/owner-policy-hardening.sql \
+            supabase/owner-policy-hardening.sql \
+            tests/sql/owner-guard-assertions.sql; do
+            psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test -f "$sql"
+          done

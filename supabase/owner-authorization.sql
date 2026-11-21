@@ -141,7 +141,11 @@ SECURITY INVOKER
 SET search_path = ''
 AS $wallpaper_guard$
 BEGIN
-  IF auth.uid() IS NOT NULL
+  -- Treat any REST API request (anon OR signed in) as untrusted. A NULL
+  -- uid is never an implicit administrator. SQL Editor maintenance sessions
+  -- without REST claims retain emergency access.
+  IF (auth.uid() IS NOT NULL
+      OR COALESCE(current_setting('request.jwt.claim.role', true), '') IN ('anon', 'authenticated'))
      AND NOT COALESCE(public.tracker_account_allowed(), false) THEN
     RAISE EXCEPTION 'Tracker owner authorization required'
       USING ERRCODE = '42501';

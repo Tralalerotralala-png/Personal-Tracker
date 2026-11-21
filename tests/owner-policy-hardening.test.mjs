@@ -29,7 +29,9 @@ test('the wallpaper authorization trigger protects security-definer write paths'
   for(const sql of [bootstrap,hardening]){
     assert.match(sql,/CREATE OR REPLACE FUNCTION public\.tracker_wallpaper_write_owner_guard\(\)/);
     assert.match(sql,/SECURITY INVOKER/);
-    assert.match(sql,/IF auth\.uid\(\) IS NOT NULL\s+AND NOT COALESCE\(public\.tracker_account_allowed\(\), false\)/);
+    assert.match(sql,/IF \(auth\.uid\(\) IS NOT NULL/);
+    assert.match(sql,/current_setting\('request\.jwt\.claim\.role', true\)/);
+    assert.match(sql,/AND NOT COALESCE\(public\.tracker_account_allowed\(\), false\)/);
     assert.match(sql,/RAISE EXCEPTION 'Tracker owner authorization required'/);
     assert.match(sql,/BEFORE INSERT OR UPDATE OR DELETE ON public\.wallpaper_access/);
     assert.match(sql,/REVOKE ALL ON FUNCTION public\.tracker_wallpaper_write_owner_guard\(\)\s+FROM PUBLIC, anon, authenticated/);
