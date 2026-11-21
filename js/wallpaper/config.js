@@ -4,7 +4,7 @@
 //   3. whatever was used last time on this device
 const SAVED_KEY = 'wp:config';
 
-export const DEFAULTS = { url: '', anonKey: '', wallpaperKey: '', refreshMinutes: 10, textScale: 1, margin: 2, scanlines: false, accent: '', privacyMode:false };
+export const DEFAULTS = { url: '', anonKey: '', wallpaperKey: '', refreshMinutes: 10, textScale: 1, margin: 2, scanlines: false, accent: '', privacyMode:false, cacheSnapshot:true, rememberCredentials:false };
 
 const clampNum = (v, min, max, fallback) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback; };
 
@@ -36,6 +36,8 @@ export function fromProperties(props) {
   if (v('margin') !== undefined) out.margin = clampNum(v('margin'), 0, 8, DEFAULTS.margin);
   if (v('scanlines') !== undefined) out.scanlines = Boolean(v('scanlines'));
   if (v('privacymode') !== undefined) out.privacyMode = Boolean(v('privacymode'));
+  if (v('cachesnapshot') !== undefined) out.cacheSnapshot = Boolean(v('cachesnapshot'));
+  if (v('remembercredentials') !== undefined) out.rememberCredentials = Boolean(v('remembercredentials'));
   if (v('accentcolor') !== undefined) out.accent = colorToHex(v('accentcolor'));
   return out;
 }
@@ -59,7 +61,14 @@ export function loadSaved(storage = globalThis.localStorage) {
   try { return JSON.parse(storage.getItem(SAVED_KEY)) ?? {}; } catch { return {}; }
 }
 export function saveConfig(config, storage = globalThis.localStorage) {
-  try { storage.setItem(SAVED_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+  // Wallpaper Engine's property panel already retains keys; no additional
+  // unencrypted copy is needed by default in this browser profile.
+  const saved={...config};
+  if(!config.rememberCredentials){delete saved.anonKey;delete saved.wallpaperKey;}
+  try { storage.setItem(SAVED_KEY, JSON.stringify(saved)); } catch { /* ignore */ }
+}
+export function clearSavedConfig(storage = globalThis.localStorage) {
+  try { storage.removeItem(SAVED_KEY); } catch { /* ignore */ }
 }
 
 // Later layers win, but an EMPTY value never erases a real one (Wallpaper Engine sends
