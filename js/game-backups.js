@@ -38,6 +38,21 @@ export function createGameBackupService({client, store}) {
     if (error || !data?.session?.user?.id) throw new Error('Sign in to upload or download backups.');
     return data.session.user.id;
   }
+  // The local settings store queues cloud sync asynchronously. That is not
+  // durable enough by itself to authorize deleting the only Storage bytes.
+  // Confirm the owner-scoped intent is already persisted by PostgREST first.
+  async function confirmServerDeleteMarker(uid,key,value,flag){
+    const local=await store.get('settings',key);
+    if(!local||local.deleted_at)throw Error('Deletion marker was not saved locally.');
+    const {data,error}=await client.from('settings').upsert({
+      user_id:uid,key,value,created_at:local.created_at,
+      updated_at:local.updated_at,deleted_at:null
+    },{onConflict:'user_id,key'}).select('key,value');
+    if(error||!Array.isArray(data)||!data.some(row=>
+      row.key===key&&row.value?.id===value.id&&
+      row.value?.path===value.path&&row.value?.[flag]===true))
+      throw Error('Could not confirm game-backup deletion marker on the cloud server. The backup was not deliberately removed until this step completed.');
+  }
   async function listAll() {
     // The legacy shared array is read for backwards compatibility, but all new
     // uploads have their own setting key. Concurrent devices can then upload
@@ -114,14 +129,21 @@ export function createGameBackupService({client, store}) {
     // Do not reuse REMOVED_PREFIX here: another device's "pending" update must
     // never overwrite an already-synced final deletion tombstone.
     const pendingKey=DELETE_PENDING_PREFIX + entry.id;
-    await store.setSetting(pendingKey,
-      {id:entry.id,path:entry.path,pending:true,requestedAt:new Date().toISOString()});
+    const pending={id:entry.id,path:entry.path,pending:true,
+      requestedAt:new Date().toISOString()};
+    await store.setSetting(pendingKey,pending);
+    // A lost browser cache must never be the only record that deletion was
+    // requested; require a server acknowledgment before touching Storage.
+    await confirmServerDeleteMarker(uid,pendingKey,pending,'pending');
     const {error}=await client.storage.from(GAME_BACKUP_BUCKET).remove([entry.path]);
     if(error)throw new Error(`Could not delete backup: ${error.message}. The backup remains listed; retry to finish deletion.`);
     // Never rewrite the legacy shared index. Independent tombstones hide a
     // deleted backup even if a stale device later uploads its old metadata.
-    await store.setSetting(REMOVED_PREFIX + entry.id,
-      {id:entry.id,path:entry.path,deleted:true,deletedAt:new Date().toISOString()});
+    const removedKey=REMOVED_PREFIX + entry.id;
+    const removed={id:entry.id,path:entry.path,deleted:true,
+      deletedAt:new Date().toISOString()};
+    await store.setSetting(removedKey,removed);
+    await confirmServerDeleteMarker(uid,removedKey,removed,'deleted');
     await store.remove('settings', ENTRY_PREFIX + entry.id);
     // If cleanup fails the final tombstone still wins, and the pending marker
     // does not change backup visibility. A future cleanup may remove it.
