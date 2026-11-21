@@ -66,7 +66,7 @@ async function scanTar(archive) {
  return index;
 }
 
-export async function createPortableTar({backup,assets=[],accountId=null}) {
+export async function createPortableTar({backup,assets=[],accountId=null,coverage={photos:true,games:true,audio:true}}) {
  inspectBackup(backup,{mode:'replace'});
  if(!Array.isArray(assets)||assets.length>MAX_FILES-1)throw Error('Too many assets');
  const seen=new Set(),specs=[],files=[];
@@ -84,7 +84,7 @@ export async function createPortableTar({backup,assets=[],accountId=null}) {
   files.push(asset);
  }
  const manifest={app:PORTABLE_APP,version:PORTABLE_VERSION,accountId,backup,assets:specs,
-  createdAt:new Date().toISOString(),integrity:'SHA-256 per 1 MiB chunk',mediaIncluded:true};
+  createdAt:new Date().toISOString(),integrity:'SHA-256 per 1 MiB chunk',mediaIncluded:assets.length>0,mediaCoverage:coverage};
  const manifestBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
  if(manifestBlob.size>50*1024*1024)throw Error('Portable manifest exceeds 50 MB');
  const parts=[...tarPart('manifest.json',manifestBlob)];
@@ -169,7 +169,7 @@ export async function exportPortableArchive({store,photos,gameBackups,include={p
     name:track.name,addedAt:track.addedAt,mime:track.blob.type});
   }
  }
- return createPortableTar({backup,assets,accountId:store.accountId||null});
+ return createPortableTar({backup,assets,accountId:store.accountId||null,coverage:include});
 }
 
 const blobToDataUrl=blob=>new Promise((resolve,reject)=>{
