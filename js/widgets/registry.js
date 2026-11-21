@@ -91,10 +91,14 @@ function mountMud(el, { weather, store, interactive }) {
     const code = c ? Number(c.weather_code) : 0;
     const clearEnough = [0, 1, 2].includes(code);
     const wx = c && Number.isFinite(c.temperature_2m) ? h('div', { class: 'w-weather-now' },
+      // The city belongs to the same current-conditions row, BEFORE its
+      // weather icon. Do not isolate it in a tiny third column: long names
+      // should stay on one line and ellipsize only when necessary.
+      s.place?.name?h('span', { class: 'w-weather-place', title:s.place.name,
+        'aria-label':(language()==='es'?'Clima en ':'Weather in ')+s.place.name }, s.place.name):null,
       h('span', { class: `w-weather-glyph${night && code === 0 ? ' w-weather-moon' : ''}`, title: night ? localizedMoonPhase(moon.label,language()) : localizedWeather(weatherGlyph(code).text), html: weatherIconSvg(code,{night,date:now}) }),
-      h('div', {}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
-        h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text))),
-      h('span', { class: 'w-weather-place' }, s.place?.name || '')) : null;
+      h('div', {class:'w-weather-reading'}, h('strong', {}, `${Math.round(c.temperature_2m)}°C`),
+        h('span', {}, night && clearEnough ? `${localizedWeather(weatherGlyph(code).text)} · ${localizedMoonPhase(moon.label,language())}` : localizedWeather(weatherGlyph(code).text)))) : null;
     const forecast = !s.rows.length ? note(s.status === 'no-location' ? t('Choose a place in the Weather tab.') : t('Loading the forecast...')) : (() => {
       const sum = s.summary;
       return h('div', { class: 'w-mud-compact' },
