@@ -8,7 +8,7 @@ import { weatherGlyph, weatherIconSvg } from './pixel-icon.js';
 import { localizedWeather } from './mud-format-v2.js';
 import { skyEventIconSvg } from '../weather/sky-events.js';
 import { baseDreamNight, loadDreamNight } from '../weather/dream-night.js';
-import { JOURNAL_KEY, emptyJournal, validPin, encryptJournal, decryptJournal } from './private-journal-crypto.js';
+import { JOURNAL_KEY, emptyJournal, validPin, validNewJournalKey, encryptJournal, decryptJournal } from './private-journal-crypto.js';
 const DURATION=40*60*1000;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const labels={
@@ -87,13 +87,13 @@ export function createDreamDiaryView({store}) {
   if(sheet) sheet.close();clear();
   const record=await store.getSetting(JOURNAL_KEY,null);
   const first=!record;
-  const pin=h('input',{type:'password',inputmode:'numeric',minlength:4,maxlength:128,autocomplete:'off','aria-label':L().pin});
-  const confirm=h('input',{type:'password',inputmode:'numeric',minlength:4,maxlength:128,autocomplete:'off','aria-label':L().again});
+  const pin=h('input',{type:'password',inputmode:'text',minlength:first?12:4,maxlength:128,autocomplete:'off','aria-label':L().pin});
+  const confirm=h('input',{type:'password',inputmode:'text',minlength:12,maxlength:128,autocomplete:'off','aria-label':L().again});
   const error=h('p',{class:'form-error',role:'alert'});
   const body=h('div',{class:'form'},h('p',{},first?L().warning:L().intro),h('label',{},L().pin),pin,first?h('label',{},L().again):null,first?confirm:null,error);
   const submit=h('button',{class:'btn primary',type:'button',onclick:async()=>{
    if(Date.now()<blockedUntil){error.textContent=L().wait;return;}
-   if(!validPin(pin.value) || (first&&pin.value!==confirm.value)){error.textContent=first?'Use matching four-digit PINs or passphrases of 12+ characters.':L().wrong;return;}
+   if((first?!validNewJournalKey(pin.value):!validPin(pin.value)) || (first&&pin.value!==confirm.value)){error.textContent=first?(language()==='es'?'Usa dos frases de acceso iguales de 12 caracteres o más.':'Use two matching passphrases of at least 12 characters.'):L().wrong;return;}
    try{
     const data=first?emptyJournal():await decryptJournal(pin.value,record);
     if(first) await store.setSetting(JOURNAL_KEY,await encryptJournal(pin.value,data));
@@ -237,7 +237,7 @@ export function createDreamDiaryView({store}) {
    const again=h('input',{type:'password',maxlength:128,autocomplete:'new-password'});
    const err=h('p',{class:'form-error'});
    const dialog=trackDialog(openSheet({title:L().change,size:'small',body:h('div',{class:'form'},h('p',{class:'hint'},L().warning),h('label',{},L().newPin),newPin,h('label',{},L().repeat),again,err),footer:[h('button',{class:'btn primary',onclick:async()=>{
-    if(!validPin(newPin.value)||newPin.value!==again.value){err.textContent=L().wrong;return;}
+    if(!validNewJournalKey(newPin.value)||newPin.value!==again.value){err.textContent=language()==='es'?'Usa una frase nueva de 12 caracteres o más y repítela exactamente.':'Use a new passphrase of at least 12 characters and repeat it exactly.';return;}
     try{await writeChain;await store.setSetting(JOURNAL_KEY,await encryptJournal(newPin.value,session.data));session.pin=newPin.value;dialog.close();touch();toast(L().save);}catch{err.textContent=L().saveFailed;}
    }},L().save)]}));
   };

@@ -7,6 +7,9 @@ const enc = new TextEncoder(), dec = new TextDecoder();
 const b64 = bytes => btoa(String.fromCharCode(...bytes));
 const unb64 = str => Uint8Array.from(atob(str), c=>c.charCodeAt(0));
 export function validPin(pin){return typeof pin==='string'&&(/^\d{4}$/.test(pin)||(pin.length>=12&&pin.length<=128&&pin.trim()===pin));}
+// New journals and key rotations require a passphrase, but decrypting an
+// existing four-digit legacy journal must remain possible without data loss.
+export function validNewJournalKey(value){return typeof value==='string'&&value.length>=12&&value.length<=128&&value.trim()===value;}
 async function derive(pin, salt) {
  const material=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);

@@ -1,12 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
-import {encryptJournal,decryptJournal,validPin,emptyJournal} from '../js/ui/private-journal-crypto.js';
+import {encryptJournal,decryptJournal,validPin,validNewJournalKey,emptyJournal} from '../js/ui/private-journal-crypto.js';
 import {LESSONS,lessonForDate} from '../js/ui/daily-phrases.js';
 if(!globalThis.crypto) globalThis.crypto=webcrypto;
 test('PIN requires exactly four decimal digits',()=>{
  for(const pin of ['1234','0000','9999']) assert.equal(validPin(pin),true);
  for(const pin of ['123','12345','12a4','１２３４']) assert.equal(validPin(pin),false);
+});
+test('new journal setup and key rotation require a strong passphrase, but old PIN unlock still works',()=>{
+ for(const pass of ['a securely memorized phrase','twelvechars!', 'abcdefghijkl'])
+  assert.equal(validNewJournalKey(pass),true);
+ for(const pass of ['1234','0000','short', '   twelvechars', 'abcdefghijkl ', 'x'.repeat(129)])
+  assert.equal(validNewJournalKey(pass),false);
+ assert.equal(validPin('1234'),true,'legacy 4-digit PINs must remain readable');
+ const ui=new URL('../js/ui/dream-diary.js',import.meta.url);
 });
 test('private journal encrypts before sync and decrypts only with the correct PIN',async()=>{
  const original={...emptyJournal(),dreams:[{title:'Private dream',body:'secret library'}]};
