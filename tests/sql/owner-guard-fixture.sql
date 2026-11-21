@@ -9,7 +9,10 @@ GRANT USAGE ON SCHEMA public TO authenticated,anon;
 GRANT USAGE ON SCHEMA storage TO authenticated,anon;
 
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE SET search_path='' AS $$
- SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid;
+ SELECT coalesce(
+   nullif(current_setting('request.jwt.claim.sub',true),''),
+   nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub'
+ )::uuid;
 $$;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated,anon;
 CREATE FUNCTION public.tracker_account_allowed() RETURNS boolean
