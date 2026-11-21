@@ -19,7 +19,7 @@ test('Coming Up only includes dates supported by actual wetness scores',()=>{
   wet('2026-11-27',65,{phase:'future'}),
  ];
  assert.deepEqual(forecastAgendaDays(data,'2026-11-21').map(row=>row.date),
-  ['2026-11-21','2026-11-22','2026-11-25','2026-11-27']);
+  ['2026-11-21','2026-11-22','2026-11-23','2026-11-24','2026-11-25','2026-11-26','2026-11-27']);
  assert.deepEqual(forecastAgendaDays([], '2026-11-21'),[]);
  assert.deepEqual(forecastAgendaDays(data, ''),[]);
  assert.deepEqual(forecastAgendaDays(data,'2026-11-28'),[]);
