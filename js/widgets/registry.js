@@ -10,7 +10,6 @@ import { mountCurrency } from './currency.js';
 import { uvMeter, mudBar, mudClass, dayShort, dayMonth, dayLong, summarySentence, localizedWeather, localizedMudLabel } from '../ui/mud-format-v2.js';
 import { groupByDay, addDaysKey, todayKeyLocal } from '../calendar/recurrence.js';
 import { locationPath } from '../data/inventory-logic.js';
-import { resolveDailyLoot } from '../data/daily-loot.js';
 import { timeAgo } from '../ui/format.js';
 import {articleKey,readingIndex,updateReading} from '../feed/reading.js';
 import { weatherGlyph, glyphSvg, weatherIconSvg } from '../ui/pixel-icon.js';
@@ -71,6 +70,12 @@ export function analogClockSvg(now=new Date(),ui={}){
 }
 
 function mountMud(el, { weather, store, interactive }) {
+  const openForecastDay = (r) => {
+    if(!interactive)return;
+    // The Weather tab resolves the date after its route has become visible.
+    window.dispatchEvent(new CustomEvent('tracker-weather-open-day',{detail:{date:r.date}}));
+    location.hash='#mud';
+  };
   let ui = {};
   const readSettings = async () => { ui = (await store.getSetting('ui')) ?? {}; run(); };
   const render = () => {
@@ -112,7 +117,7 @@ function mountMud(el, { weather, store, interactive }) {
           const temperature = Number.isFinite(r.raw?.tmax) ? `${Math.round(r.raw.tmax)}°` : '—';
           const precipitation = Number.isFinite(r.raw?.precip) ? `${Number(r.raw.precip).toFixed(1)} mm` : '—';
           const title = `${dayLong(r.date)} · ${localizedWeather(icon.text)} · ${temperature} · ${precipitation} · ${localizedMudLabel(r.label)} ${r.index}/100`;
-          return h('div', { class: `w-forecast-day ${r.phase === 'today' ? 'today' : ''}`, title, 'aria-label': title },
+          return h(interactive?'button':'div', { class: `w-forecast-day ${r.phase === 'today' ? 'today' : ''}`, title, 'aria-label': title, ...(interactive?{type:'button',onclick:()=>openForecastDay(r)}:{}) },
             h('span', { class: 'w-forecast-label' }, r.phase === 'today' ? t('Now') : dayShort(r.date)),
             h('span', { class: 'w-forecast-icon', html: weatherIconSvg(r.raw?.weather_code,{night:r.phase === 'today' && night,date:now}) }),
             h('span', { class: 'w-forecast-condition' }, localizedWeather(icon.text)),
@@ -227,12 +232,10 @@ function mountLoot(el, { store, showPlaces = true, interactive = false }) {
   const render = async () => {
     const [items, locations] = await Promise.all([store.list('items'), store.list('locations')]);
     const lost = items.filter((i) => i.is_lost);
-    const loot = await resolveDailyLoot(store, items);
-    if (!items.length) return replace(el, note('No items yet. Add some in the Pack tab.'));
+    if (!lost.length) return replace(el, note(language()==='es'?'No hay objetos perdidos.':'No lost items.'));
     // On the wallpaper, where things are stored is hidden unless you turned that on.
     const where = (i) => (showPlaces ? locationPath(locations, i.location_id) : null);
     replace(el, h('div', { class: 'w-loot' },
-      loot ? h(interactive ? 'a' : 'div', { class: `w-loot-today r-${loot.rarity}`, ...(interactive ? {href:'#inventory', onclick:()=>sessionStorage.setItem('tracker-open-item',loot.id)} : {}) }, h('span', { class: 'w-k' }, t("Today's loot")), h('b', {'data-user-content':'true'}, loot.name), showPlaces ? h('span', { class: 'w-path' }, where(loot)) : null) : null,
       lost.length ? h('div', { class: 'w-lost' }, h('span', { class: 'w-k warn' }, lost.length === 1 ? '1 lost quest' : `${lost.length} lost quests`),
         lost.slice(0, 3).map((i) => {
           const days = daysSince(i.lost_since);
