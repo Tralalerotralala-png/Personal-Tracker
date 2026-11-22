@@ -224,7 +224,7 @@ export function createDreamDiaryView({store}) {
    activeDraftFlush=persistDraft;
    form.addEventListener('input',()=>{editorDirty=true;clearTimeout(activeDraftTimer);activeDraftTimer=setTimeout(()=>persistDraft().catch(()=>{}),1800);});
    const closeEditor=async()=>{
-     if(editorDirty&&!confirm(language()==='es'?'¿Salir del editor? Se conservará un borrador cifrado.':'Leave the editor? An encrypted draft will be kept.'))return;
+     if(editorDirty&&!await confirmDialog({title:language()==='es'?'¿Salir del editor?':'Leave the editor?',message:language()==='es'?'Se conservará un borrador cifrado.':'An encrypted draft will be kept.',confirmLabel:language()==='es'?'Salir':'Leave'}))return;
      clearTimeout(activeDraftTimer);activeDraftTimer=null;
      if(editorDirty)try{await persistDraft();}catch{toast(L().saveFailed);return;}
      editorDirty=false;editorOpen=false;activeDraftFlush=null;replace(el,h('div',{class:'panel-head journal-page-head'},h('h2',{},L().title)),wrap);draw();
