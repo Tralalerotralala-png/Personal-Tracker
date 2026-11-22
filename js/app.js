@@ -248,8 +248,15 @@ function applyTypography() {
 }
 applyTypography();
 window.addEventListener('tracker-display-change', applyTypography);
+// The Library route is a media shelf (books + vinyl), while its Games tab
+// uses the separate controller art. User-selected alternate nav glyphs still win.
+const libraryNavArt=()=>h('img',{class:'library-nav-art',src:'./icons/library-media-pixel.png',
+ width:72,height:72,alt:'',decoding:'async',onerror:e=>{
+  e.currentTarget.parentElement.innerHTML=navGlyphSvg('games');
+ }});
 const navButtons = NAV.map(([key, label, glyph]) => h('a', { class: 'slot', href: `#${key}`, 'data-route': key },
-  h('span', { class: 'slot-icon', html: navGlyphSvg(key==='hub'?'hub':glyph) }), h('span', { class: 'slot-label' }, label)));
+  h('span',key==='games'?{class:'slot-icon'}:{class:'slot-icon',html:navGlyphSvg(key==='hub'?'hub':glyph)},
+   key==='games'?libraryNavArt():null), h('span', { class: 'slot-label' }, label)));
 const packNav=navButtons.find(n=>n.dataset.route==='inventory');
 const packIcon=packNav?.querySelector('.slot-icon');
 const PACK_KEY='tracker-pack-appearance-v1';
@@ -294,7 +301,8 @@ function applyNavIconChoices(){
   if(alt){el.innerHTML=navGlyphSvg(alt.glyph,alt);el.style.color=alt.color;}
   else{
    el.style.removeProperty('color');
-   if(route!=='mud'&&route!=='diary')el.innerHTML=navGlyphSvg(glyph);
+   if(route==='games')el.replaceChildren(libraryNavArt());
+   else if(route!=='mud'&&route!=='diary')el.innerHTML=navGlyphSvg(glyph);
   }
  }
 }
@@ -315,7 +323,8 @@ function customizeNavigationIcon(initialRoute='overview'){
   glyphSelect.value=selected?.glyph||'default';
   color.value=selected?.color||'#509e85';
   const defaultGlyph=alternateRoutes.find(([key])=>key===route)?.[2]||'board';
-  preview.innerHTML=navGlyphSvg(selected?.glyph||defaultGlyph,selected||{});
+  if(route==='games'&&!selected)preview.replaceChildren(libraryNavArt());
+  else preview.innerHTML=navGlyphSvg(selected?.glyph||defaultGlyph,selected||{});
  }
  routeSelect.addEventListener('change',draw);
  glyphSelect.addEventListener('change',()=>{
