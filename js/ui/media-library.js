@@ -4,7 +4,7 @@ import { h, replace, confirmDialog, promptDialog, toast, libraryCoverButton } fr
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGamesView } from './games.js';
-import { mediaIcon, mediaAccent, mediaCollectionToolbar } from './media-art.js';
+import { mediaIcon, mediaAccent, mediaCollectionToolbar, mediaStarRating } from './media-art.js';
 const KEY='other_media_library_v1';
 const KINDS=['books','films','albums'];
 const LABELS={en:{games:'Games',books:'Books',films:'Films & TV',albums:'Albums',library:'Media Library',add:'Add',name:'Title',creator:'Author / Director / Artist',status:'Status',notes:'Notes',cover:'Cover URL (HTTPS)',save:'Save',cancel:'Back',edit:'Edit',delete:'Delete',journal:'Personal journal',entry:'Add note',shelf:'Shelf',view:'Toggle shelf/grid',rating:'Rating',grid:'Cover grid',shelves:'Bookshelves',replay:'Replay reveal',empty:'Build your collection',noResults:'No matching entries',items:'titles',newShelf:'New shelf'},es:{games:'Juegos',books:'Libros',films:'Películas y TV',albums:'Álbumes',library:'Biblioteca multimedia',add:'Agregar',name:'Título',creator:'Autor / Director / Artista',status:'Estado',notes:'Notas',cover:'URL de portada (HTTPS)',save:'Guardar',cancel:'Volver',edit:'Editar',delete:'Eliminar',journal:'Diario personal',entry:'Agregar nota',shelf:'Estante',view:'Cambiar estantes/cuadrícula',rating:'Calificación',grid:'Cuadrícula',shelves:'Estantes',replay:'Repetir apertura',empty:'Crea tu colección',noResults:'Sin resultados',items:'títulos',newShelf:'Nuevo estante'}};
@@ -102,8 +102,10 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const book=active==='books',vinyl=active==='albums',comic=book&&row.mediaType==='comic';
   const kind=comic?'comic':active==='films'&&row.mediaType==='series'?'series':active;
   const media=book?h('div',{class:'media-book-pages','aria-hidden':'true'},
-    h('span',{class:'media-page-flip'}),h('span',{class:'media-page-flip second'}),
-    comic?h('span',{class:'media-comic-panel'}):null):
+    h('span',{class:'media-page-flip'}),
+    h('span',{class:'media-page-flip second'},h('span',{class:'media-mini-left'})),
+    comic?h('span',{class:'media-comic-panel'}):null,
+    h('span',{class:'media-mini-right'})):
    vinyl?h('div',{class:'media-vinyl-record','aria-hidden':'true'},
     h('span',{class:'media-vinyl-label'},mediaIcon('albums',row.title))):
    h('div',{class:'media-case-disc','aria-hidden':'true'});
@@ -156,7 +158,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   void refresh();return panel;
  }
  function renderDetail(row){
-  const kind=active;
+  const kind=active,stage=caseArt(row);
   const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
   const journalPanel=h('div',{class:'game-journal'},h('h3',{},L().journal),journal,
    h('button',{class:'btn small',type:'button',onclick:async()=>{
@@ -173,40 +175,36 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    ...(row.journal||[]).map(e=>h('p',{class:'game-journal-entry'},h('small',{},new Date(e.date).toLocaleDateString()),' ',e.text)));
   const info=h('div',{class:'media-detail-info'},h('h2',{},row.title),h('p',{},row.creator||'—'),
    h('p',{},`${L().status}: ${row.status||'—'}`),
-   h('p',{},`${L().rating}: ${row.rating??'—'}`),
+   h('div',{class:'media-rating-detail'},h('span',{},L().rating),mediaStarRating(row.rating,{label:L().rating}).el),
    h('p',{class:'media-notes'},row.notes||''),journalPanel);
   if(kind==='books'){
-   const spread=h('div',{class:'media-inner-spread'});
+   const casing=stage.querySelector('.media-case-books');
+   const left=casing.querySelector('.media-mini-left'),right=casing.querySelector('.media-mini-right');
    const previous=h('button',{class:'btn small',type:'button'},language()==='es'?'Anterior':'Previous');
    const next=h('button',{class:'btn small',type:'button'},language()==='es'?'Siguiente':'Next');
    const counter=h('small',{class:'media-inner-counter'});
-   const gallery=h('section',{class:'media-interiors'},
-    h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
-    h('p',{class:'media-inner-privacy'},language()==='es'?
-     'Las páginas sincronizadas se guardan en tu cuenta; las imágenes locales anteriores permanecen en este dispositivo.':
-     'Synced pages are saved to your account; older local images remain on this device.'),
-    spread,h('div',{class:'media-interior-controls'},previous,counter,next));
+   const controls=h('div',{class:'media-interior-controls media-mini-controls'},previous,counter,next);
+   stage.append(controls);
    let pages=[],index=bookSpreads.get(row.id)||0;
    const draw=()=>{
-    if(pages.length)index=Math.max(0,Math.min(index,pages.length-1));
-     bookSpreads.set(row.id,index);
-     const visible=pages.slice(index,index+2);
-    replace(spread,visible.length?visible.map((item,n)=>
-     h('figure',{class:'media-inner-page'},
-      h('img',{src:item.src,alt:item.caption||`${row.title}, page ${index+n+1}`,loading:'lazy'}),
-      item.caption?h('figcaption',{},item.caption):null)):
-     h('p',{class:'media-inner-empty'},language()==='es'?
-      'Añade imágenes desde Editar para verlas aquí de dos en dos.':
-      'Add your own images in Edit to view two pages side by side.'));
+    index=Math.max(0,Math.min(index,Math.max(0,pages.length-1)));
+    bookSpreads.set(row.id,index);
+    const visible=pages.slice(index,index+2);
+    casing.classList.toggle('has-interior-art',visible.length>0);
+    const miniImage=(item,n)=>item?h('img',{
+     src:item.src,alt:item.caption||`${row.title}, interior page ${index+n+1}`,
+     title:item.caption||`${row.title}, page ${index+n+1}`,loading:'lazy'}):null;
+    replace(left,miniImage(visible[0],0));
+    replace(right,miniImage(visible[1],1));
     previous.disabled=index===0;next.disabled=index+2>=pages.length;
     counter.textContent=pages.length?`${index+1}–${Math.min(index+2,pages.length)} / ${pages.length}`:'0 / 0';
+    controls.hidden=pages.length<=2;
    };
    previous.addEventListener('click',()=>{index=Math.max(0,index-2);draw();});
    next.addEventListener('click',()=>{index=Math.min(Math.max(0,pages.length-1),index+2);draw();});
    draw();
-   pagesFor(row.id).then(saved=>{pages=saved;draw();})
+   pagesFor(row.id).then(saved=>{if(!stage.isConnected||page?.entry?.id!==row.id)return;pages=saved;draw();})
     .catch(error=>console.warn('Could not load private book images',error));
-   info.append(gallery);
   }
   if(kind==='albums')info.append(albumSongPanel(row));
   info.append(h('div',{class:'inline-actions'},
@@ -227,7 +225,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
      dirty=false;page=null;render();
     }catch(error){console.error('Could not delete media entry',error);toast(language()==='es'?'No se pudo eliminar.':'Could not delete entry.');}
    }},L().delete)));
-  return h('section',{class:'media-detail game-detail'},caseArt(row),info);
+  return h('section',{class:'media-detail game-detail'},stage,info);
  }
  function renderEditor(row){
   const kind=active,draftId=row?.id||uuid();
@@ -237,7 +235,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const notes=h('textarea',{rows:8,maxlength:10000},row?.notes||'');
   const coverUrl=h('input',{type:'url',value:row?.cover?.startsWith('https:')?row.cover:'',placeholder:'https://'});
   const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});
-  const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:row?.rating??''});
+  const rating=mediaStarRating(row?.rating,{editable:true,label:L().rating,onChange:()=>{dirty=true;}});
   const status=h('select',{},names[kind].en.map((name,i)=>
    h('option',{value:name,selected:(row?.status||names[kind].en[0])===name},names[kind][language()][i])));
   const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||data.shelvesByKind[kind].at(-1)||'Collection'});
@@ -249,7 +247,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const error=h('p',{class:'form-error',role:'alert'});
   const fields=[field(L().name,title),field(L().creator,creator),field(L().status,status),
    field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),
-   field(L().rating,rating),field(L().cover,coverUrl),
+   field(L().rating,rating.el),field(L().cover,coverUrl),
    field(language()==='es'?'Subir portada':'Upload cover',upload)];
   let interiorPages=[],originalSyncedPages=[];
   const ready=kind==='books'?pagesFor(row?.id).then(saved=>{
@@ -298,12 +296,11 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const saveButton=h('button',{class:'btn primary',type:'button',onclick:async()=>{
    error.textContent='';
    if(!title.value.trim()){error.textContent=L().name+' required';return;}
-   const rawRating=rating.value.trim();
-   const parsed=rawRating===''?null:Number(rawRating);
+   const parsed=rating.getValue();
    if(parsed!==null&&(!Number.isFinite(parsed)||parsed<0||parsed>10||
-       Math.abs(parsed*2-Math.round(parsed*2))>1e-8)){
-    error.textContent=language()==='es'?'Usa una calificación entre 0 y 10, en pasos de 0,5.':
-      'Enter a rating from 0 to 10 in steps of 0.5.';return;
+       Math.abs(parsed*10-Math.round(parsed*10))>1e-8)){
+    error.textContent=language()==='es'?'Usa una calificación entre 0 y 10, en pasos de 0,1.':
+      'Enter a rating from 0 to 10 in steps of 0.1.';return;
    }
    let image=coverUrl.value.trim()||row?.cover||'';
    if(image&&!/^https:\/\//.test(image)&&!image.startsWith('data:image/')){
