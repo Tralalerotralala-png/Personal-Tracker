@@ -123,9 +123,11 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
     const songs=await music.list();
     if(active!=='albums'||page?.entry?.id!==album.id)return;
     const linked=songs.filter(song=>song.albumId===album.id),unlinked=songs.filter(song=>!song.albumId&&!song.deletionPending);
-    replace(entries,...(linked.length?linked.map(song=>h('div',{class:'album-song-row'},
-      h('button',{class:'btn small ghost',type:'button',onclick:()=>audioPlayer?.playCloud(song)},'▶ '+song.name),
-      h('button',{class:'btn small ghost',type:'button',onclick:async()=>{try{await music.assignAlbum(song,null);await refresh();void audioPlayer?.refreshCloud();}catch(error){status.textContent=error.message;}}},language()==='es'?'Desvincular':'Unlink'))):[h('p',{class:'hint'},language()==='es'?'Aún no hay canciones en este álbum.':'No songs attached to this album yet.')])));
+    const songRows=linked.length?linked.map(song=>h('div',{class:'album-song-row'},
+       h('button',{class:'btn small ghost',type:'button',onclick:()=>audioPlayer?.playCloud(song)},'▶ '+song.name),
+       h('button',{class:'btn small ghost',type:'button',onclick:async()=>{try{await music.assignAlbum(song,null);await refresh();void audioPlayer?.refreshCloud();}catch(error){status.textContent=error.message;}}},language()==='es'?'Desvincular':'Unlink'))):[
+       h('p',{class:'hint'},language()==='es'?'Aún no hay canciones en este álbum.':'No songs attached to this album yet.')];
+    replace(entries,...songRows);
     replace(available,...(unlinked.length?[h('select',{'aria-label':language()==='es'?'Canción existente':'Existing cloud song'},unlinked.map(song=>h('option',{value:song.id},song.name))),h('button',{class:'btn small',type:'button',onclick:async()=>{
       const select=available.querySelector('select'),song=unlinked.find(entry=>entry.id===select?.value);
       if(!song)return;
@@ -177,7 +179,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
     spread,h('div',{class:'media-interior-controls'},previous,counter,next));
    let pages=[],index=bookSpreads.get(row.id)||0;
    const draw=()=>{
-    index=Math.max(0,Math.min(index,Math.max(0,pages.length-1)));
+    if(pages.length)index=Math.max(0,Math.min(index,pages.length-1));
      bookSpreads.set(row.id,index);
      const visible=pages.slice(index,index+2);
     replace(spread,visible.length?visible.map((item,n)=>
