@@ -52,6 +52,14 @@ test('pixel-stacked catalogue artwork is deterministic, safely generated and cat
  const spindle=mediaPixelGrid('albums');
  assert.equal(spindle[7][8],null,'Vinyl needs a visible center hole');
  assert.equal(spindle[7][9],null);
+ assert.equal(spindle[7][7],'#eee3cb','Vinyl label should look like cream paper');
+ assert.equal(spindle[5][7],'#a95746','Vinyl label needs the red center ring');
+ const controller=mediaPixelGrid('games');
+ for(const shade of ['#438bdd','#d95358','#4cbd84','#e9ba49'])
+  assert.ok(controller.some(row=>row.includes(shade)),'Controller missing coloured button '+shade);
+ const book=mediaPixelGrid('books');
+ assert.equal(book[8][12],'#244b80','Slightly wider blue cover');
+ assert.equal(book[8][13],'#eee8d8','Narrow cream page edge');
  assert.ok(mediaPixelGrid('films')[4].filter(Boolean).length>=14,'TV should look widescreen');
  assert.match(mediaIconSvg('books'),/#102743/i,'Book needs navy cover');
  assert.doesNotMatch(mediaIconSvg('comic','<img onerror=alert(1)>'),/<img|onerror|script/i);
@@ -90,6 +98,11 @@ test('all categories use the exact same three-action component and category shel
  assert.match(css,/width:21%;height:21%/);
  assert.match(media,/store\.updateSetting|await commit\(/);
  assert.match(media,/media-inner-spread/);
+ assert.match(media,/syncedPagesKey/,'Synced interior pages must be rendered');
+ assert.match(media,/cloud:false/,'Existing device-only pages must remain local');
+ assert.match(games,/media-replay/,'Game detail must have the same reveal replay control');
+ assert.doesNotMatch(games,/Side panel|sideMode|game-side-mode/,'Game side panel is obsolete');
+ assert.doesNotMatch(css,/game-side-mode/);
  assert.match(media,/convertInteriorImage/);
  assert.match(css,/\.media-inner-spread/);
  assert.match(media,/media-vinyl-record/);

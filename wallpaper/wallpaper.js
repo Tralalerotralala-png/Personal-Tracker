@@ -2796,6 +2796,19 @@ function confirmDialog({ title = 'Are you sure?', message, confirmLabel = 'Confi
   });
 }
 
+function promptDialog({title='Enter a value',label=title,initial='',maxLength=60,confirmLabel='Save'}={}){
+ return new Promise(resolve=>{
+  let value=null;
+  const input=h('input',{type:'text',maxlength:maxLength,value:initial,'aria-label':label});
+  const sheet=openSheet({title,size:'small',body:h('div',{class:'form'},h('label',{},label),input),
+   footer:[h('button',{class:'btn ghost',type:'button',onclick:()=>sheet.close()},'Cancel'),
+    h('button',{class:'btn primary',type:'button',onclick:()=>{value=input.value.trim();sheet.close();}},confirmLabel)],
+   onClose:()=>resolve(value)});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();value=input.value.trim();sheet.close();}});
+  input.focus();
+ });
+}
+
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
 function daysSince(iso) {
@@ -2844,7 +2857,7 @@ function libraryCoverButton(art,title,open,host,{transition=true}={}){
   });
   return button;
 }
-Object.assign(__exports, { h, replace, toast, openSheet, confirmDialog, todayKey, daysSince, libraryCoverButton });
+Object.assign(__exports, { h, replace, toast, openSheet, confirmDialog, promptDialog, todayKey, daysSince, libraryCoverButton });
 });
 __define("js/ui/format.js", function (__require, __exports) {
 "use strict";

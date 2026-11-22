@@ -7,8 +7,9 @@ test('Game details and editor are main-area pages, not generic sheets', () => {
  assert.match(games, /function showPage\(/);
  assert.match(games, /game-page-body/);
  assert.doesNotMatch(games, /openSheet\(/);
- assert.match(games, /Side panel/);
- assert.match(games, /Expand to page/);
+ assert.match(games, /Replay reveal/);
+ assert.match(games, /media-case-stage/);
+ assert.doesNotMatch(games, /Side panel|Expand to page|game-side-mode/);
 });
 test('Weather forecast combines ground indicators with daily forecast and past observations', () => {
  assert.match(weather, /wx-unified-day/);

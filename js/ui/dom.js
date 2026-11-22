@@ -80,6 +80,19 @@ export function confirmDialog({ title = 'Are you sure?', message, confirmLabel =
   });
 }
 
+export function promptDialog({title='Enter a value',label=title,initial='',maxLength=60,confirmLabel='Save'}={}){
+ return new Promise(resolve=>{
+  let value=null;
+  const input=h('input',{type:'text',maxlength:maxLength,value:initial,'aria-label':label});
+  const sheet=openSheet({title,size:'small',body:h('div',{class:'form'},h('label',{},label),input),
+   footer:[h('button',{class:'btn ghost',type:'button',onclick:()=>sheet.close()},'Cancel'),
+    h('button',{class:'btn primary',type:'button',onclick:()=>{value=input.value.trim();sheet.close();}},confirmLabel)],
+   onClose:()=>resolve(value)});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();value=input.value.trim();sheet.close();}});
+  input.focus();
+ });
+}
+
 export const todayKey = () => new Date().toISOString().slice(0, 10);
 
 export function daysSince(iso) {

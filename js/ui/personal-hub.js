@@ -3,7 +3,7 @@
 import { h, replace, openSheet, confirmDialog, toast } from './dom.js';
 import { uuid } from '../data/util.js';
 import { TRACKING_KEY, itemFields, categoryFields, attentionFor } from '../data/tracking.js';
-import { groupByDay, addDaysKey } from '../calendar/recurrence.js';
+import { groupByDay, addDaysKey, startParts } from '../calendar/recurrence.js';
 import { t, locale, categoryLabel } from './language.js';
 const TYPES = ['task','note','expense'];
 const keyFor = (type, id) => `hub_${type}:${id}`;
@@ -84,7 +84,7 @@ export async function collectAlerts(store, hub) {
 function buildPersonalHub({store, host}) {
   const wrap=h('div',{class:'hub'}), tabs=h('div',{class:'hub-tabs'}), panel=h('div',{class:'hub-panel'});
   wrap.append(tabs,panel);
-  let active='alerts'; let hub, context, gamesLibrary, otherMedia;
+  let active='alerts',hubSearchQuery=''; let hub, context, gamesLibrary, otherMedia;
   const names={alerts:'Alerts',tasks:'Tasks',notes:'Notes',search:'Search',insights:'Insights',timeline:'Activity',review:'Weekly review'};
   host.append(wrap);
   async function reload() {
@@ -172,15 +172,32 @@ function buildPersonalHub({store, host}) {
       !rows.length?empty('No entries yet. Select Add to create one.'):null];
   }
   function drawSearch(){
-    const q=h('input',{type:'search',placeholder:t('Search everything'),'aria-label':t('Search everything')});
-    const results=h('div',{});
-    const all=[...context.items.map(x=>({type:'Pack',title:x.name,detail:x.notes||''})),
-      ...context.events.map(x=>({type:'Calendar',title:x.title,detail:x.notes||''})),
-      ...hub.task.map(x=>({type:'Task',title:x.title,detail:x.body||''})),
-      ...hub.note.map(x=>({type:'Note',title:x.title,detail:x.body||''})),
-      ...hub.expense.map(x=>({type:'Expense',title:x.title,detail:x.category||''}))];
-    function search(){const term=q.value.toLowerCase().trim();const found=term?all.filter(r=>`${r.title} ${r.detail} ${r.type}`.toLowerCase().includes(term)).slice(0,100):[];
-      results.replaceChildren(...found.map(r=>h('div',{class:'hub-row'},h('b',{},r.title),h('span',{class:'hint'},r.type))),!found.length?empty(term?'No matching results.':'Type to search your items, events, tasks, notes and expenses.'):null);}
+    const q=h('input',{type:'search',placeholder:t('Search everything'),'aria-label':t('Search everything'),value:hubSearchQuery});
+    const results=h('div',{class:'hub-search-results'});
+    const all=[
+      ...context.items.map(x=>({type:'Pack',title:x.name,detail:x.notes||'',itemId:x.id})),
+      ...context.events.map(x=>({type:'Calendar',title:x.title,detail:x.notes||'',eventId:x.id,dateKey:startParts(x).key})),
+      ...hub.task.map(x=>({type:'Task',title:x.title,detail:x.body||'',deepLink:{target:'hub',kind:'task',id:x.id}})),
+      ...hub.note.map(x=>({type:'Note',title:x.title,detail:x.body||'',deepLink:{target:'hub',kind:'note',id:x.id}})),
+      ...hub.expense.map(x=>({type:'Expense',title:x.title,detail:x.category||'',deepLink:{target:'expenses',kind:'expense',id:x.id}})),
+      ...(Array.isArray(gamesLibrary?.games)?gamesLibrary.games:[]).map(x=>({type:'Game',title:x.title,detail:x.platform||'',deepLink:{target:'games',kind:'game',id:x.id}})),
+      ...['books','films','albums'].flatMap(kind=>(Array.isArray(otherMedia?.[kind])?otherMedia[kind]:[]).map(x=>({type:kind==='books'?'Book':kind==='films'?'Film':'Album',title:x.title,detail:x.creator||'',deepLink:{target:'games',kind,id:x.id}})))
+    ];
+    function openResult(row){
+      if(row.itemId){try{sessionStorage.setItem('tracker-open-item',row.itemId);}catch{};location.hash='#inventory';return;}
+      if(row.eventId){window.dispatchEvent(new CustomEvent('tracker-calendar-open',{detail:{eventId:row.eventId,dateKey:row.dateKey}}));location.hash='#calendar';return;}
+      if(row.deepLink){
+        if(row.deepLink.target==='hub'){active=row.deepLink.kind==='task'?'tasks':'notes';draw();editor(row.deepLink.kind,hub[row.deepLink.kind].find(x=>x.id===row.deepLink.id));return;}
+        window.dispatchEvent(new CustomEvent('tracker-search-open',{detail:row.deepLink}));
+        location.hash='#'+row.deepLink.target;
+      }
+    }
+    function search(){
+      const term=q.value.toLocaleLowerCase().trim();hubSearchQuery=q.value;
+      const found=term?all.filter(r=>String(r.title+' '+r.detail+' '+r.type).toLocaleLowerCase().includes(term)).slice(0,100):[];
+      replace(results,...found.map(row=>h('button',{class:'hub-row hub-search-result',type:'button',onclick:()=>openResult(row)},h('b',{},row.title),h('span',{class:'hint'},row.type))),
+        !found.length?empty(term?'No matching results.':'Type to search items, events, tasks, notes, expenses and media.'):null);
+    }
     q.addEventListener('input',search);search();return [h('h3',{},t('Search everything')),q,results];
   }
   function drawInsights(){

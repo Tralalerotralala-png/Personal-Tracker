@@ -15,12 +15,12 @@ const PALETTES=[
  ['#c28ca9','#f5e4ec','#80566e']
 ];
 const KIND_PALETTES={
- games:['#384961','#acbcd0','#77a99e','#dfedf1'],
+ games:['#243247','#c9d5e8','#8498b3','#edf4fb','#438bdd','#d95358','#4cbd84','#e9ba49'],
  books:['#102743','#244b80','#6687b4','#eee8d8'],
  comic:['#222b4e','#5d6598','#c78caa','#f0e4e5'],
  films:['#203441','#3d8aad','#8bcde9','#ecf7fb'],
  series:['#203441','#3d8aad','#8bcde9','#ecf7fb'],
- albums:['#10151c','#303a48','#a18bb9','#d6e0e7']
+ albums:['#080c13','#26303a','#667481','#eee3cb','#a95746']
 };
 const cache=new Map();
 export function mediaAccent(seed=''){return PALETTES[hash32(seed)%PALETTES.length][0];}
@@ -33,7 +33,7 @@ export function mediaPixelGrid(kind='books'){
  if(k==='books'||k==='comic'){
   // Upright hardback with navy cloth, two narrow spine strips and cream page edge.
   for(let y=1;y<=13;y++)for(let x=3;x<=13;x++){
-   let shade=x>=12||y===13?3:x<=4||y===1?0:1;
+   let shade=x>=13||y===13?3:x<=4||y===1?0:1;
    if(x===5||y===12)shade=2;
    if(y>=4&&y<=10&&x>=7&&x<=10&& (y===4||y===10||x===7||x===10))shade=2;
    at(x,y,palette[shade]);
@@ -49,22 +49,34 @@ export function mediaPixelGrid(kind='books'){
   for(let x=5;x<=12;x++)at(x,13,palette[0]);
   at(2,3,palette[3]);at(3,3,palette[2]);
  }else if(k==='albums'){
-  // An unmistakable black vinyl record with grooves and a transparent spindle.
+  // Crisp vinyl silhouette: concentric grooves, warm paper label and
+  // red label ring, reflective highlight, and a transparent spindle.
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
    const radius=Math.hypot(x-8.5,y-7);
-   if(radius>7||radius<1.15)continue;
-   const shade=radius<2.4?3:radius<3.6?2:radius<6.35?((x+y)%3===0?1:0):2;
-   at(x,y,palette[shade]);
+   if(radius>7||radius<.9)continue;
+   let color=palette[0];
+   if(radius<2.1)color=palette[3];
+   else if(radius<2.85)color=palette[4];
+   else if(radius<3.3)color=palette[0];
+   else if(radius<6.65)color=(Math.round(radius*2)+(x+y)%5)%5===0?palette[2]:palette[1];
+   else color=palette[0];
+   if(radius>=3.4&&radius<=6.5&&x<=6&&y<=5&&(x+y)%3===0)color=palette[2];
+   at(x,y,color);
   }
  }else{
-  // A readable controller rather than a generic stack of coloured cubes.
-  for(let y=5;y<=11;y++)for(let x=2;x<=15;x++){
-   if(y===5&&(x<=5||x>=12))continue;
-   if(y===11&&(x<=4||x>=13))continue;
-   at(x,y,palette[y===5||y===11?0:1]);
+  // SNES-style controller: dark D-pad and distinctive coloured buttons.
+  for(let y=4;y<=11;y++)for(let x=2;x<=15;x++){
+   const edge=y===4?(x>=6&&x<=11):
+     y===5?(x>=4&&x<=13):
+     y===11?(x>=4&&x<=6||x>=11&&x<=13):true;
+   if(!edge)continue;
+   const outline=y===4||y===11||x===2||x===15;
+   at(x,y,palette[outline?0:y>=9?2:1]);
   }
-  for(const [x,y] of [[5,7],[4,8],[5,9],[6,8],[12,7],[13,9]])at(x,y,palette[2]);
-  at(7,8,palette[3]);at(10,8,palette[3]);
+  for(const [x,y] of [[5,6],[4,7],[5,7],[6,7],[5,8]])at(x,y,palette[0]);
+  for(const [x,y,shade] of [[12,6,4],[14,7,5],[10,7,6],[12,8,7]])at(x,y,palette[shade]);
+  at(8,8,palette[0]);at(9,8,palette[0]);
+  at(6,5,palette[3]);at(7,5,palette[3]);
  }
  return grid;
 }

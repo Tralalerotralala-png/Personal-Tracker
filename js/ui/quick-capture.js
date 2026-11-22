@@ -43,11 +43,17 @@ export async function saveQuickCapture(store,{kind,title,body='',date= today(),a
   const chosen=mediaStatus[kind].includes(status)?status:mediaStatus[kind][0];
   const rec={id:uuid(),title:text(name,120),status:chosen,notes,cover:'',rating:null,journal:[]};
   if(kind==='game'){
-   const old=await store.getSetting('game_library_v1',null)||{},shelves=Array.isArray(old.shelves)&&old.shelves.length?old.shelves:['Favorites','Playing','Backlog','Completed'];
-   return store.setSetting('game_library_v1',{...old,shelves,mode:old.mode||'shelf',games:[...(old.games||[]),{...rec,platform:text(platform,100),shelf:shelves.includes(chosen)?chosen:shelves.includes('Backlog')?'Backlog':shelves[0],lastOpened:null}]});
+   return store.updateSetting('game_library_v1',old=>{
+    const current=old&&typeof old==='object'?old:{};
+    const shelves=Array.isArray(current.shelves)&&current.shelves.length?current.shelves:['Favorites','Playing','Backlog','Completed'];
+    return {...current,shelves,mode:current.mode||'shelf',games:[...(current.games||[]),{...rec,platform:text(platform,100),shelf:shelves.includes(chosen)?chosen:shelves.includes('Backlog')?'Backlog':shelves[0],lastOpened:null}]};
+   },{});
   }
-  const old=await store.getSetting('other_media_library_v1',null)||{},key=mediaKeys[kind];
-  return store.setSetting('other_media_library_v1',{books:[],films:[],albums:[],...old,[key]:[...(old[key]||[]),{...rec,creator:text(creator,150),shelf:'Collection'}]});
+  const key=mediaKeys[kind];
+  return store.updateSetting('other_media_library_v1',old=>{
+   const current=old&&typeof old==='object'?old:{};
+   return {books:[],films:[],albums:[],...current,[key]:[...(current[key]||[]),{...rec,creator:text(creator,150),shelf:'Collection'}]};
+  },{books:[],films:[],albums:[]});
  }
  throw Error('Unknown capture type.');
 }

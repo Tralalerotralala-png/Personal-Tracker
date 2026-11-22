@@ -18,7 +18,7 @@ test('clock has validated appearance, face options and hands',()=>{
  assert.match(svg,/XII/);assert.match(svg,/#aa2233/);assert.match(svg,/#e67d83/);
 });
 test('quick capture saves income, items and library entries in real existing records',async()=>{
- const settings={},rows=[];const store={setSetting:async(k,v)=>{settings[k]=v;},getSetting:async k=>settings[k],upsert:async(t,v)=>rows.push([t,v])};
+ const settings={},rows=[];const store={setSetting:async(k,v)=>{settings[k]=v;},getSetting:async k=>settings[k],updateSetting:async(k,mutate,fallback)=>{const next=await mutate(settings[k]??fallback);settings[k]=next;return next;},upsert:async(t,v)=>rows.push([t,v])};
  const date='2026-11-16';
  await saveQuickCapture(store,{kind:'income',title:'Payment',amount:10,currency:'USD',date});
  assert.equal(Object.values(settings)[0].type,'income');

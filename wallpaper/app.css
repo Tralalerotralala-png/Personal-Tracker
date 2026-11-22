@@ -12,6 +12,9 @@
   --ink-dim: #a39475;
   --accent: #43b9ad;
   --accent-ink: #0b1c1a;
+  --input-bg: color-mix(in srgb, var(--panel) 65%, var(--bg));
+  --nav-selected-bg: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  --placeholder-ink: var(--ink-dim);
   --danger: #d9604c;
   --warn: #e0a23a;
   --ok: #7fb356;
@@ -39,6 +42,7 @@ html {
   -webkit-text-size-adjust: 100%;
   color-scheme: dark;
 }
+html[data-color-mode='light']{color-scheme:light}
 body { margin: 0; min-height: 100dvh; padding-top: env(safe-area-inset-top, 0px); }
 
 h1, h2, h3 { font-weight: 600; margin: 0; line-height: 1.2; }
@@ -60,7 +64,7 @@ img, svg { display: block; }
 /* Pixel-cut corners shared by anything framed. Focus uses an inset ring because
    clip-path would hide an outer outline. */
 .btn, .chip, .stat, .tile-frame, .row-item, .loot, .quest-log, .pill, .toast,
-input[type='text'], input[type='email'], input[type='number'], input[type='search'], select, textarea,
+input[type='text'], input[type='email'], input[type='number'], input[type='search'], input[type='url'], input[type='password'], input[type='date'], input[type='time'], input[type='month'], input[type='datetime-local'], select, textarea,
 .slot, .seg, .crumb, .login-card, .photo-preview, .rarity-opt, .fab {
   clip-path: polygon(
     var(--notch) 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% calc(100% - var(--notch)),
@@ -91,7 +95,7 @@ main { flex: 1; padding: 14px 14px calc(var(--hotbar-h) + var(--safe-b) + 84px);
 }
 .slot svg { width: 24px; height: 24px; }
 .slot-label { font-size: .85rem; }
-.slot.on { color: var(--ink); background: #10231f; border-color: var(--accent); }
+.slot.on { color: var(--ink); background: var(--nav-selected-bg); border-color: var(--accent); }
 .slot:hover { color: var(--ink); }
 
 .pill { padding: 3px 10px; background: var(--panel); border: 3px solid var(--edge); color: var(--ink-dim); cursor: pointer; font-size: .85rem; }
@@ -133,14 +137,15 @@ main { flex: 1; padding: 14px 14px calc(var(--hotbar-h) + var(--safe-b) + 84px);
 .form { display: grid; gap: 4px; }
 .form label, .set-block label { display: block; margin-top: 12px; color: var(--ink-dim); font-size: .95rem; }
 .form label.check, .set-block label.check { display: flex; gap: 10px; align-items: center; color: var(--ink); }
-input[type='text'], input[type='email'], input[type='number'], input[type='search'], select, textarea {
-  width: 100%; padding: 9px 11px; background: #110d09; color: var(--ink); border: 3px solid var(--edge); font: inherit; border-radius: 0;
+input[type='text'], input[type='email'], input[type='number'], input[type='search'], input[type='url'], input[type='password'], input[type='date'], input[type='time'], input[type='month'], input[type='datetime-local'], select, textarea {
+  width: 100%; min-width:0; padding: 9px 11px; background: var(--input-bg); color: var(--ink); border: 3px solid var(--edge); font: inherit; border-radius: 0;
 }
 input[type='search']::-webkit-search-cancel-button { filter: invert(.8); }
+html[data-color-mode='light'] input[type='search']::-webkit-search-cancel-button{filter:none}
 textarea { resize: vertical; min-height: 5em; }
 input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
 input[type='color'] { width: 44px; height: 38px; padding: 0; border: 3px solid var(--edge); background: none; flex: none; }
-::placeholder { color: #7d6f55; }
+::placeholder { color: var(--placeholder-ink); opacity:.85; }
 .form-error { color: var(--danger); min-height: 1.2em; margin-top: 8px; }
 .inline-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: center; }
 .stepper { display: grid; grid-template-columns: 48px 1fr 48px; gap: 8px; }
@@ -174,8 +179,8 @@ details.more summary { cursor: pointer; padding: 6px 0; }
 .pane { display: grid; gap: 12px; margin-top: 12px; }
 .aside, .maincol { display: grid; gap: 12px; align-content: start; min-width: 0; }
 
-.where-input { min-height: 56px; font-size: 1.15rem; padding: 12px 14px; border-color: var(--accent); background: #0d1b19; }
-.where-input::placeholder { color: #5f8c86; }
+.where-input { min-height: 56px; font-size: 1.15rem; padding: 12px 14px; border-color: var(--accent); background: var(--input-bg); }
+.where-input::placeholder { color: var(--placeholder-ink); }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
 .stat { padding: 5px 4px; background: var(--panel); border: 3px solid var(--edge); text-align: center; }
@@ -245,7 +250,7 @@ details.more summary { cursor: pointer; padding: 6px 0; }
 .lost-tag { color: var(--danger); font-size: .85rem; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .crumb { padding: 0 8px; background: var(--panel-2); border: 2px solid var(--edge); font-size: .9rem; }
-.crumb.last { border-color: var(--accent); color: var(--accent); background: #0d1b19; }
+.crumb.last { border-color: var(--accent); color: var(--accent); background: var(--nav-selected-bg); }
 .sep { color: var(--ink-dim); }
 
 .empty { text-align: center; padding: 36px 16px; color: var(--ink-dim); display: grid; gap: 14px; justify-items: center; }
@@ -436,7 +441,7 @@ html.scanlines body::after {
 .legend i { width: 10px; height: 10px; background: var(--mc); display: inline-block; }
 @media (min-width: 700px) {
   .cal-day { min-height: 100px; padding: 5px 6px; }
-  .cal-ev { width: auto; height: auto; flex: 1 1 100%; padding: 0 5px; border-left: 3px solid var(--c); background: #110d09; font-size: .8rem; min-width: 0; }
+  .cal-ev { width: auto; height: auto; flex: 1 1 100%; padding: 0 5px; border-left: 3px solid var(--c); background: var(--input-bg); font-size: .8rem; min-width: 0; }
   .cal-ev-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
@@ -469,7 +474,7 @@ html.scanlines body::after {
 .wd-toggles { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
 .wd { min-width: 44px; min-height: 36px; padding: 0 6px; background: var(--panel-2); border: 3px solid var(--edge); color: var(--ink-dim); cursor: pointer; }
 .wd.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-input[type='date'], input[type='time'] { width: 100%; padding: 9px 11px; background: #110d09; color: var(--ink); border: 3px solid var(--edge); font: inherit; border-radius: 0; color-scheme: dark; }
+input[type='date'], input[type='time'] { width: 100%; padding: 9px 11px; background: var(--input-bg); color: var(--ink); border: 3px solid var(--edge); font: inherit; border-radius: 0; color-scheme: inherit; }
 
 /* ---- tuning sheet ---- */
 .tune-row { display: grid; gap: 4px; margin: 12px 0; }
@@ -724,7 +729,7 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .cat-field-controls input[type=checkbox], .tracking-choices input[type=checkbox] { width: 18px; height: 18px; }
 .tracking-heading { margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--edge); }
 .tracking-control { margin: 8px 0; }
-.tracking-control input[type=date], .form input[type=date] { background: #110d09; color: var(--ink); border: 3px solid var(--edge); font: inherit; padding: 9px; width: 100%; color-scheme: dark; }
+.tracking-control input[type=date], .form input[type=date] { background: var(--input-bg); color: var(--ink); border: 3px solid var(--edge); font: inherit; padding: 9px; width: 100%; color-scheme: inherit; }
 .track-slider { display: flex; align-items: center; gap: 12px; }
 .track-slider input { flex:1; accent-color:var(--accent); }
 .track-readout, .track-chip, .track-warning { font-size: .72rem; }
@@ -868,7 +873,7 @@ html[data-layout-width="compact"] main{max-width:1100px}
 @media(max-width:550px){.game-detail{grid-template-columns:1fr}.game-detail img{max-width:180px}.game-cover-grid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}}
 
 @media(max-width:899px){.hotbar{grid-template-columns:repeat(7,minmax(0,1fr))}}
-@media(max-width:480px){.hotbar .slot-label{font-size:.56rem}.hotbar .slot-icon svg{width:19px;height:19px}}
+@media(max-width:480px){.hotbar .slot-label{font-size:.7rem;letter-spacing:0}.hotbar .slot-icon svg{width:21px;height:21px}}
 
 /* Compact weather icons and currency conversion widget. */
 .w-stats{grid-template-columns:repeat(3,minmax(0,1fr));height:auto;min-height:64px}
@@ -934,7 +939,6 @@ html[data-layout-width="compact"] main{max-width:1100px}
 .games-view .game-editor-layout{max-width:850px}
 .games-view .game-editor-form textarea{min-height:230px;resize:vertical}
 .games-view .game-editor-actions{display:flex;justify-content:flex-end;padding:14px 0}
-@media(min-width:850px){.games-view.game-side-mode .game-page-body{width:min(740px,80vw);min-width:340px;max-width:95%;resize:horizontal;overflow:auto;margin-left:auto;padding:14px;border:2px solid var(--edge);background:var(--panel)}.games-view.game-side-mode .game-page-head{justify-content:flex-end}}
 @media(max-width:849px){.games-view .game-page-body{width:100%}}
 
 /* Unified compact daily weather + ground cards. */
@@ -1681,7 +1685,6 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
 .box-stock-panel>button{justify-self:start;}
 .box-stock-total{font-variant-numeric:tabular-nums;}
 /* Reserve the protruding disc's footprint to keep it off the game text. */
-.game-detail:has(>.media-case-game){grid-template-columns:minmax(240px,310px) minmax(0,1fr);gap:24px;}
 .media-case-game{width:clamp(148px,17vw,225px);margin-right:76px;}
 .media-case-game .media-case-disc{
  top:12%;left:10%;width:96%;border:3px solid #6b8aa9;
@@ -1689,7 +1692,7 @@ dialog.item-editor .sheet-body { padding:10px 14px 14px; }
  box-shadow:inset 0 0 0 2px #c5e2f488,inset 0 0 14px #0a1f43aa,4px 5px 0 #0006;
  animation:mediaOpticalDiscReveal 1.2s .18s cubic-bezier(.16,.74,.2,1) both;
 }
-@media(max-width:650px){.game-detail:has(>.media-case-game){grid-template-columns:1fr;gap:18px;}.media-case-game{width:min(56vw,210px);margin-right:0;}}
+@media(max-width:650px){.media-library-view .games-view .media-case-game{width:min(56vw,210px);margin-right:0;}}
 .game-backups .backup-upload{margin:0 0 14px;padding:12px;border:1px solid var(--edge);background:var(--panel-2);}
 .game-backups [hidden]{display:none!important;}
 
@@ -2860,3 +2863,26 @@ button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var
  .media-interior-edit-item img{height:105px}
 }
 @media(prefers-reduced-motion:reduce){.media-inner-page{transition:none!important}}
+
+/* Shared Library detail geometry; games use the same art/info columns as books. */
+.media-library-view .games-view .media-detail{grid-template-columns:minmax(290px,360px) minmax(0,1fr)}
+.media-library-view .games-view .media-case-stage .media-case-game{margin-right:14px}
+.media-library-view .games-view .media-detail-info>h2{margin:0 0 12px;overflow-wrap:anywhere}
+.media-detail-info>.game-journal,.media-detail-info>.game-backups{margin-top:18px}
+.album-song-panel{display:grid;gap:10px;margin-top:20px;padding-top:16px;border-top:2px solid var(--edge)}
+.album-song-panel h3{font-size:1rem}
+.album-song-panel input[type=file]{width:min(100%,350px);min-width:0}
+.album-song-panel .album-song-list{display:grid;gap:8px}
+.album-song-panel .album-song-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+ padding:6px 8px;background:var(--panel-2);border:1px solid var(--edge);min-width:0}
+.album-song-row .btn:first-child{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;justify-content:flex-start;text-align:left}
+.album-song-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.album-song-link select{flex:1 1 180px;width:auto}
+.audio-list-row{flex-wrap:wrap;padding:5px 0;border-bottom:1px solid var(--edge)}
+.audio-list-row .audio-list-play{flex:1 1 140px;min-width:0;overflow-wrap:anywhere;text-align:left;justify-content:flex-start}
+.audio-list-row .audio-list-play small{display:block;color:var(--ink-dim);font-size:.72rem}
+@media(max-width:700px){
+ .media-library-view .games-view .media-detail{grid-template-columns:1fr;gap:20px}
+ .media-library-view .games-view .media-case-stage{justify-items:start}
+ .album-song-panel .inline-actions>*{max-width:100%}
+}

@@ -68,11 +68,11 @@ BEGIN
     CREATE POLICY tracker_private_owner ON storage.objects
       AS RESTRICTIVE FOR ALL TO authenticated
       USING (
-        bucket_id NOT IN ('item-photos', 'game-backups')
+        bucket_id NOT IN ('item-photos', 'game-backups', 'music-tracks')
         OR (SELECT public.tracker_account_allowed())
       )
       WITH CHECK (
-        bucket_id NOT IN ('item-photos', 'game-backups')
+        bucket_id NOT IN ('item-photos', 'game-backups', 'music-tracks')
         OR (SELECT public.tracker_account_allowed())
       );
   END IF;

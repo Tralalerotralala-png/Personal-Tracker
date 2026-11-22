@@ -386,6 +386,24 @@ for width,height in [(390,844),(1280,900)]:
         picker.locator('input[aria-label="Icon color"]').fill("#bc6745")
         picker.get_by_role("button",name="Save icons").click()
         assert page.evaluate("JSON.parse(localStorage.getItem('tracker-nav-icon-choices-v1')).games.glyph")=="gear"
+        # Light palette controls must remain readable, including selected nav and primary actions.
+        for palette,preset in [("Lavender Dawn","dawn"),("Paper Archive","parchment")]:
+            page.locator(".theme-choice",has_text=palette).click()
+            page.wait_for_function("(id)=>document.documentElement.dataset.theme===id",arg=preset)
+            ratios=page.evaluate("""() => {
+              const rgb=value=>{const nums=[...String(value).matchAll(/[-+]?(?:\\d*\\.)?\\d+(?:e[-+]?\\d+)?/gi)].slice(0,3).map(x=>Number(x[0]));return String(value).startsWith('color(srgb')?nums:nums.map(n=>n/255);};
+              const lum=value=>{const [r,g,b]=rgb(value).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return r*.2126+g*.7152+b*.0722;};
+              const ratio=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+              const input=document.createElement('input'),button=document.createElement('button');
+              input.type='text';button.className='btn primary';document.body.append(input,button);
+              const i=getComputedStyle(input),b=getComputedStyle(button),nav=getComputedStyle(document.querySelector('.slot.on'));
+              const data={input:ratio(i.color,i.backgroundColor),button:ratio(b.color,b.backgroundColor),nav:ratio(nav.color,nav.backgroundColor),scheme:getComputedStyle(document.documentElement).colorScheme};
+              input.remove();button.remove();return data;
+            }""")
+            assert ratios["scheme"]=="light",ratios
+            assert min(ratios["input"],ratios["button"],ratios["nav"])>=4.5,(palette,ratios)
+        page.locator(".theme-choice",has_text="Original / Classic").click()
+        page.wait_for_function("() => document.documentElement.dataset.theme==='classic'")
         page.keyboard.press("Escape")
         page.reload(wait_until="domcontentloaded")
         page.locator(".top .gear").wait_for(timeout=25000)
@@ -462,8 +480,11 @@ for width,height in [(390,844),(1280,900)]:
             return [s.strip() for s in toolbar.locator(".media-collection-actions button").all_inner_texts()]
         assert game_action_names[:2]==action_names(books_toolbar)[:2],(game_action_names,action_names(books_toolbar))
         assert action_names(books_toolbar)==["Cover grid","New shelf","Add Books"],action_names(books_toolbar)
-        page.once("dialog",lambda dialog: dialog.accept("Example comics shelf"))
         books_toolbar.locator("button",has_text="New shelf").click()
+        shelf_prompt=page.locator("dialog.sheet[open]").last
+        shelf_prompt.locator("input[type=text]").fill("Example comics shelf")
+        shelf_prompt.locator("button",has_text="Save").click()
+        shelf_prompt.wait_for(state="detached",timeout=5000)
         shelf=page.locator(".media-library-view .game-shelf",has=page.locator("h3",has_text="Example comics shelf"))
         shelf.wait_for(state="visible",timeout=10000)
         assert shelf.locator(".media-empty-shelf").count()==1
@@ -495,6 +516,13 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-inner-page img").first.wait_for(state="visible",timeout=10000)
         assert page.locator(".media-inner-page img").count()==2
         assert "7.5" in page.locator(".media-detail-info").inner_text()
+        # Unlike the old implementation, Books retains its selected title
+        # while other Library categories are visited.
+        page.locator(".media-library-view .hub-tabs button",has_text="Games").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        assert "Sample Illustrated Book" in page.locator(".media-detail-info h2").inner_text()
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        assert "Sample Illustrated Book" in page.locator(".media-detail-info h2").inner_text()
         page.locator(".media-case-stage .media-replay").click()
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .game-book",has_text="Sample Illustrated Book").click()
@@ -517,11 +545,11 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-detail-info").wait_for(state="visible",timeout=10000)
         assert "Rating: 8.5" in page.locator(".media-detail-info").inner_text()
         assert "Status: Watched" in page.locator(".media-detail-info").inner_text()
-        # A category switch forces a local-store refresh. The edit must survive.
-        page.locator(".media-library-view .game-page-head button",has_text="Back").click()
+        # Film selection and saved edit survive a category change without
+        # forcing the user to find and reopen the same title.
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
-        page.locator(".media-library-view .game-book",has_text="Example TV Series").click()
+        assert "Example TV Series" in page.locator(".media-detail-info h2").inner_text()
         assert "Rating: 8.5" in page.locator(".media-detail-info").inner_text()
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
@@ -599,6 +627,15 @@ for width,height in [(390,844),(1280,900)]:
               "excerpt",page.locator(".media-library-view").inner_text()[:450])
         page.locator(".game-detail").first.wait_for(timeout=10000)
         assert "Unique test game" in page.locator(".games-view").inner_text()
+        assert page.locator(".games-view .game-detail .media-case-stage").count()==1
+        assert page.locator(".games-view .game-detail .media-detail-info").count()==1
+        assert page.locator(".games-view .media-case-stage .media-replay").count()==1
+        assert page.locator(".games-view .game-page-head button").count()==1,"Game details should only have Back, no side-panel toggle"
+        page.locator(".games-view .media-case-stage .media-replay").click()
+        assert page.locator(".games-view .game-detail").is_visible(),"Replay must keep the selected game open"
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Games").click()
+        assert "Unique test game" in page.locator(".games-view .game-page-head").inner_text()
         page.evaluate("location.hash='#overview'")
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         # The decrypted private journal must close on navigation, not merely

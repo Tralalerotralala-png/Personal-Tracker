@@ -17,7 +17,7 @@ test('fresh installs and existing-project hardening use the same restrictive dat
     assert.match(sql,/WITH CHECK \(\(SELECT public\.tracker_account_allowed\(\)\)\)/);
     for(const table of tables) assert.match(sql,new RegExp("'"+table+"'"));
     assert.match(sql,/storage\.objects\s+AS RESTRICTIVE FOR ALL TO authenticated/);
-    assert.match(sql,/bucket_id NOT IN \('item-photos', 'game-backups'\)/);
+    assert.match(sql,/bucket_id NOT IN \('item-photos', 'game-backups', 'music-tracks'\)/);
     assert.match(sql,/COALESCE\(existing\.qual, ''\) NOT LIKE/);
     assert.match(sql,/COALESCE\(existing\.with_check, ''\) NOT LIKE/);
     assert.doesNotMatch(sql,/\bDROP\s+TABLE\b/i);
