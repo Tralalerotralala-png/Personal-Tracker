@@ -1,29 +1,56 @@
 # Personal Tracker
 
-Personal Tracker is a customizable, local-first organizer for everyday records, media, calendars and weather. New installations use neutral defaults; personal records and preferences belong to each installation's local device or configured private account.
+A customizable, offline-first personal dashboard for organizing everyday life. Built with vanilla JavaScript, CSS and IndexedDB, with optional Supabase sign-in and synchronization.
 
-It helps me keep track of belongings, plan dates and tasks, manage expenses, and organize games, books, films, and music. There's a private journal for dreams and notes, local weather and ground estimates, and a place to follow news and practice languages. The home screen puts the information I check most often together. Its colors can change with the weather, time of day, and moon phase. There's also an optional Wallpaper Engine version for the desktop.
+Personal Tracker brings collections, planning, finances and useful daily information into one retro-inspired, widget-based web app. It's a personal project designed primarily for a single owner, not a hosted multi-user service.
 
-The site works offline for many everyday tasks. Data stays in your browser unless you choose to connect Supabase, which lets you sign in and sync between devices. With a private Storage bucket, you can also keep copies of game saves and configuration files. Some features, such as live weather and news, still need an internet connection.
+## Features
 
-The code is public, so do not commit personal records, preferences, account exports or private credentials. To run your own copy, fork the project and host it on GitHub Pages or another static web host. You can create a separate Supabase project, run the included database setup, and use your own project URL and publishable key. Your records then belong to your installation, not mine. You can also skip Supabase and use the local-only mode.
+- **Dashboard:** Rearrangeable widgets, customizable layouts, themes and pixel-art icons.
+- **Inventory:** Track belongings, categories, locations and photos.
+- **Media Library:** Organize games, books and comics, films and TV, and albums. Track progress, notes, covers and decimal ratings; optionally store game backups and upload music privately with Supabase Storage.
+- **Calendar:** Events, repeating schedules, reminders, an agenda and ICS calendar imports.
+- **Weather and sky:** Local forecasts, estimated ground conditions, UV, moon phases and astronomical events.
+- **Personal records:** Expenses, dream diary, personal notes and a passphrase-encrypted Logs journal.
+- **News and learning:** A configurable news feed and daily language practice.
+- **Offline use:** Installable progressive web app (PWA) with local browser storage; optional Wallpaper Engine desktop version.
 
-**Coming Up** covers seven days. It displays the latest calculated wetness scores, or an explicitly marked carry-forward estimate when a day is missing, updating the estimate when weather refreshes. Current and daily peak UV only appear when the source supplies a valid value. Clicking a day shows compact hourly rain probability and, when available, modelled UV hours already elapsed versus upcoming hours. Sky events explain both their astronomy and traditional associations without repetitive disclaimers or unrelated eclipse warnings. Weather, lunar, zodiac and planetary icons now share stepped-pixel depth with the app's existing layered inventory sprites.
+Weather, news and cloud synchronization need an internet connection. Some weather and ground readings are *model estimates*, not measurements at your address.
 
-The full instructions are in [SETUP.md](SETUP.md). Start with `config.example.js` if you're connecting your own Supabase project, run `supabase/schema.sql` for the database, and run `supabase/game-backups.sql` if you want private file backups. Check that Row Level Security and Storage access policies are enabled before putting personal information online. Never publish a Supabase secret or service-role key, private backup, or password. Use a unique 12–128-character passphrase for the new encrypted Logs journal; four-digit PINs are supported only by the archived old format and are not strong enough to protect highly sensitive secrets.
+## Getting started
 
-Inventory objects now support pixel-perfect horizontal sprite stacking with two pre-baked viewing angles, based on SpriteCook's written sprite-stacking technique. The complete catalog and unnamed item sprites use the new renderer, while the 24px navigation and weather symbols stay clearly recognizable. **Settings → Appearance → Sprite style** switches between layered objects and original flat icons. The existing one-view assets use approximate extrusions; exact 3D reconstruction requires four matching orthographic views. See [the sprite-stacking guide](docs/sprite-stacking.md). New catalogue/category icons use `js/ui/media-art.js` and the existing `renderLayeredSprite` renderer; future in-app icons should follow that code-generated pixel-stack convention rather than introducing unrelated icon assets.
+No JavaScript framework or application build step is required to serve the website. Use a local HTTP server rather than opening `index.html` directly:
 
-**Daily language practice:** starting **21 November 2026**, Phrase of the Day uses 37 curated **B2-level Mandarin–German mini-dialogues**, each with a realistic speaking context, transferable sentence pattern, tone-marked pinyin, English and Mexican Spanish translations for both speakers, literal word/phrase meanings that you can tap in Mandarin and German, a second speaker's reply, and notes on pragmatic nuance. Try responding before revealing the model reply and useful expressions. Short dashboard widgets open the expanded dialogue in a sheet; the phrase-history calendar still shows the exact beginner lesson for dates before this upgrade. Everything works offline without saving voice or responses to the server.
+```bash
+git clone https://github.com/Tralalerotralala-png/Personal-Tracker.git
+cd Personal-Tracker
+python3 -m http.server 8080
+```
 
-The app uses plain HTML, CSS, and JavaScript modules. No build step is needed to serve the website. For local testing, run `python -m http.server 8080` from the repository folder and open `http://localhost:8080`. Run `node --test` to check the JavaScript tests. The separate Wallpaper Engine files can be rebuilt with `node scripts/build-wallpaper.mjs`.
+Open **http://localhost:8080** in your browser.
 
-## Stabilization and security
+**Choose your data mode before running a fork:**
 
-The hosted instance is a private, single-owner deployment. It uses owner-restricted Supabase RLS; a fork should use its *own* Supabase project and security policies. Its local IndexedDB cache is account-specific but **not encrypted at rest**. A known account can reopen its cache offline if it was verified while online. Never use this deployment as shared-device private storage without clearing device caches.
+- **Local-only:** Remove `config.js` from your own copy (or replace it with placeholder values). The app uses browser IndexedDB and starts with sample data.
+- **Private cloud sync:** Use `config.example.js` to configure **your own** Supabase project, then follow [SETUP.md](SETUP.md) for database, authentication, Storage and owner-access policies.
 
-The private Logs journal encrypts **each entry and draft independently** with AES-GCM and a key derived from a 12–128-character passphrase. Unrelated entries can sync separately across offline devices. The retired PIN-based journal format is no longer active, and old browser caches are purged on app startup. Legacy records are excluded from new backup exports and imports; previously exported backups outside the app cannot be erased remotely. The same entry can still have a last-write-wins conflict; unlocked Logs offers recovery of readable losing revisions as new entries. There is no forgotten-passphrase recovery. Structured-data JSON exports do **not** include photos, game backup files or audio files, and may contain readable personal information. Back up those files separately. A legacy browser database can be exported for manual review from Settings; it is never silently assigned to a user.
+This repository includes deployment configuration. **Do not reuse the original project's Supabase backend for your fork.** Browser configuration may contain only a public/publishable key, never a secret or service-role key.
 
-New CI includes basic mobile/desktop browser smoke tests in addition to Node tests. Browser security headers beyond meta CSP (especially framing restrictions) require an appropriate host; GitHub Pages does not let this repository set arbitrary HTTP response headers. The feed-proxy and pixel-icon-ai edge function *sources* enforce owner authorization but are optional and must be configured, security-reviewed and deployed separately.
+## Development
 
-**Weather city label and app identity:** The selected city now sits to the left of the current weather reading and never wraps into a separate single-letter line. Very long city names use a single-line ellipsis. The original PNG favicon and installed-app icons have been restored; the experimental replacement app icon was removed. Phrase History also displays both target-language lines and their English/Spanish meanings.
+Node.js 22 is used in CI. Useful commands:
+
+```bash
+npm test                     # JavaScript tests
+npm run build:wallpaper      # Regenerate Wallpaper Engine files
+```
+
+The website starts at `index.html`; application modules live in `js/`, and `css/app.css` is the source stylesheet. `wallpaper/` contains generated desktop assets. GitHub Actions also runs browser and database-policy tests.
+
+## Data and privacy
+
+Local-only records are stored on your device; general IndexedDB data is **not encrypted at rest**. Cloud mode uses account-specific browser caches and Supabase synchronization. The existing hosted backend is owner-restricted; self-hosted deployments must configure and verify their own Row Level Security and access policies.
+
+The private Logs journal uses passphrase-based encryption, with **no forgotten-passphrase recovery**. JSON exports can contain readable personal data and do not include uploaded photos, game-backup files or music tracks. Back up those files separately.
+
+**Never commit personal records, exported backups, passwords or private credentials.** For detailed deployment and recovery guidance, see [SETUP.md](SETUP.md).
