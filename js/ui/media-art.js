@@ -104,3 +104,68 @@ export function mediaCollectionToolbar({viewLabel,newShelfLabel,addLabel,onToggl
    action(newShelfLabel,onNewShelf),
    action(addLabel,onAdd,true)));
 }
+
+// One precise 0–10 rating treatment for all four Library categories.
+// 9.7 / 10 renders as 4.85 of five stars, preserving tenth-point precision.
+export function ratingNumber(value){
+ if(value===null||value===undefined||value==='')return null;
+ const n=Number(value);
+ return Number.isFinite(n)&&n>=0&&n<=10&&Math.abs(n*10-Math.round(n*10))<1e-7
+  ?Math.round(n*10)/10:null;
+}
+export function mediaStarRating(value,{editable=false,label='Rating',onChange=null}={}){
+ let selected=ratingNumber(value),preview=null;
+ const empty=h('span',{class:'media-stars-empty','aria-hidden':'true'},'★★★★★');
+ const filled=h('span',{class:'media-stars-filled','aria-hidden':'true'},'★★★★★');
+ const stars=h('span',{class:'media-stars'},empty,filled);
+ const output=h('output',{class:'media-stars-score','aria-live':editable?'polite':'off'});
+ function draw(){
+  const shown=preview??selected;
+  filled.style.width=((shown??0)*10)+'%';
+  const detail=shown===null?'— / 10':shown.toFixed(1)+' / 10';
+  output.textContent=detail;
+  stars.title=detail+(shown===null?'':' · '+(shown/2).toFixed(2)+' / 5 stars');
+ }
+ if(!editable){
+  const el=h('div',{class:'media-star-rating media-star-readonly','aria-label':label},stars,output);
+  draw();return {el,getValue:()=>selected};
+ }
+ const range=h('input',{class:'media-stars-range',type:'range',min:0,max:10,step:0.1,
+  value:selected??0,'aria-label':label+' (0–10 in tenths)'});
+ const number=h('input',{class:'media-stars-number',type:'number',min:0,max:10,step:0.1,
+  inputmode:'decimal',value:selected??'','aria-label':label+' exact score out of 10'});
+ const clear=h('button',{class:'btn small ghost media-stars-clear',type:'button',
+  onclick:()=>{selected=null;preview=null;number.value='';range.value=0;draw();onChange?.();}},
+  'Clear');
+ function commit(input,{updateNumber=true}={}){
+  const v=ratingNumber(input);
+  if(v===null)return;
+  selected=v;preview=null;
+  range.value=String(v);
+  if(updateNumber)number.value=v.toFixed(1);
+  draw();onChange?.();
+ }
+ range.addEventListener('input',()=>commit(range.value));
+ number.addEventListener('input',()=>{
+  if(number.value===''){selected=null;preview=null;draw();onChange?.();return;}
+  const v=ratingNumber(number.value);
+  if(v!==null)commit(number.value,{updateNumber:false});else onChange?.();
+ });
+ range.addEventListener('pointermove',event=>{
+  if(event.pointerType!=='mouse'&&event.pointerType!=='pen')return;
+  const rect=range.getBoundingClientRect();
+  if(!rect.width)return;
+  preview=Math.max(0,Math.min(10,Math.round(((event.clientX-rect.left)/rect.width)*100)/10));
+  draw();
+ });
+ range.addEventListener('pointerleave',()=>{preview=null;draw();});
+ range.addEventListener('blur',()=>{preview=null;draw();});
+ stars.append(range);
+ const el=h('div',{class:'media-star-rating media-star-editable',role:'group','aria-label':label},
+  stars,number,clear,output);
+ draw();
+ return {el,getValue:()=>{
+  const raw=number.value.trim();
+  return raw===''?null:Number(raw);
+ }};
+}

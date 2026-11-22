@@ -513,9 +513,11 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-case-books .media-page-flip").first.wait_for(state="visible",timeout=10000)
         assert page.locator(".media-case-books .media-case-disc").count()==0
         assert "mediaBookCover" in page.locator(".media-case-books .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
-        page.locator(".media-inner-page img").first.wait_for(state="visible",timeout=10000)
-        assert page.locator(".media-inner-page img").count()==2
-        assert "7.5" in page.locator(".media-detail-info").inner_text()
+        page.locator(".media-case-books.has-interior-art .media-mini-left img").wait_for(state="visible",timeout=10000)
+        assert page.locator(".media-case-books .media-mini-right img").count()==1
+        assert page.locator(".media-library-view .media-interiors").count()==0,"Pages belong inside the miniature, not below the journal"
+        assert "7.5 / 10" in page.locator(".media-detail-info .media-stars-score").inner_text()
+        assert page.locator(".media-detail-info .media-stars-filled").evaluate("(el)=>el.style.width")=="75%"
         # Unlike the old implementation, Books retains its selected title
         # while other Library categories are visited.
         page.locator(".media-library-view .hub-tabs button",has_text="Games").click()
@@ -526,8 +528,9 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-case-stage .media-replay").click()
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .game-book",has_text="Sample Illustrated Book").click()
-        page.locator(".media-inner-page img").first.wait_for(state="visible",timeout=10000)
-        assert page.locator(".media-inner-page img").count()==2
+        page.locator(".media-case-books.has-interior-art .media-mini-left img").wait_for(state="visible",timeout=10000)
+        assert page.locator(".media-case-books .media-mini-right img").count()==1
+        assert page.locator(".media-library-view .media-interiors").count()==0,"Pages belong inside the miniature, not below the journal"
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
         page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
@@ -539,18 +542,20 @@ for width,height in [(390,844),(1280,900)]:
         assert "mediaOpticalDiscReveal" in page.locator(".media-case-films .media-case-disc").evaluate("(el)=>getComputedStyle(el).animationName")
         assert "mediaDvdCoverReveal" in page.locator(".media-case-films .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
         page.locator(".media-detail-info button",has_text="Edit").click()
-        page.locator(".media-editor input[type=number]").fill("8.5")
+        page.locator(".media-editor input[type=number]").fill("9.7")
         page.locator(".media-editor select").first.select_option("Watched")
         page.locator(".media-editor + .btn.primary").click()
         page.locator(".media-detail-info").wait_for(state="visible",timeout=10000)
-        assert "Rating: 8.5" in page.locator(".media-detail-info").inner_text()
+        assert "9.7 / 10" in page.locator(".media-detail-info .media-stars-score").inner_text()
+        assert page.locator(".media-detail-info .media-stars-filled").evaluate("(el)=>el.style.width")=="97%"
         assert "Status: Watched" in page.locator(".media-detail-info").inner_text()
         # Film selection and saved edit survive a category change without
         # forcing the user to find and reopen the same title.
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
         assert "Example TV Series" in page.locator(".media-detail-info h2").inner_text()
-        assert "Rating: 8.5" in page.locator(".media-detail-info").inner_text()
+        assert "9.7 / 10" in page.locator(".media-detail-info .media-stars-score").inner_text()
+        assert page.locator(".media-detail-info .media-stars-filled").evaluate("(el)=>el.style.width")=="97%"
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         media_search=page.locator(".media-library-view .media-search-filters input")
