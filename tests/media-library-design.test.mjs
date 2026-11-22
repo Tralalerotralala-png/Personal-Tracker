@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createStore } from '../js/data/store.js';
 import { createMemoryAdapter } from '../js/data/adapters.js';
 import { ensureRequestedMedia, markRequestedMediaRemoved, REQUESTED_MEDIA } from '../js/data/library-starter.js';
-import { mediaIconSvg, mediaAccent, mediaPixelGrid } from '../js/ui/media-art.js';
+import { mediaIconSvg, mediaAccent, mediaPixelGrid, ratingNumber } from '../js/ui/media-art.js';
 
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
@@ -97,14 +97,20 @@ test('all categories use the exact same three-action component and category shel
  assert.match(css,/\.media-case-game \.media-case-disc::after/);
  assert.match(css,/width:21%;height:21%/);
  assert.match(media,/store\.updateSetting|await commit\(/);
- assert.match(media,/media-inner-spread/);
+ assert.match(media,/media-mini-left/);
+ assert.match(media,/media-mini-right/);
+ assert.match(media,/has-interior-art/);
+ assert.doesNotMatch(media,/info\.append\(gallery\)/);
+ assert.match(games,/mediaStarRating/);
+ assert.match(media,/mediaStarRating/);
  assert.match(media,/syncedPagesKey/,'Synced interior pages must be rendered');
  assert.match(media,/cloud:false/,'Existing device-only pages must remain local');
  assert.match(games,/media-replay/,'Game detail must have the same reveal replay control');
  assert.doesNotMatch(games,/Side panel|sideMode|game-side-mode/,'Game side panel is obsolete');
  assert.doesNotMatch(css,/game-side-mode/);
  assert.match(media,/convertInteriorImage/);
- assert.match(css,/\.media-inner-spread/);
+ assert.match(css,/\.media-case-books\.has-interior-art \.media-mini-left/);
+ assert.match(css,/\.media-stars-filled/);
  assert.match(media,/media-vinyl-record/);
  assert.match(media,/media-comic-panel/);
  assert.match(css,/@keyframes mediaBookCover/);
@@ -117,4 +123,20 @@ test('all categories use the exact same three-action component and category shel
  assert.match(css,/prefers-reduced-motion:reduce/);
  assert.equal(css,read('wallpaper/app.css'));
  assert.match(read('sw.js'),/\.\/js\/ui\/media-art\.js/);
+});
+
+
+test('rating precision is identical for games, books, films and albums',()=>{
+ assert.equal(ratingNumber(0),0);
+ assert.equal(ratingNumber(9.7),9.7);
+ assert.equal(ratingNumber(10),10);
+ assert.equal(ratingNumber('8.3'),8.3);
+ assert.equal(ratingNumber(null),null);
+ assert.equal(ratingNumber(9.75),null,'Only tenths are saved');
+ assert.equal(ratingNumber(10.1),null);
+ const library=read('js/ui/media-library.js'),games=read('js/ui/games.js');
+ for(const source of [library,games]){
+  assert.match(source,/mediaStarRating\(.*rating/);
+  assert.match(source,/Math\.abs\(.*\*10-Math\.round\(.*\*10\)\)/);
+ }
 });
