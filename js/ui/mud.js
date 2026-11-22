@@ -180,7 +180,8 @@ export function createMudView({ store, weather }) {
           ? ' · El estado del suelo es un cálculo meteorológico, no una medición directa. La calificación indica los datos disponibles, no una precisión comprobada.'
           : ' · Ground conditions are modeled from weather, not measured with a sensor. The rating reflects available inputs, not a verified accuracy percentage.'),
       h('h4', { class: 'wx-outlook-title' }, language()==='es'?'Clima y suelo — próximos siete días':'Weather and ground — next seven days'),
-      h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
+      h('div', { class: 'wx-outlook wx-unified', tabindex:0,
+        'aria-label':language()==='es'?'Pronóstico de siete días; desplázate horizontalmente para ver los demás días':'Seven-day forecast; scroll horizontally to explore all days' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
         return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather), title: 'View weather and ground details' },
           h('span', { class: 'wx-unified-date' }, d.phase === 'today' ? 'Today' : dayShort(d.date)),
@@ -278,13 +279,28 @@ export function createMudView({ store, weather }) {
       banner(state),
       weatherPanel(state, today, future),
       h('details',{class:'wx-forecast-review'},
-        h('summary',{},language()==='es'?'Comparación con el pronóstico anterior':'Yesterday’s forecast compared'),
+        h('summary',{},language()==='es'?'Seguimiento de pronósticos guardados':'Saved forecast tracking'),
         state.forecastReview
-          ? h('p',{},language()==='es'
-              ? `Para ${state.forecastReview.date}: se pronosticaron ${fmt(state.forecastReview.forecastRain)} mm de lluvia y ${fmt(state.forecastReview.forecastHigh)}°C. El modelo retrospectivo indica ${fmt(state.forecastReview.retrospectiveRain)} mm y ${fmt(state.forecastReview.retrospectiveHigh)}°C.`
-              : `For ${state.forecastReview.date}: forecast ${fmt(state.forecastReview.forecastRain)} mm rain and ${fmt(state.forecastReview.forecastHigh)}°C high. Later retrospective model data shows ${fmt(state.forecastReview.retrospectiveRain)} mm and ${fmt(state.forecastReview.retrospectiveHigh)}°C.`)
-          : h('p',{class:'hint'},language()==='es'?'Podrás ver la comparación cuando se guarde un pronóstico y estén disponibles los datos del día siguiente.':'Comparison becomes available after a forecast is saved and the next day’s data arrives.'),
-        h('p',{class:'hint'},language()==='es'?'La comparación es entre versiones del modelo Open-Meteo, no mediciones realizadas en tu domicilio.':'Both values come from Open-Meteo model data, not measurements at your address.')),
+          ? h('div',{class:'wx-forecast-review-result'},
+              h('p',{},language()==='es'
+                ? `Predicción guardada el ${state.forecastReview.issued} para el ${state.forecastReview.date}; se compara con el modelo actualizado después de esa fecha.`
+                : `Prediction saved on ${state.forecastReview.issued} for ${state.forecastReview.date}, compared with later model data.`),
+              h('p',{},language()==='es'
+                ? `Lluvia: ${fmt(state.forecastReview.forecastRain)} mm previstos → ${fmt(state.forecastReview.retrospectiveRain)} mm retrospectivos.`
+                : `Rain: ${fmt(state.forecastReview.forecastRain)} mm forecast → ${fmt(state.forecastReview.retrospectiveRain)} mm retrospective.`),
+              h('p',{},language()==='es'
+                ? `Máxima: ${fmt(state.forecastReview.forecastHigh)}°C previstos → ${fmt(state.forecastReview.retrospectiveHigh)}°C retrospectivos.`
+                : `High temperature: ${fmt(state.forecastReview.forecastHigh)}°C forecast → ${fmt(state.forecastReview.retrospectiveHigh)}°C retrospective.`))
+          : h('p',{class:'hint'},state.forecastTracking?.nextDate
+              ? (language()==='es'
+                  ? `Ya se guardaron predicciones para ${state.forecastTracking.pending} día(s) futuros. La próxima fecha comprobable es ${state.forecastTracking.nextDate}, después de que termine el día y se actualice el modelo.`
+                  : `Tracking predictions for ${state.forecastTracking.pending} upcoming day(s). Next target: ${state.forecastTracking.nextDate}; comparison becomes possible after that day ends and the model refreshes.`)
+              : language()==='es'
+                ? 'El seguimiento empieza al guardar un pronóstico actualizado en este dispositivo. Vuelve después de que haya terminado uno de esos días.'
+                : 'Tracking begins when an updated forecast is saved on this device. Return after a forecasted day has ended.'),
+        h('p',{class:'hint'},language()==='es'
+          ? 'Las predicciones se guardan en este dispositivo. Se comparan versiones del modelo Open-Meteo, no mediciones en tu domicilio.'
+          : 'Saved predictions stay on this device. Both values come from Open-Meteo model data, not measurements at your address.')),
       hourlyRain(state),
       skyPanel(state),
       h('details', { class: 'ground-history wx-history', open: historyExpanded ? true : null, ontoggle: e=>{if(e.target.isConnected)historyExpanded=e.target.open;} },

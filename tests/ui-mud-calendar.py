@@ -82,6 +82,13 @@ with sync_playwright() as p:
           '| observed:', page.locator('section[aria-label="Observed days"] .mud-row').count(),
           '| forecast:', page.locator('section[aria-label="Forecast days"] .mud-row').count())
     assert rows.count() == 11
+    # Even on a narrow phone the forecast strip must have exactly one row.
+    forecast_strip=page.locator('.wx-panel .wx-outlook.wx-unified')
+    forecast_cards=forecast_strip.locator('.wx-unified-day')
+    assert forecast_cards.count()>=2
+    card_tops=[round(c.bounding_box()['y']) for c in forecast_cards.all()]
+    assert max(card_tops)-min(card_tops)<=1,f'Forecast wrapped onto a second row: {card_tops}'
+    assert forecast_strip.evaluate('(el)=>el.scrollWidth>el.clientWidth'),"Mobile forecast should scroll inside the card"
     print('summary:', page.locator('.mud-summary').inner_text().replace('\n', ' | '))
     print('header:', page.locator('.mud-head').inner_text().replace('\n', ' | '))
     labels = page.locator('.mud-label').all_inner_texts()

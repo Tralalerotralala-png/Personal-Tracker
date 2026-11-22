@@ -942,7 +942,14 @@ html[data-layout-width="compact"] main{max-width:1100px}
 @media(max-width:849px){.games-view .game-page-body{width:100%}}
 
 /* Unified compact daily weather + ground cards. */
-.wx-unified{gap:7px;grid-template-columns:repeat(6,minmax(0,1fr))}
+.wx-unified{gap:7px}
+/* Only the current seven-day outlook stays in a single horizontal strip.
+   Narrow devices scroll sideways; historical cards keep their own grid. */
+.wx-panel .wx-outlook.wx-unified{
+ grid-template-columns:repeat(7,minmax(126px,1fr));width:100%;min-width:0;
+ overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:thin
+}
+.wx-panel .wx-outlook.wx-unified>.wx-unified-day{scroll-snap-align:start}
 .wx-unified-day{appearance:none;font:inherit;color:inherit;cursor:pointer;min-width:0;padding:8px 5px;display:flex;flex-direction:column;align-items:center;gap:5px;line-height:1.25;text-align:center}
 .wx-unified-day:hover,.wx-unified-day:focus-visible{border-color:var(--accent);outline-offset:2px}
 .wx-unified-day .wx-day-icon{margin:0}.wx-unified-day .mud-bar{width:100%;max-width:115px;height:6px;margin-top:2px}

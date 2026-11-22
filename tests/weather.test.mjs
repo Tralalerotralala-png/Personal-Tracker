@@ -344,6 +344,27 @@ test('service: fresh data is cached (no repeat fetch) until forced or stale', as
   assert.equal(fetchImpl.calls.length, afterFirst + 4);
 });
 
+test('service: local date rollover refreshes even within the hourly cache and compares saved predictions', async () => {
+ const fetchImpl=routedFetch();
+ let nowMs=Date.parse(TODAY+'T21:50:00Z'); // Berlin local time: 23:50.
+ const {svc,store}=serviceFixture({fetchImpl,now:()=>new Date(nowMs)});
+ const first=await svc.setPlace(berlin);
+ assert.equal(first.forecastReview,null);
+ assert.ok(first.forecastTracking?.pending>=2,'Future dated forecasts should be recorded locally');
+ const firstCalls=fetchImpl.calls.length;
+ nowMs+=20*60_000; // Berlin local time: next day 00:10, less than one-hour TTL.
+ const next=await svc.refresh();
+ assert.equal(fetchImpl.calls.length,firstCalls+2,'A new local date must invalidate the fresh cache');
+ assert.equal(next.forecastReview,null,'Target dates cannot be compared before they have ended');
+ nowMs+=48*60*60_000; // The first saved future day now has finished.
+ const compared=await svc.refresh();
+ assert.ok(compared.forecastReview,'The first completed forecast day must be compared');
+ assert.equal(compared.forecastReview.issued,TODAY);
+ assert.ok(compared.forecastReview.date>TODAY);
+ const archive=await store.meta.get('weather-forecast-archive-v1');
+ assert.ok(archive.byPlace['52.520,13.410'].lastReview,'Completed comparisons must persist');
+});
+
 test('service: offline falls back to saved data and says so', async () => {
   let down = false;
   const good = routedFetch();
