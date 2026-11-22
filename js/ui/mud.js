@@ -180,7 +180,8 @@ export function createMudView({ store, weather }) {
           ? ' · El estado del suelo es un cálculo meteorológico, no una medición directa. La calificación indica los datos disponibles, no una precisión comprobada.'
           : ' · Ground conditions are modeled from weather, not measured with a sensor. The rating reflects available inputs, not a verified accuracy percentage.'),
       h('h4', { class: 'wx-outlook-title' }, language()==='es'?'Clima y suelo — próximos siete días':'Weather and ground — next seven days'),
-      h('div', { class: 'wx-outlook wx-unified' }, days.map((d) => {
+      h('div', { class: 'wx-outlook wx-unified', tabindex:0,
+        'aria-label':language()==='es'?'Pronóstico de siete días; desplázate horizontalmente para ver los demás días':'Seven-day forecast; scroll horizontally to explore all days' }, days.map((d) => {
         const icon = weatherGlyph(d.raw.weather_code);
         return h('button', { class: 'wx-day wx-unified-day', type: 'button', onclick: () => openDayDetail(d, weather), title: 'View weather and ground details' },
           h('span', { class: 'wx-unified-date' }, d.phase === 'today' ? 'Today' : dayShort(d.date)),
