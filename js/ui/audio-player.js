@@ -1,6 +1,6 @@
-// On-device audio library. Only preferences and the audio widget's grid position
-// use app settings; neither music files nor radio listening history sync to the cloud.
-import { h, replace, toast } from './dom.js';
+// Music player: private cloud songs stream without browser persistence; older local tracks remain available.
+// Radio history and player preferences stay on the device.
+import { h, replace, toast, confirmDialog } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { WIDGET_DEFS } from '../widgets/defs.js';
@@ -67,10 +67,10 @@ export async function writeLocalAudio(accountId,record) {
  return true;
 }
 const time=s=>Number.isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'LIVE';
-export function createAudioPlayer({store}){
+export function createAudioPlayer({store,cloudMusic=null}){
  const key=KEY+':'+(store.accountId||'local'),dbName='personal-tracker-local-music:'+(store.accountId||'local');
  const dbOp=(mode,fn)=>accountDbOp(dbName,mode,fn);
- let prefs=readPrefs(key),tracks=[],favorites=Array.isArray(prefs.favorites)?prefs.favorites.filter(s=>secureStream(s.url)):[],results=[],active=null,objectUrl=null,dockHost=null,mode='music',requestId=0,ready=false,profileChanged=false;
+ let prefs=readPrefs(key),tracks=[],localTracks=[],cloudTracks=[],favorites=Array.isArray(prefs.favorites)?prefs.favorites.filter(s=>secureStream(s.url)):[],results=[],active=null,objectUrl=null,dockHost=null,mode='music',requestId=0,playRequest=0,ready=false,profileChanged=false;
  const audio=document.createElement('audio');audio.preload='metadata';audio.volume=Number.isFinite(prefs.volume)?Math.max(0,Math.min(1,prefs.volume)):.65;
  const savePrefs=()=>{try{localStorage.setItem(key,JSON.stringify({...prefs,favorites,volume:audio.volume}));}catch{}};
  const floating=h('aside',{class:'floating-audio','aria-label':tr('Music and radio','Música y radio')});
@@ -106,9 +106,16 @@ export function createAudioPlayer({store}){
  }
  function clearSource(){audio.pause();audio.removeAttribute('src');audio.load();if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null;}}
  async function start(item,kind){
-  if(!item)return;clearSource();active={...item,kind};audio.src=kind==='music'?(objectUrl=URL.createObjectURL(item.blob)):item.url;
+  if(!item)return;
+  const serial=++playRequest;
+  let src;
+  try{src=kind==='music'?(item.cloud?await cloudMusic.signedUrl(item):URL.createObjectURL(item.blob)):item.url;}
+  catch(error){showStatus(error.message||tr('Song unavailable.','Canción no disponible.'));return;}
+  if(serial!==playRequest){if(src.startsWith('blob:'))URL.revokeObjectURL(src);return;}
+  clearSource();active={...item,kind};audio.src=src;
+  if(src.startsWith('blob:'))objectUrl=src;
   if('mediaSession' in navigator&&globalThis.MediaMetadata){
-    navigator.mediaSession.metadata=new MediaMetadata({title:item.name||'Audio',artist:kind==='radio'?'Internet radio':'Local audio',album:'Personal Tracker'});
+   navigator.mediaSession.metadata=new MediaMetadata({title:item.name||'Audio',artist:kind==='radio'?'Internet radio':item.cloud?'Cloud music':'Local audio',album:'Personal Tracker'});
   }
   try{await audio.play();showStatus('');}catch{showStatus(tr('Playback unavailable. Try another file or station.','No se pudo reproducir. Prueba otro archivo o estación.'));}refreshTransport();
  }
@@ -124,13 +131,38 @@ export function createAudioPlayer({store}){
  }
  audio.addEventListener('ended',()=>{if(active?.kind==='music')step(1);});
  audio.addEventListener('error',()=>{if(active)showStatus(tr('Audio unavailable or format unsupported by this browser.','Audio no disponible o formato incompatible con este navegador.'));});
- file.onchange=async()=>{let count=0;for(const blob of file.files||[]){if(!blob.size||blob.size>150*1024*1024)continue;const item={id:uuid(),name:blob.name.slice(0,250),blob,addedAt:Date.now()};try{await dbOp('readwrite',s=>s.put(item));tracks.push(item);count++;}catch{showStatus(tr('Device storage is full or unavailable.','El almacenamiento local está lleno o no disponible.'));break;}}file.value='';if(count)showStatus(tr(count+' tracks added locally',count+' pistas agregadas al dispositivo'));drawLibrary();};
+ const combineTracks=()=>{tracks=[...cloudTracks,...localTracks];drawLibrary();};
+ async function refreshCloud(){if(!cloudMusic)return;try{cloudTracks=await cloudMusic.list();combineTracks();}catch(error){showStatus(error.message||tr('Could not load cloud songs.','No se pudieron cargar las canciones en la nube.'));}}
+ file.onchange=async()=>{
+  const selected=[...file.files||[]];file.value='';let count=0;
+  for(const blob of selected){
+   try{
+    if(cloudMusic){showStatus(tr('Uploading to private cloud storage…','Subiendo al almacenamiento privado…'));await cloudMusic.upload(blob);}
+    else{if(!blob.size||blob.size>150*1024*1024)throw Error('Local audio files must be under 150 MB.');const item={id:uuid(),name:blob.name.slice(0,250),blob,addedAt:Date.now()};await dbOp('readwrite',s=>s.put(item));localTracks.push(item);}
+    count++;
+   }catch(error){showStatus(error.message||tr('Audio upload failed.','Error al subir audio.'));break;}
+  }
+  if(cloudMusic)await refreshCloud();else combineTracks();
+  if(count)showStatus(cloudMusic?tr(count+' song(s) saved to the private cloud.',count+' canción(es) guardadas en la nube privada.'):tr(count+' tracks added locally',count+' pistas agregadas al dispositivo'));
+ };
  function row(item,kind){
-  const saved=favorites.some(s=>s.id===item.id);
-  return h('div',{class:'audio-list-row'},h('button',{class:'btn small ghost audio-list-play',type:'button',onclick:()=>start(item,kind)},item.name,kind==='radio'&&item.region?h('small',{},item.region):null),
-    h('button',{class:'btn small ghost',type:'button',title:kind==='music'?tr('Remove local copy','Eliminar copia local'):tr('Favorite station','Estación favorita'),onclick:async()=>{
-      if(kind==='music'){try{await dbOp('readwrite',s=>s.delete(item.id));tracks=tracks.filter(t=>t.id!==item.id);if(active?.id===item.id){clearSource();active=null;refreshTransport();}}catch{showStatus(tr('Could not remove file.','No se pudo quitar el archivo.'));}}else{favorites=saved?favorites.filter(s=>s.id!==item.id):[...favorites,item].slice(0,100);savePrefs();}drawLibrary();
-    }},kind==='music'?'×':saved?'★':'☆'));
+  const saved=favorites.some(s=>s.id===item.id),cloud=kind==='music'&&item.cloud;
+  const transfer=kind==='music'&&!cloud&&cloudMusic?h('button',{class:'btn small ghost',type:'button',onclick:async()=>{
+   try{showStatus(tr('Moving song to the cloud…','Moviendo canción a la nube…'));
+    await cloudMusic.upload(new File([item.blob],item.name,{type:item.blob.type||'audio/mpeg'}));
+    await refreshCloud();await dbOp('readwrite',s=>s.delete(item.id));localTracks=localTracks.filter(t=>t.id!==item.id);combineTracks();showStatus(tr('Song moved to private cloud storage.','Canción transferida a la nube privada.'));
+   }catch(error){showStatus(error.message||tr('Transfer failed; local copy was kept.','Error de transferencia; se conservó la copia local.'));}
+  }},tr('Move to cloud','Mover a nube')):null;
+  return h('div',{class:'audio-list-row'},h('button',{class:'btn small ghost audio-list-play',type:'button',onclick:()=>start(item,kind)},item.name,kind==='radio'&&item.region?h('small',{},item.region):kind==='music'?h('small',{},cloud?tr('Cloud','Nube'):tr('On device','En dispositivo')):null),transfer,
+   h('button',{class:'btn small ghost',type:'button',title:kind==='music'?cloud?tr('Delete cloud song','Eliminar canción de la nube'):tr('Remove local copy','Eliminar copia local'):tr('Favorite station','Estación favorita'),onclick:async()=>{
+    if(kind==='music'){
+     if(cloud&&!await confirmDialog({title:tr('Delete song?','¿Eliminar canción?'),message:item.name+' — '+tr('This permanently deletes the cloud file.','Se eliminará definitivamente el archivo de la nube.'),confirmLabel:tr('Delete','Eliminar'),danger:true}))return;
+     try{if(cloud){await cloudMusic.remove(item);cloudTracks=cloudTracks.filter(t=>t.id!==item.id);}else{await dbOp('readwrite',s=>s.delete(item.id));localTracks=localTracks.filter(t=>t.id!==item.id);}
+      if(active?.id===item.id){++playRequest;clearSource();active=null;refreshTransport();}
+      combineTracks();
+     }catch(error){showStatus(error.message||tr('Could not remove song.','No se pudo eliminar la canción.'));}
+    }else{favorites=saved?favorites.filter(s=>s.id!==item.id):[...favorites,item].slice(0,100);savePrefs();drawLibrary();}
+   }},kind==='music'?'×':saved?'★':'☆'));
  }
  async function search(){
   const seq=++requestId;prefs.country=country.value;prefs.region=region.value;savePrefs();showStatus(tr('Finding stations…','Buscando estaciones…'));
@@ -138,7 +170,7 @@ export function createAudioPlayer({store}){
  }
  function drawLibrary(){
   musicTab.classList.toggle('primary',mode==='music');radioTab.classList.toggle('primary',mode==='radio');
-  if(mode==='music')replace(library,h('div',{class:'inline-actions'},h('button',{class:'btn small',type:'button',onclick:()=>file.click()},tr('Add audio files','Agregar audio')),file),h('p',{class:'hint'},tr('Music stays on this device (150 MB/file). Browser storage limits apply.','La música se queda en este dispositivo (150 MB/archivo). Aplican límites del navegador.')),h('div',{class:'audio-list'},tracks.length?tracks.map(x=>row(x,'music')):h('p',{class:'hint'},tr('No tracks yet.','Aún no hay pistas.'))));
+  if(mode==='music')replace(library,h('div',{class:'inline-actions'},h('button',{class:'btn small',type:'button',onclick:()=>file.click()},cloudMusic?tr('Upload songs to cloud','Subir canciones a la nube'):tr('Add local audio files','Agregar audio local')),file,cloudMusic?h('button',{class:'btn small ghost',type:'button',onclick:refreshCloud},tr('Refresh','Actualizar')):null),h('p',{class:'hint'},cloudMusic?tr('New songs upload privately to your account (25 MB per file). They stream on your signed-in devices, not stored in browser music storage. Existing local songs can be moved individually. Internet is required.','Las canciones nuevas se guardan en la nube privada (25 MB por archivo). Se reproducen en tus dispositivos con sesión iniciada; no se guardan en el navegador. Puedes transferir canciones locales. Requiere internet.'):tr('Music stays on this device (150 MB/file). Sign in for cloud uploads.','La música se guarda en este dispositivo (150 MB/archivo). Inicia sesión para subirla a la nube.')),h('div',{class:'audio-list'},tracks.length?tracks.map(x=>row(x,'music')):h('p',{class:'hint'},tr('No tracks yet.','Aún no hay pistas.'))));
   else replace(library,h('div',{class:'audio-radio-search'},country,region,query,h('button',{class:'btn small',type:'button',onclick:search},tr('Find local stations','Buscar estaciones locales'))),h('div',{class:'audio-radio-url'},stream,h('button',{class:'btn small',type:'button',onclick:()=>{const url=secureStream(stream.value);if(!url){showStatus(tr('Enter a valid HTTPS stream URL.','Ingresa una URL HTTPS válida.'));return;}const item={id:'custom:'+url,name:new URL(url).hostname,url,region:''};if(!favorites.some(s=>s.id===item.id)){favorites=[...favorites,item].slice(0,100);savePrefs();}start(item,'radio');drawLibrary();}},tr('Play URL','Reproducir URL'))),h('div',{class:'audio-list'},favorites.length?h('strong',{},tr('Favorites','Favoritas')):null,...favorites.map(s=>row(s,'radio')),results.length?h('strong',{},tr('Stations','Estaciones')):null,...results.filter(s=>!favorites.some(f=>f.id===s.id)).map(s=>row(s,'radio'))),h('p',{class:'hint'},tr('Online radio directory: Radio Browser. Streams require internet; station availability varies.','Directorio de Radio Browser. Requiere internet; la disponibilidad varía.')));
  }
  const profile=()=>matchMedia('(min-width:900px)').matches?'desktop':'mobile';
@@ -163,9 +195,9 @@ export function createAudioPlayer({store}){
  }
  launcher.onclick=()=>{expanded=true;prefs.expanded=true;savePrefs();place();};
  drawLibrary();refreshTransport();place();
- const refreshTracks=()=>dbOp('readonly',s=>s.getAll()).then(rows=>{tracks=rows.sort((a,b)=>a.addedAt-b.addedAt);drawLibrary();}).catch(()=>showStatus(tr('Local music storage unavailable.','Almacenamiento local no disponible.')));
- window.addEventListener('tracker-audio-changed',refreshTracks);
- refreshTracks();
+ const refreshTracks=()=>dbOp('readonly',s=>s.getAll()).then(rows=>{localTracks=rows.sort((a,b)=>a.addedAt-b.addedAt);combineTracks();}).catch(()=>showStatus(tr('Local music storage unavailable.','Almacenamiento local no disponible.')));
+ window.addEventListener('tracker-audio-changed',()=>{refreshTracks();void refreshCloud();});
+ refreshTracks();void refreshCloud();
  store.getSetting('location',null).then(p=>{if(!prefs.region&&p?.label){const parts=p.label.split(',').map(s=>s.trim());if(parts.length>=3)region.value=parts[1];}}).catch(()=>{});
- return {el:floating,mount(host){dockHost=host;place();return {destroy(){if(dockHost===host){dockHost=null;place();}}};},pause(){audio.pause();}};
+ return {el:floating,mount(host){dockHost=host;place();return {destroy(){if(dockHost===host){dockHost=null;place();}}};},pause(){audio.pause();},playCloud(song){if(song?.cloud||song?.path)void start({...song,cloud:true},'music');},refreshCloud};
 }
