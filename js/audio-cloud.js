@@ -70,9 +70,9 @@ export function createCloudMusicService({store,client}){
   const removed=new Set(),pending=new Set(),records=[];
   for(const row of data||[]){
    const value=row.value;
-   if(row.deleted_at||!value||typeof value.id!=='string'||typeof value.path!=='string')continue;
+   if(row.deleted_at||!value||typeof value.id!=='string'||typeof value.path!=='string'||!UUID.test(value.id))continue;
    const ownerPath=Object.keys(TYPES).some(ext=>value.path===cloudSongPath(uid,value.id,ext));
-   if(!UUID.test(value.id)||!ownerPath)continue;
+   if(!ownerPath)continue;
    if(row.key===REMOVED+value.id&&value.deleted===true)removed.add(value.id);
    if(row.key===PENDING+value.id&&value.pending===true)pending.add(value.id);
    if(row.key===ENTRY+value.id&&valid(value,uid))records.push(value);
