@@ -25,5 +25,5 @@ test('desktop grid collapses unused tracks; narrow wrapped rows stretch to use t
 test('app, wallpaper and offline PWA share the no-gap forecast layout', () => {
   assert.equal(read('wallpaper/app.css'), read('css/app.css'));
   assert.match(read('wallpaper/wallpaper.js'), /class: 'w-forecast-cards' \}, days\.map/);
-  assert.match(read('sw.js'), /const VERSION = 'v\\d+'/);
+  assert.match(read('sw.js'), /const VERSION = 'v\d+'/);
 });
