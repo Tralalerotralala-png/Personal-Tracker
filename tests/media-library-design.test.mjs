@@ -87,7 +87,8 @@ test('all categories use the exact same three-action component and category shel
  assert.match(dom,/\{transition=true\}=\{\}/);
  assert.match(dom,/!transition\|\|reduced\(\)/);
  assert.match(media,/media-case-/);
- assert.match(media,/onerror:e=>e\.currentTarget\.replaceWith\(fallback\(\)\)/);
+ assert.match(media,/index<sources.length/);
+ assert.match(media,/e\.currentTarget\.replaceWith\(fallback\(\)\)/);
  assert.doesNotMatch(helper,/media-collection-title/);
  assert.match(helper,/class:'media-collection-toolbar media-collection-toolbar-compact'/);
  assert.match(helper,/angle:0,hoverAngle:35/);
