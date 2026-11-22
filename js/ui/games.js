@@ -14,14 +14,14 @@ export function createGamesView({store,backups=null}){
  const clean=(s,n=3000)=>String(s??'').trim().slice(0,n);
  const safeUrl=s=>/^https:\/\/[^\s]+$/i.test(s||'')?s:'';
  async function load(){page=null;const saved=await store.getSetting(KEY);if(saved&&typeof saved==='object')state={...saved,games:Array.isArray(saved.games)?saved.games:[],shelves:Array.isArray(saved.shelves)?saved.shelves:baseShelves,customShelves:Array.isArray(saved.customShelves)?saved.customShelves:[],mode:saved.mode==='grid'?'grid':'shelf'};render();}
- async function save(){await store.setSetting(KEY,state);render();}
+ async function save(next=state){await store.setSetting(KEY,next);state=next;render();}
  function cover(game){const src=game.cover?.startsWith('data:image/')||safeUrl(game.cover)?game.cover:'';return src?h('img',{src,alt:game.title,loading:'lazy',referrerpolicy:'no-referrer'}):h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},mediaIcon('games',game.title));}
- function goBack(){if(dirty&&!confirm('Discard unsaved changes?'))return;dirty=false;page=null;sideMode=false;render();}
+ async function goBack(){if(dirty&&!await confirmDialog({title:L().cancel,message:language()==='es'?'Se perderán los cambios no guardados.':'Discard unsaved changes?',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true}))return;dirty=false;page=null;sideMode=false;render();}
  function showPage(body,title,editing=false){
   const back=h('button',{class:'btn small',type:'button',onclick:goBack},L().cancel);
   const expand=h('button',{class:'btn small',type:'button',onclick:()=>{sideMode=!sideMode;renderPage();}},sideMode?'Expand to page':'Side panel');
   function renderPage(){expand.textContent=sideMode?'Expand to page':'Side panel';el.classList.toggle('game-side-mode',sideMode);replace(el,h('div',{class:'game-page-head'},back,h('h2',{},title),expand),h('section',{class:'game-page-body'},body));}
-  page={render:renderPage};renderPage();
+  page={render:renderPage,editing};renderPage();
  }
  function formatNotes(text){
   const lines=String(text||'').split(/\r?\n/);
@@ -43,9 +43,9 @@ export function createGamesView({store,backups=null}){
   const journalPanel=h('section',{class:'game-journal'},h('h3',{},language()==='es'?'Diario de juego':'Game journal'),
     journalText,h('button',{class:'btn small',onclick:async()=>{if(!journalText.value.trim())return;game.journal=[{id:uuid(),date:new Date().toISOString(),text:journalText.value.trim().slice(0,5000)},...(game.journal||[])];await store.setSetting(KEY,state);detail(game);}},language()==='es'?'Agregar nota':'Add journal note'),
     ...journalEntries.map(x=>h('div',{class:'game-journal-entry'},h('small',{},new Date(x.date).toLocaleDateString()),h('p',{},x.text))));
-  showPage(h('div',{class:'game-detail'},caseArt(game),h('div',{},h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating||'—'}`),formatNotes(game.notes||'—'),journalPanel,createGameBackupPanel({backups,gameId:game.id}),h('div',{class:'inline-actions'},edit,remove))),game.title);
+  showPage(h('section',{class:'media-detail game-detail'},h('div',{class:'media-case-stage'},caseArt(game)),h('div',{class:'media-detail-info'},h('h2',{},game.title),h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('p',{},`${L().rating}: ${game.rating??'—'}`),formatNotes(game.notes||'—'),journalPanel,createGameBackupPanel({backups,gameId:game.id}),h('div',{class:'inline-actions'},edit,remove))),game.title);
  }
- async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:existing?.rating||''});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||'Backlog')===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
+ async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=h('input',{type:'number',min:0,max:10,step:0.5,value:existing?.rating??''});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||'Backlog')===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
  const form=h('div',{class:'form game-editor-form'},h('label',{},L().name),title,h('label',{},L().platform),platform,h('label',{},L().shelf),shelf,h('label',{},L().status),status,h('label',{},L().rating),rating,h('label',{},L().cover),coverUrl,h('button',{class:'btn small',onclick:async()=>{
   const q=title.value.trim();if(!q){feedback.textContent='Enter a game title first.';return;}
   feedback.textContent='Searching Wikipedia…';try{const url=`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q+' video game')}&gsrlimit=5&prop=pageimages&piprop=thumbnail&pithumbsize=400&format=json&origin=*`;const r=await fetch(url);if(!r.ok)throw new Error('Search unavailable');const data=await r.json();const pages=Object.values(data.query?.pages||{}).filter(p=>p.thumbnail?.source);if(!pages.length){feedback.textContent='No cover found. Paste a cover URL or upload one.';return;}const first=pages[0];coverUrl.value=first.thumbnail.source;feedback.textContent=`Found image from Wikipedia: ${first.title}. Check that it is the right cover.`;}catch{feedback.textContent='Cover search unavailable. Paste an HTTPS URL or upload an image.';}
@@ -56,9 +56,11 @@ export function createGamesView({store,backups=null}){
  if(coverUrl.value.trim()){image=safeUrl(coverUrl.value.trim());if(!image){feedback.textContent='Cover URL must start with HTTPS.';return;}}
  if(upload.files?.length){const file=upload.files[0];if(file.size>120*1024||!['image/png','image/jpeg','image/webp'].includes(file.type)){feedback.textContent='Choose a PNG, JPEG or WebP smaller than 120 KB.';return;}
  image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});}
- const item={id:existing?.id||uuid(),title:clean(title.value,120),platform:clean(platform.value,100),notes:clean(notes.value,10000),cover:image,shelf:shelf.value,status:status.value,rating:rating.value?Number(rating.value):null,journal:existing?.journal||[],lastOpened:existing?.lastOpened||null};
- const ix=state.games.findIndex(g=>g.id===item.id);if(ix>=0)state.games[ix]=item;else state.games.push(item);
- try{dirty=false;await save();detail(item);toast(L().save);}catch{dirty=true;feedback.textContent='Could not save. Try a smaller cover image.';}
+ const rawRating=rating.value.trim(),value=rawRating===''?null:Number(rawRating);
+ if(value!==null&&(!Number.isFinite(value)||value<0||value>10||Math.abs(value*2-Math.round(value*2))>1e-8)){feedback.textContent='Rating must be from 0 to 10 in half-point steps.';return;}
+ const item={id:existing?.id||uuid(),title:clean(title.value,120),platform:clean(platform.value,100),notes:clean(notes.value,10000),cover:image,shelf:shelf.value,status:status.value,rating:value,journal:existing?.journal||[],lastOpened:existing?.lastOpened||null};
+ const next={...state,games:[...state.games]};const ix=next.games.findIndex(g=>g.id===item.id);if(ix>=0)next.games[ix]=item;else next.games.push(item);
+ try{await save(next);dirty=false;detail(item);toast(L().save);}catch{dirty=true;feedback.textContent='Could not save. Try a smaller cover image.';}
  }},L().save);
  form.addEventListener('input',()=>{dirty=true;});
  showPage(h('div',{class:'game-editor-layout'},form,h('div',{class:'game-editor-actions'},saveButton)),existing?`${L().edit}: ${existing.title}`:L().add,true);
@@ -93,7 +95,8 @@ export function createGamesView({store,backups=null}){
  updateResults();replace(el,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(e.detail?.kind!=='game')return;const saved=await store.getSetting(KEY);if(!saved)return;const known=new Set(state.games.map(x=>x.id));state.games=[...state.games,...(Array.isArray(saved.games)?saved.games:[]).filter(x=>!known.has(x.id))];if(Array.isArray(saved.shelves))state.shelves=[...new Set([...state.shelves,...saved.shelves])];if(!page)render();});
- return {el,mount:load,show:render,hide:()=>{},
+ return {el,mount:load,show:()=>{if(!dirty)render();},hide:()=>{},
+   async canNavigate(){if(!dirty)return true;const discard=await confirmDialog({title:L().cancel,message:language()==='es'?'Se perderán los cambios no guardados.':'Discard unsaved game changes?',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true});if(discard)dirty=false;return discard;},
   openById(id){
    const game=state.games.find(x=>x.id===id);
    if(!game)return false;
