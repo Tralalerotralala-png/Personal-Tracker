@@ -68,7 +68,18 @@ async function applyDisplay() {
   const valid = s => /^#[0-9a-fA-F]{6}$/.test(s || '');
   document.documentElement.dataset.theme = ui?.theme_preset || 'classic';
   document.documentElement.dataset.layoutWidth = ui?.layout_width || 'adaptive';
-  document.documentElement.style.setProperty('--accent', valid(ui?.accent_color) ? ui.accent_color : '#43b9ad');
+  const accent=valid(ui?.accent_color)?ui.accent_color:'#43b9ad';
+  document.documentElement.style.setProperty('--accent',accent);
+  const luminance=hex=>{
+    const channels=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
+    return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;
+  };
+  const contrast=(a,b)=>{const light=Math.max(luminance(a),luminance(b)),dark=Math.min(luminance(a),luminance(b));return(light+.05)/(dark+.05);};
+  document.documentElement.style.setProperty('--accent-ink',contrast(accent,'#101010')>=contrast(accent,'#ffffff')?'#101010':'#ffffff');
+  const background=valid(ui?.background_color)?ui.background_color:'#17130f';
+  const colorMode=luminance(background)>.5?'light':'dark';
+  document.documentElement.dataset.colorMode=colorMode;
+  document.documentElement.style.colorScheme=colorMode;
   for (const [key, cssName, fallback] of [
     ['background_color','--bg','#17130f'], ['panel_color','--panel','#231c15'],
     ['panel_secondary_color','--panel-2','#2e251c'], ['text_color','--ink','#eadfc4'],
