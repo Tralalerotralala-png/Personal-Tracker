@@ -15,6 +15,8 @@ export function createMediaLibraryView({store,backups=null}) {
  const games=createGamesView({store,backups});
  const L=()=>LABELS[language()];
  let active='games',data={books:[],films:[],albums:[],shelvesByKind:{books:[],films:[],albums:[]}},shelfMode=true,page=null,dirty=false,query='',statusFilter='all',pendingSearch=null;
+  const categoryUi=Object.fromEntries(KINDS.map(kind=>[kind,{page:null,query:'',statusFilter:'all',shelfMode:true}]));
+  const bookSpreads=new Map();
  window.addEventListener('tracker-search-open',event=>{
   if(event.detail?.target==='games'&&['game','books','films','albums'].includes(event.detail.kind))
    pendingSearch={kind:event.detail.kind,id:event.detail.id};
@@ -84,7 +86,7 @@ export function createMediaLibraryView({store,backups=null}) {
    ?h('img',{src:row.cover,alt:row.title,loading:'lazy',referrerpolicy:'no-referrer',
       onerror:e=>e.currentTarget.replaceWith(fallback())}):fallback();
  }
- function back(){if(dirty&&!confirm(language()==='es'?'¿Descartar cambios sin guardar?':'Discard unsaved changes?'))return;dirty=false;page=null;render();}
+ async function back(){if(dirty&&!await confirmDialog({title:language()==='es'?'¿Descartar cambios?':'Discard changes?',message:language()==='es'?'Los cambios no guardados se perderán.':'Unsaved changes will be lost.',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true}))return;dirty=false;page=null;render();}
  function show(entry=null,editing=false){page={entry,editing};render();}
  function edit(entry){page={entry,editing:true};render();}
  function caseArt(row){
@@ -140,9 +142,11 @@ export function createMediaLibraryView({store,backups=null}) {
      'Imágenes guardadas solo en este dispositivo. No se suben a la nube.':
      'Images stay on this device; they are not uploaded to the cloud.'),
     spread,h('div',{class:'media-interior-controls'},previous,counter,next));
-   let pages=[],index=0;
+   let pages=[],index=bookSpreads.get(row.id)||0;
    const draw=()=>{
-    const visible=pages.slice(index,index+2);
+    index=Math.max(0,Math.min(index,Math.max(0,pages.length-1)));
+     bookSpreads.set(row.id,index);
+     const visible=pages.slice(index,index+2);
     replace(spread,visible.length?visible.map((item,n)=>
      h('figure',{class:'media-inner-page'},
       h('img',{src:item.src,alt:item.caption||`${row.title}, page ${index+n+1}`,loading:'lazy'}),
@@ -290,12 +294,17 @@ export function createMediaLibraryView({store,backups=null}) {
    const tabs=h('div',{class:'hub-tabs media-category-tabs','aria-label':L().library},
     ['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),type:'button',
      'aria-pressed':String(active===k),onclick:async()=>{
-       if(dirty&&!confirm('Discard unsaved changes?'))return;
-       dirty=false;page=null;active=k;query='';statusFilter='all';
+       if(k===active)return;
+       if(dirty&&!await confirmDialog({title:language()==='es'?'¿Descartar cambios?':'Discard changes?',message:language()==='es'?'Los cambios no guardados se perderán.':'Unsaved changes will be lost.',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true}))return;
+       if(active!=='games')categoryUi[active]={page:dirty?null:page,query,statusFilter,shelfMode};
+       dirty=false;active=k;
+       const saved=categoryUi[k];page=saved?.page||null;query=saved?.query||'';statusFilter=saved?.statusFilter||'all';shelfMode=saved?.shelfMode??true;
        render();
        if(k!=='games'){
-        try {await refreshCollection();if(active===k&&!page)render();}
-        catch(error){console.warn('Could not refresh media library',error);}
+        try {await refreshCollection();if(active===k){
+         if(page?.entry?.id){const latest=list(k).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
+         render();
+        }}catch(error){console.warn('Could not refresh media library',error);}
        }
      }},mediaIcon(k),h('span',{},L()[k]))));
    const top=h('div',{class:'panel-head media-library-header'},h('h2',{},L().library),tabs);
@@ -348,7 +357,7 @@ export function createMediaLibraryView({store,backups=null}) {
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
  return {el,mount:load,show:async()=>{
-   if(!page)await refreshCollection();
+   if(pendingSearch&&dirty){pendingSearch=null;toast(language()==='es'?'Guarda o descarta el editor antes de abrir otro elemento.':'Save or discard your edits before opening another item.');return;}
    if(pendingSearch){
     const {kind,id}=pendingSearch;pendingSearch=null;
     dirty=false;query='';statusFilter='all';page=null;
@@ -366,6 +375,10 @@ export function createMediaLibraryView({store,backups=null}) {
     const row=data[kind]?.find(item=>item.id===id);
     if(row){active=kind;page={entry:row,editing:false};render();return;}
    }
+   // Keep an in-progress editor mounted when returning from another route.
+   if(dirty&&page?.editing)return;
+   await refreshCollection();
+   if(page?.entry?.id){const latest=list(active).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
    render();
   },hide:()=>{}};
 }
