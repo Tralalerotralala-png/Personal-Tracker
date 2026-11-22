@@ -386,6 +386,24 @@ for width,height in [(390,844),(1280,900)]:
         picker.locator('input[aria-label="Icon color"]').fill("#bc6745")
         picker.get_by_role("button",name="Save icons").click()
         assert page.evaluate("JSON.parse(localStorage.getItem('tracker-nav-icon-choices-v1')).games.glyph")=="gear"
+        # Light palette controls must remain readable, including selected nav and primary actions.
+        for palette,preset in [("Lavender Dawn","dawn"),("Paper Archive","parchment")]:
+            page.locator(".theme-choice",has_text=palette).click()
+            page.wait_for_function("(id)=>document.documentElement.dataset.theme===id",arg=preset)
+            ratios=page.evaluate("""() => {
+              const rgb=value=>[...String(value).matchAll(/[\\d.]+/g)].slice(0,3).map(x=>Number(x[0])/255);
+              const lum=value=>{const [r,g,b]=rgb(value).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return r*.2126+g*.7152+b*.0722;};
+              const ratio=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+              const input=document.createElement('input'),button=document.createElement('button');
+              input.type='text';button.className='btn primary';document.body.append(input,button);
+              const i=getComputedStyle(input),b=getComputedStyle(button),nav=getComputedStyle(document.querySelector('.slot.on'));
+              const data={input:ratio(i.color,i.backgroundColor),button:ratio(b.color,b.backgroundColor),nav:ratio(nav.color,nav.backgroundColor),scheme:getComputedStyle(document.documentElement).colorScheme};
+              input.remove();button.remove();return data;
+            }""")
+            assert ratios["scheme"]=="light",ratios
+            assert min(ratios["input"],ratios["button"],ratios["nav"])>=4.5,(palette,ratios)
+        page.locator(".theme-choice",has_text="Original / Classic").click()
+        page.wait_for_function("document.documentElement.dataset.theme==='classic'")
         page.keyboard.press("Escape")
         page.reload(wait_until="domcontentloaded")
         page.locator(".top .gear").wait_for(timeout=25000)
