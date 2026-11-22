@@ -1,6 +1,6 @@
 // A small, synced personal game library. Reuses the existing settings store;
 // no new database tables, dependencies or private tokens.
-import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
+import { h, replace, confirmDialog, promptDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { mediaIcon, mediaCollectionToolbar } from './media-art.js';
@@ -73,7 +73,7 @@ export function createGamesView({store,backups=null}){
   newShelfLabel:L().newShelf,addLabel:L().add,
   onToggle:()=>{state.mode=state.mode==='grid'?'shelf':'grid';void save();},
   onNewShelf:async()=>{
-   const name=prompt(L().newShelf)?.trim().slice(0,60);
+   const name=(await promptDialog({title:L().newShelf,maxLength:60}))?.trim().slice(0,60);
    if(!name||state.shelves.some(s=>s.toLocaleLowerCase()===name.toLocaleLowerCase()))return;
    state.shelves.push(name);state.customShelves=[...new Set([...(state.customShelves||[]),name])];
    state.mode='shelf';await save();
