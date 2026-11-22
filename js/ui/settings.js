@@ -1,5 +1,5 @@
 // Settings sheet: account, sync, rarity meanings, categories, display, backup.
-import { h, replace, toast, openSheet, confirmDialog } from './dom.js';
+import { h, replace, toast, openSheet, confirmDialog, promptDialog } from './dom.js';
 import { language, t, categoryLabel } from './language.js';
 import { TRACK_FIELDS, TRACK_LABELS, categoryFields } from '../data/tracking.js';
 import { openPersonalHub } from './personal-hub.js';
@@ -283,7 +283,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
   }
   drawSavedThemes(ui?.custom_theme_presets||[]);
   const saveTheme=h('button',{class:'btn',type:'button',onclick:async()=>{
-    const name=prompt(language()==='es'?'Nombre del nuevo tema':'Name your new theme');if(!name?.trim())return;
+    const name=await promptDialog({title:language()==='es'?'Nombre del nuevo tema':'Name your new theme',maxLength:42});if(!name?.trim())return;
     const value=await store.getSetting('ui')||{};const palettes=[...(value.custom_theme_presets||[])];
     if(palettes.length>=30){toast(language()==='es'?'Máximo de 30 temas':'Maximum 30 saved themes');return;}
     const colors=Object.fromEntries(paletteKeys.map(key=>[key,value[key]||presets.classic[key]]));
