@@ -5,6 +5,7 @@ export const MUSIC_BUCKET='music-tracks';
 export const MUSIC_LIMIT=25*1024*1024;
 const ENTRY='music_track_v1:';
 const REMOVED='music_track_removed_v1:';
+const PENDING='music_track_delete_pending_v1:';
 const TYPES={mp3:'audio/mpeg',m4a:'audio/mp4',mp4:'audio/mp4',aac:'audio/aac',ogg:'audio/ogg',opus:'audio/ogg',wav:'audio/wav',flac:'audio/flac',webm:'audio/webm'};
 const UUID=/^[0-9a-f-]{8,64}$/i;
 
@@ -64,16 +65,19 @@ export function createCloudMusicService({store,client}){
  async function list(){
   const uid=await userId();
   const {data,error}=await client.from('settings').select('key,value,deleted_at').eq('user_id',uid)
-   .or('key.like.music_track_v1:%,key.like.music_track_removed_v1:%');
+   .or('key.like.music_track_v1:%,key.like.music_track_removed_v1:%,key.like.music_track_delete_pending_v1:%');
   if(error)throw Error('Could not load cloud songs: '+error.message);
-  const removed=new Set(),records=[];
+  const removed=new Set(),pending=new Set(),records=[];
   for(const row of data||[]){
    const value=row.value;
-   if(row.deleted_at||!valid(value,uid))continue;
+   if(row.deleted_at||!value||typeof value.id!=='string'||typeof value.path!=='string')continue;
+   const ownerPath=Object.keys(TYPES).some(ext=>value.path===cloudSongPath(uid,value.id,ext));
+   if(!UUID.test(value.id)||!ownerPath)continue;
    if(row.key===REMOVED+value.id&&value.deleted===true)removed.add(value.id);
-   if(row.key===ENTRY+value.id)records.push(value);
+   if(row.key===PENDING+value.id&&value.pending===true)pending.add(value.id);
+   if(row.key===ENTRY+value.id&&valid(value,uid))records.push(value);
   }
-  return records.filter(song=>!removed.has(song.id)).map(song=>({...song,cloud:true}))
+  return records.filter(song=>!removed.has(song.id)).map(song=>({...song,cloud:true,deletionPending:pending.has(song.id)}))
    .sort((a,b)=>String(a.addedAt).localeCompare(String(b.addedAt)));
  }
  async function signedUrl(song){
@@ -94,12 +98,14 @@ export function createCloudMusicService({store,client}){
  async function remove(song){
   const uid=await userId();
   if(!valid(song,uid))throw Error('Invalid song.');
-  const key=REMOVED+song.id,value={id:song.id,path:song.path,deleted:true,deletedAt:new Date().toISOString()};
-  await store.setSetting(key,value);
-  await confirmIndex(uid,key,value);
+  const pendingKey=PENDING+song.id,pending={id:song.id,path:song.path,pending:true};
+  await store.setSetting(pendingKey,pending);await confirmIndex(uid,pendingKey,pending);
   const {error}=await client.storage.from(MUSIC_BUCKET).remove([song.path]);
   if(error)throw Error('Could not remove song bytes: '+error.message);
+  const key=REMOVED+song.id,value={id:song.id,path:song.path,deleted:true,deletedAt:new Date().toISOString()};
+  await store.setSetting(key,value);await confirmIndex(uid,key,value);
   await store.remove('settings',ENTRY+song.id);
+  await store.remove('settings',pendingKey).catch(()=>{});
   return true;
  }
  return {checkReady,upload,list,signedUrl,assignAlbum,remove};
