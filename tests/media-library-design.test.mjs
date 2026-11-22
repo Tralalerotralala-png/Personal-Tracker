@@ -90,6 +90,10 @@ test('all categories use the exact same three-action component and category shel
  assert.match(dom,/\{transition=true\}=\{\}/);
  assert.match(dom,/!transition\|\|reduced\(\)/);
  assert.match(media,/media-case-/);
+ assert.doesNotMatch(media,/media-case-badge/,'Books, Films and Albums must never overlay icon badges on covers');
+ assert.doesNotMatch(css,/\.media-case-badge/,'Removed overlay has no leftover styling');
+ assert.match(media,/mediaIcon\(kind,row\.title\)/,'Missing-cover placeholders may still use a full-sized media icon');
+
  assert.match(media,/index<sources.length/);
  assert.match(media,/e\.currentTarget\.replaceWith\(fallback\(\)\)/);
  assert.doesNotMatch(helper,/media-collection-title/);

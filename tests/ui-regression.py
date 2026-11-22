@@ -522,6 +522,7 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-editor + .btn.primary").click()
         page.locator(".media-case-books .media-page-flip").first.wait_for(state="visible",timeout=10000)
         assert page.locator(".media-case-books .media-case-disc").count()==0
+        assert page.locator(".media-case-books .media-case-front .media-case-badge").count()==0
         assert "mediaBookCover" in page.locator(".media-case-books .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
         page.locator(".media-case-books.has-interior-art .media-mini-left img").wait_for(state="visible",timeout=10000)
         assert page.locator(".media-case-books .media-mini-right img").count()==1
@@ -551,6 +552,7 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-case-films .media-case-disc").first.wait_for(state="visible",timeout=10000)
         assert "mediaOpticalDiscReveal" in page.locator(".media-case-films .media-case-disc").evaluate("(el)=>getComputedStyle(el).animationName")
         assert "mediaDvdCoverReveal" in page.locator(".media-case-films .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
+        assert page.locator(".media-case-films .media-case-front .media-case-badge").count()==0
         page.locator(".media-detail-info button",has_text="Edit").click()
         page.locator(".media-editor input[type=number]").fill("9.7")
         page.locator(".media-editor select").first.select_option("Watched")
@@ -586,6 +588,7 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-case-albums .media-vinyl-record").wait_for(state="visible",timeout=10000)
         assert page.locator(".media-case-albums .media-vinyl-record").count()==1
         assert page.locator(".media-case-albums .media-case-disc").count()==0
+        assert page.locator(".media-case-albums .media-case-front .media-case-badge").count()==0
         assert "mediaSleeveReveal" in page.locator(".media-case-albums .media-case-front").evaluate("(el)=>getComputedStyle(el).animationName")
         assert "mediaVinylReveal" in page.locator(".media-case-albums .media-vinyl-record").evaluate("(el)=>getComputedStyle(el).animationName")
         # On wide screens the optical medium stays in its own column, away from text.
