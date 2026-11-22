@@ -220,11 +220,11 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
 
   // -- display
   const scan = h('input', { type: 'checkbox', id: 'st-scan', checked: Boolean(ui?.scanlines),
-    onchange: async (e) => { await store.setSetting('ui', { ...(await store.getSetting('ui')), scanlines: e.target.checked }); } });
+    onchange: async (e) => { await store.setSetting('ui', { ...(await store.getSetting('ui')), scanlines: e.target.checked });window.dispatchEvent(new Event('tracker-theme-refresh')); } });
   const accentColor = h('input',{type:'color',value: /^#[0-9a-f]{6}$/i.test(ui?.accent_color||'')?ui.accent_color:'#43b9ad', onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),accent_color:e.target.value,theme_preset:'custom'}); updateChoices('custom'); window.dispatchEvent(new Event('tracker-theme-refresh'));}});
   const paletteColors = [ ['Background', 'background_color', '#17130f'], ['Panels', 'panel_color', '#231c15'], ['Secondary panels', 'panel_secondary_color', '#2e251c'], ['Text', 'text_color', '#eadfc4'], ['Muted text', 'muted_color', '#a39475'], ['Borders', 'border_color', '#4a3b2a'] ];
   const customColors = paletteColors.map(([label,key,def]) => h('label', { class: 'theme-color-field' }, h('span', {}, label), h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(ui?.[key] || '') ? ui[key] : def, onchange: async e => { await store.setSetting('ui', { ...(await store.getSetting('ui')), [key]:e.target.value,theme_preset:'custom' }); updateChoices('custom'); window.dispatchEvent(new Event('tracker-theme-refresh')); } })));
-  const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100})});
+  const panelOpacity = h('input',{type:'range',min:65,max:100,step:5,value:Math.round(100*(ui?.panel_opacity??1)),onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),panel_opacity:Number(e.target.value)/100});window.dispatchEvent(new Event('tracker-theme-refresh'));}});
   const spriteMotion=h('select',{'aria-label':'Sprite animation',onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),sprite_motion:e.target.value});window.dispatchEvent(new Event('tracker-theme-refresh'));}},[['static','Static sprite depth','Profundidad estática'],['subtle','Reactive sprites','Sprites interactivos'],['lively','Animated idle sprites','Sprites animados en reposo']].map(([value,en,es])=>h('option',{value,selected:(ui?.sprite_motion||'subtle')===value},language()==='es'?es:en)));
   const spriteStyle=h('select',{'aria-label':'Inventory sprite style',onchange:async e=>{
     await store.setSetting('ui',{...(await store.getSetting('ui')),sprite_style:e.target.value==='flat'?'flat':'stack'});
@@ -233,7 +233,7 @@ export async function openSettings({ ctx, syncStatus, weather, feed, proxySugges
     h('option',{value:'stack',selected:ui?.sprite_style!=='flat'},language()==='es'?'Objetos pixelados con volumen':'Layered pixel-art objects'),
     h('option',{value:'flat',selected:ui?.sprite_style==='flat'},language()==='es'?'Iconos clásicos planos':'Classic flat icons')
   ]);
-  const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked})});
+  const lessMotion = h('input',{type:'checkbox',checked:Boolean(ui?.reduce_animations),onchange:async e=>{await store.setSetting('ui',{...(await store.getSetting('ui')),reduce_animations:e.target.checked});window.dispatchEvent(new Event('tracker-theme-refresh'));}});
   const presets = {
     sakura: {"name":"Sakura Dusk","accent_color":"#ec9cbb","background_color":"#201522","panel_color":"#302239","panel_secondary_color":"#47304b","text_color":"#ffedf4","muted_color":"#c4a1ba","border_color":"#77546d"},
     arctic: {"name":"Arctic Aurora","accent_color":"#83e3c6","background_color":"#111e2a","panel_color":"#1b3040","panel_secondary_color":"#254454","text_color":"#ecf7fa","muted_color":"#a0c0cc","border_color":"#456c7e"},
