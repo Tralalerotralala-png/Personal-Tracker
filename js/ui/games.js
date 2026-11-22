@@ -96,7 +96,7 @@ export function createGamesView({store,backups=null}){
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(e.detail?.kind!=='game')return;const saved=await store.getSetting(KEY);if(!saved)return;const known=new Set(state.games.map(x=>x.id));state.games=[...state.games,...(Array.isArray(saved.games)?saved.games:[]).filter(x=>!known.has(x.id))];if(Array.isArray(saved.shelves))state.shelves=[...new Set([...state.shelves,...saved.shelves])];if(!page)render();});
  return {el,mount:load,show:()=>{if(!dirty)render();},hide:()=>{},
-   async canNavigate(){if(!dirty)return true;const discard=await confirmDialog({title:L().cancel,message:language()==='es'?'Se perderán los cambios no guardados.':'Discard unsaved game changes?',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true});if(discard)dirty=false;return discard;},
+   async canNavigate(){if(!dirty)return true;const discard=await confirmDialog({title:L().cancel,message:language()==='es'?'Se perderán los cambios no guardados.':'Discard unsaved game changes?',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true});if(discard){dirty=false;page=null;sideMode=false;render();}return discard;},
   openById(id){
    const game=state.games.find(x=>x.id===id);
    if(!game)return false;
