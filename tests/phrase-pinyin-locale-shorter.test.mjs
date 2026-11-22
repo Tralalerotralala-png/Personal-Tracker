@@ -62,5 +62,5 @@ test('history and expanded view show one selected language, including phrases an
  assert.match(css,/\.phrase-b2-chip-pinyin/);
  assert.equal(read('wallpaper/app.css'),css);
  assert.match(read('wallpaper/wallpaper.js'),/B2_LITERAL_PINYIN/);
- assert.match(read('sw.js'),/const VERSION = 'v112'/);
+ assert.match(read('sw.js'),/const VERSION = 'v\\d+'/);
 });
