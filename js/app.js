@@ -13,6 +13,7 @@ import { createFeedService } from './feed/service.js';
 import { createFeedView } from './ui/feed.js';
 import { createOverviewView } from './ui/overview.js';
 import { createAudioPlayer } from './ui/audio-player.js';
+import { createCloudMusicService } from './audio-cloud.js';
 import { createDreamDiaryView } from './ui/dream-diary.js';
 import { createMediaLibraryView } from './ui/media-library.js';
 import { moonPhaseSvg } from './weather/moon-phase.js';
@@ -49,6 +50,7 @@ if(mode==='cloud'&&!store){
 }else{
 const photos = createPhotos({ store, client });
 const gameBackups = client ? createGameBackupService({store,client}) : null;
+const cloudMusic = client && mode==='cloud' ? createCloudMusicService({store,client}) : null;
 const weather = createWeatherService({ store });
 // Signed-in requests to the optional feed proxy carry your sign-in token, so only you can use it.
 const proxyHeaders = auth ? async () => {
@@ -194,10 +196,10 @@ const inventory = createInventoryView({ store, photos, auth, config: ctx.config 
 const mud = createMudView({ store, weather });
 const calendar = createCalendarView({ store, weather });
 const feedView = createFeedView({ store, feed, proxySuggestion });
-const audioPlayer = createAudioPlayer({ store });
+const audioPlayer = createAudioPlayer({ store, cloudMusic });
 const overview = createOverviewView({ store, ctx: { store, weather, feed, audioPlayer } });
 const diary = createDreamDiaryView({ store });
-const games = createMediaLibraryView({ store, backups:gameBackups });
+const games = createMediaLibraryView({ store, backups:gameBackups, music:cloudMusic, audioPlayer });
 const hubView = createPersonalHubView({ store });
 const expensesView = createExpensesView({ store });
 
@@ -556,7 +558,7 @@ const header = h('header', { class: 'top' },
   h('span', { class: 'brand' }, h('span', { class: 'brand-glyph', html: glyphSvg('pack') }), h('span', { class: 'brand-name' }, 'Personal Tracker')),
   searchWrap, captureButton, h('span', { class: 'spacer' }), skyBadge, pill,
   h('button', { class: 'btn small ghost gear', type: 'button', 'aria-label': 'Settings',
-    onclick: () => openSettings({ ctx: {...ctx, photos, gameBackups}, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
+    onclick: () => openSettings({ ctx: {...ctx, photos, gameBackups, cloudMusic}, syncStatus, weather, feed, proxySuggestion }) }, h('span', { class: 'gear-icon', html: glyphSvg('gear') })));
 
 replace(root, h('a', { class: 'skip-link', href: '#main', onclick: e => { e.preventDefault(); main.focus(); } }, t('Skip to content')), header,
   store.adapter.kind==='memory'?h('div',{class:'temporary-storage-banner',role:'alert'},'Temporary device storage: changes may disappear after a refresh. Export a backup before leaving this page.'):null,
