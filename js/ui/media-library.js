@@ -227,7 +227,12 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    previous.addEventListener('click',()=>{index=Math.max(0,index-2);draw();});
    next.addEventListener('click',()=>{index=Math.min(Math.max(0,pages.length-1),index+2);draw();});
    draw();
-   pagesFor(row.id).then(saved=>{if(!stage.isConnected||page?.entry?.id!==row.id)return;pages=saved;draw();})
+   pagesFor(row.id).then(saved=>{
+    const current=active==='books'&&page?.entry?.id===row.id&&stage.isConnected;
+    const preserved=cachedViews.get('books')?.contains(stage)&&categoryUi.books?.page?.entry?.id===row.id;
+    if(!current&&!preserved)return;
+    pages=saved;draw();
+   })
     .catch(error=>console.warn('Could not load private book images',error));
   }
   if(kind==='albums')info.append(albumSongPanel(row));
@@ -398,13 +403,13 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
      }},mediaIcon(k),h('span',{},L()[k]))));
    const top=h('div',{class:'panel-head media-library-header'},h('h2',{},L().library),tabs);
    games.el.hidden=active!=='games';
-   if(reuse&&mountedKind===active&&headerNode?.isConnected){
+   if(reuse&&mountedKind===active&&headerNode?.parentNode===el){
     headerNode.replaceWith(top);headerNode=top;return;
    }
    if(reuse&&cachedViews.has(active)){
     const fragment=cachedViews.get(active);
     cachedViews.delete(active);
-    replace(el,top,...fragment.childNodes);headerNode=top;mountedKind=active;return;
+    replace(el,top,...[...fragment.childNodes]);headerNode=top;mountedKind=active;return;
    }
    headerNode=top;mountedKind=active;
    if(active==='games'){replace(el,top,games.el);return;}
