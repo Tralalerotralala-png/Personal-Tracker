@@ -205,6 +205,11 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    h('button',{class:'btn danger',type:'button',onclick:async()=>{
     if(!await confirmDialog({title:L().delete,message:row.title,confirmLabel:L().delete,danger:true}))return;
     try{
+     // Keep audio available if the album is removed; unlink, never auto-delete songs.
+     if(kind==='albums'&&music){const linked=(await music.list()).filter(song=>song.albumId===row.id);
+      for(const song of linked)await music.assignAlbum(song,null);
+      void audioPlayer?.refreshCloud();
+     }
      await commit(draft=>{draft[kind]=draft[kind].filter(x=>x.id!==row.id);});
      if(kind==='books')await store.meta.delete(localPagesKey(row.id));
      dirty=false;page=null;render();
