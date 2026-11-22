@@ -20,14 +20,15 @@ const KIND_PALETTES={
  comic:['#222b4e','#5d6598','#c78caa','#f0e4e5'],
  films:['#203441','#3d8aad','#8bcde9','#ecf7fb'],
  series:['#203441','#3d8aad','#8bcde9','#ecf7fb'],
- albums:['#080c13','#26303a','#667481','#eee3cb','#a95746']
+ albums:['#090b10','#161b26','#2d3444','#495363','#98a6b9','#eff2f3','#f0dfbe','#a94f40']
 };
 const cache=new Map();
 export function mediaAccent(seed=''){return PALETTES[hash32(seed)%PALETTES.length][0];}
 
 export function mediaPixelGrid(kind='books'){
  const k=kind==='series'?'films':kind;
- const width=18,height=15,grid=Array.from({length:height},()=>Array(width).fill(null));
+ const width=k==='albums'?25:18,height=k==='albums'?25:15;
+ const grid=Array.from({length:height},()=>Array(width).fill(null));
  const at=(x,y,color)=>{if(x>=0&&y>=0&&x<width&&y<height)grid[y][x]=color;};
  const palette=KIND_PALETTES[k]||KIND_PALETTES.books;
  if(k==='books'||k==='comic'){
@@ -49,18 +50,31 @@ export function mediaPixelGrid(kind='books'){
   for(let x=5;x<=12;x++)at(x,13,palette[0]);
   at(2,3,palette[3]);at(3,3,palette[2]);
  }else if(k==='albums'){
-  // Crisp vinyl silhouette: concentric grooves, warm paper label and
-  // red label ring, reflective highlight, and a transparent spindle.
+  // Glossy black vinyl with concentric grooves, two silver reflections,
+  // a warm ivory center label, a brick-red ring and an open spindle.
+  // The denser 25px grid gives the empty-state icon readable record details.
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-   const radius=Math.hypot(x-8.5,y-7);
-   if(radius>7||radius<.9)continue;
-   let color=palette[0];
-   if(radius<2.1)color=palette[3];
-   else if(radius<2.85)color=palette[4];
-   else if(radius<3.3)color=palette[0];
-   else if(radius<6.65)color=(Math.round(radius*2)+(x+y)%5)%5===0?palette[2]:palette[1];
-   else color=palette[0];
-   if(radius>=3.4&&radius<=6.5&&x<=6&&y<=5&&(x+y)%3===0)color=palette[2];
+   const dx=x-12,dy=y-12,radius=Math.hypot(dx,dy);
+   if(radius>11.65||radius<.9)continue;
+   let color=palette[1];
+   if(radius>10.9)color=palette[0];
+   else if(radius<3.15)color=palette[6];
+   else if(radius<4.05)color=palette[7];
+   else if(radius<4.65)color=palette[0];
+   else{
+    const groove=Math.round(radius*3.4)%5;
+    color=groove===0?palette[3]:groove===1?palette[2]:palette[1];
+    const angle=Math.atan2(dy,dx);
+    // Reflections follow curved bands, rather than straight white pixels.
+    const upper=angle>-2.95&&angle<-1.55&&radius>6.9&&radius<10.1;
+    const lower=angle>.28&&angle<1.18&&radius>7.1&&radius<10.0;
+    if(upper||lower){
+     const stripe=(Math.round(radius*2.1)+Math.round(angle*2))%5;
+     color=stripe===0||stripe===1?palette[5]:palette[4];
+    }
+    // A narrower blue-silver gleam across the left edge adds vinyl depth.
+    if(angle>2.55&&angle<3.12&&radius>8&&radius<10)color=palette[3];
+   }
    at(x,y,color);
   }
  }else{
