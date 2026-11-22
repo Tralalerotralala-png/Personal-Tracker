@@ -107,7 +107,6 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  function edit(entry){page={entry,editing:true};render();}
  function caseArt(row){
   const book=active==='books',vinyl=active==='albums',comic=book&&row.mediaType==='comic';
-  const kind=comic?'comic':active==='films'&&row.mediaType==='series'?'series':active;
   const media=book?h('div',{class:'media-book-pages',role:'group','aria-label':row.title+' interior preview'},
     h('span',{class:'media-page-flip'}),
     h('span',{class:'media-page-flip second'},h('span',{class:'media-mini-left'})),
@@ -119,8 +118,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const casing=h('div',{class:`media-case media-case-${active} ${comic?'media-case-comic':''}`,
     style:`--media-art-accent:${mediaAccent(row.title)}`},
     book?h('span',{class:'media-book-spine','aria-hidden':'true'}):null,
-    media,h('div',{class:'media-case-front'},cover(row),
-     h('span',{class:'media-case-badge','aria-hidden':'true'},mediaIcon(kind,row.title))));
+    media,h('div',{class:'media-case-front'},cover(row)));
   const replay=h('button',{class:'btn small media-replay',type:'button',onclick:()=>{
     const parts=casing.querySelectorAll('.media-case-front,.media-page-flip,.media-comic-panel,.media-vinyl-record,.media-case-disc');
     parts.forEach(node=>{node.style.animation='none';});
