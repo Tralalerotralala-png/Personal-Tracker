@@ -504,6 +504,16 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".media-editor input[type=text]").first.fill("Sample Illustrated Book")
         page.locator(".media-editor input[type=number]").fill("7.5")
         page.locator(".media-editor select").nth(1).select_option("comic")
+        # A tiny in-memory cover verifies the same decoded image element survives
+        # Games -> Books -> Games -> Books without fetching or rebuilding it.
+        page.locator(".media-editor input[type=file]").first.evaluate("""async el=>{
+          const canvas=document.createElement('canvas');canvas.width=12;canvas.height=12;
+          const ctx=canvas.getContext('2d');ctx.fillStyle='#305178';ctx.fillRect(0,0,12,12);
+          const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+          const transfer=new DataTransfer();
+          transfer.items.add(new File([blob],'book-cover.png',{type:'image/png'}));
+          el.files=transfer.files;el.dispatchEvent(new Event('change',{bubbles:true}));
+        }""")
         # Two harmless canvas-made page images. They stay in local metadata.
         page.locator(".media-interior-editor input[type=file]").evaluate("""async el=>{
           const canvas=document.createElement('canvas');canvas.width=12;canvas.height=12;
@@ -529,11 +539,19 @@ for width,height in [(390,844),(1280,900)]:
         assert page.locator(".media-library-view .media-interiors").count()==0,"Pages belong inside the miniature, not below the journal"
         assert "7.5 / 10" in page.locator(".media-detail-info .media-stars-score").inner_text()
         assert page.locator(".media-detail-info .media-stars-filled").evaluate("(el)=>el.style.width")=="75%"
-        # Unlike the old implementation, Books retains its selected title
-        # while other Library categories are visited.
+        # Preserve the actual cover element, not just the selected title.
+        book_cover=page.locator(".media-case-books .media-case-front > img")
+        book_cover.wait_for(state="visible",timeout=10000)
+        assert book_cover.evaluate("el=>el.complete&&el.naturalWidth===12")
+        page.evaluate("window.__savedLibraryCover=document.querySelector('.media-case-books .media-case-front > img')")
         page.locator(".media-library-view .hub-tabs button",has_text="Games").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         assert "Sample Illustrated Book" in page.locator(".media-detail-info h2").inner_text()
+        assert book_cover.evaluate("el=>el===window.__savedLibraryCover&&el.complete&&el.naturalWidth===12"),"Switching tabs must reuse the decoded cover element"
+        # A second round trip cannot retrigger the async image load.
+        page.locator(".media-library-view .hub-tabs button",has_text="Games").click()
+        page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
+        assert book_cover.evaluate("el=>el===window.__savedLibraryCover&&el.complete&&el.naturalWidth===12")
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         assert "Sample Illustrated Book" in page.locator(".media-detail-info h2").inner_text()
         page.locator(".media-case-stage .media-replay").click()
