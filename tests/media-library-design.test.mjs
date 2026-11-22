@@ -163,3 +163,17 @@ test('generated Library and Games icons are committed as small, real PNGs and us
  assert.match(sw,/\.\/icons\/library-media-pixel\.png/);
  assert.match(sw,/\.\/icons\/games-controller-pixel\.png/);
 });
+
+test('switching Library categories retains decoded covers and avoids duplicate refresh renders',()=>{
+ const media=read('js/ui/media-library.js');
+ assert.match(media,/const cachedViews=new Map\(\),warmedCovers=new Map\(\)/);
+ assert.match(media,/document\.createDocumentFragment\(\)/);
+ assert.match(media,/cachedViews\.set\(mountedKind,fragment\)/);
+ assert.match(media,/replace\(el,top,\.\.\.\[\.\.\.fragment\.childNodes\]\)/);
+ assert.match(media,/render\(\{reuse:true\}\)/);
+ assert.match(media,/if\(JSON\.stringify\(next\)===JSON\.stringify\(data\)\)return false/);
+ assert.match(media,/const changed=await refreshCollection\(\);if\(active===k&&changed\)/);
+ assert.match(media,/new Image\(\)/);
+ assert.match(media,/img\.decode\(\)\.catch/);
+ assert.match(media,/loading:eager\?'eager':'lazy'/);
+});
