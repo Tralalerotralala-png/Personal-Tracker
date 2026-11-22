@@ -46,11 +46,20 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   return data;
  }
  const localPagesKey=id=>'media-inner-pages:v1:'+id;
+ const syncedPagesKey=id=>'media-inner-pages:cloud:v1:'+id;
+ const validPage=page=>page&&typeof page.src==='string'&&
+  /^data:image\/(?:webp|png|jpeg);base64,/.test(page.src)&&page.src.length<=520000;
  const pagesFor=async id=>{
   if(!id)return [];
-  const value=await store.meta.get(localPagesKey(id));
-  return Array.isArray(value)?value.filter(page=>typeof page?.src==='string'&&
-    /^data:image\/(?:webp|png|jpeg);base64,/.test(page.src)).slice(0,8):[];
+  // Explicitly synced pages coexist with older device-only image uploads.
+  // Never silently upload previously local pages.
+  const [synced,local]=await Promise.all([
+   store.getSetting(syncedPagesKey(id),[]),store.meta.get(localPagesKey(id))
+  ]);
+  return [
+   ...(Array.isArray(synced)?synced.filter(validPage).map(page=>({...page,cloud:true})):[]),
+   ...(Array.isArray(local)?local.filter(validPage).map(page=>({...page,cloud:false})):[])
+  ].slice(0,8);
  };
  async function convertInteriorImage(file){
   if(!['image/jpeg','image/png','image/webp'].includes(file?.type)||file.size>8*1024*1024)
@@ -174,8 +183,8 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    const gallery=h('section',{class:'media-interiors'},
     h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
     h('p',{class:'media-inner-privacy'},language()==='es'?
-     'Imágenes guardadas solo en este dispositivo. No se suben a la nube.':
-     'Images stay on this device; they are not uploaded to the cloud.'),
+     'Las páginas sincronizadas se guardan en tu cuenta; las imágenes locales anteriores permanecen en este dispositivo.':
+     'Synced pages are saved to your account; older local images remain on this device.'),
     spread,h('div',{class:'media-interior-controls'},previous,counter,next));
    let pages=[],index=bookSpreads.get(row.id)||0;
    const draw=()=>{
@@ -211,7 +220,10 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
       void audioPlayer?.refreshCloud();
      }
      await commit(draft=>{draft[kind]=draft[kind].filter(x=>x.id!==row.id);});
-     if(kind==='books')await store.meta.delete(localPagesKey(row.id));
+     if(kind==='books'){
+      await store.meta.delete(localPagesKey(row.id));
+      await store.remove('settings',syncedPagesKey(row.id));
+     }
      dirty=false;page=null;render();
     }catch(error){console.error('Could not delete media entry',error);toast(language()==='es'?'No se pudo eliminar.':'Could not delete entry.');}
    }},L().delete)));
@@ -239,14 +251,17 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    field(language()==='es'?'Formato':'Format',mediaType),field(L().shelf,shelf),
    field(L().rating,rating),field(L().cover,coverUrl),
    field(language()==='es'?'Subir portada':'Upload cover',upload)];
-  let interiorPages=[];
-  const ready=kind==='books'?pagesFor(row?.id).then(saved=>{interiorPages=saved;drawPages();}):
-    Promise.resolve();
+  let interiorPages=[],originalSyncedPages=[];
+  const ready=kind==='books'?pagesFor(row?.id).then(saved=>{
+   interiorPages=saved;originalSyncedPages=saved.filter(item=>item.cloud).map(({cloud,...page})=>page);
+   drawPages();
+  }):Promise.resolve();
   const preview=h('div',{class:'media-interior-edit-grid'});
   function drawPages(){
    replace(preview,...interiorPages.map((item,index)=>
     h('div',{class:'media-interior-edit-item'},
      h('img',{src:item.src,alt:item.caption||`Page ${index+1}`}),
+     item.cloud?h('small',{class:'hint'},language()==='es'?'Sincronizada':'Synced'):null,
      h('input',{type:'text',maxlength:100,value:item.caption||'',
       placeholder:language()==='es'?'Descripción':'Caption','aria-label':`Page ${index+1} caption`,
       oninput:event=>{item.caption=clamp(event.target.value,100);dirty=true;}}),
@@ -273,8 +288,8 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    fields.push(h('section',{class:'media-interior-editor'},
     h('h3',{},language()==='es'?'Páginas interiores':'Interior pages'),
     h('p',{class:'media-inner-privacy'},language()==='es'?
-      'Adjunta hasta 8 imágenes. Solo en este dispositivo; no se sincronizan.':
-      'Attach up to 8 images. Stored only on this device, not synced.'),
+      'Adjunta hasta 8 imágenes. Las cargas nuevas permanecen solo en este dispositivo.':
+      'Attach up to 8 images. New uploads stay on this device; synced pages are marked below.'),
     interiorUpload,preview));
   }
   fields.push(field(L().notes,notes),error);
@@ -318,7 +333,13 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
      if(!draft.shelvesByKind[kind].includes(input.shelf))
       draft.shelvesByKind[kind].push(input.shelf);
     });
-    if(kind==='books')await store.meta.set(localPagesKey(draftId),interiorPages);
+    if(kind==='books'){
+     const synced=interiorPages.filter(item=>item.cloud).map(({cloud,...image})=>image);
+     const local=interiorPages.filter(item=>!item.cloud).map(({cloud,...image})=>image);
+     if(JSON.stringify(synced)!==JSON.stringify(originalSyncedPages))
+      await store.setSetting(syncedPagesKey(draftId),synced);
+     await store.meta.set(localPagesKey(draftId),local);
+    }
     // Check what is actually persisted, rather than trusting an old UI object.
     const saved=normalizeData(await store.getSetting(KEY))[kind].find(item=>item.id===draftId);
     if(!saved||saved.rating!==parsed||saved.status!==input.status||
