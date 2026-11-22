@@ -396,9 +396,10 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  return {el,mount:load,show:async()=>{
    if(pendingSearch&&dirty){pendingSearch=null;toast(language()==='es'?'Guarda o descarta el editor antes de abrir otro elemento.':'Save or discard your edits before opening another item.');return;}
    if(pendingSearch){
+    if(active==='games'&&!await games.canNavigate()){pendingSearch=null;return;}
     const {kind,id}=pendingSearch;pendingSearch=null;
+    if(active!=='games')categoryUi[active]={page,query,statusFilter,shelfMode};
     dirty=false;query='';statusFilter='all';page=null;
-    if(active==='games'&&!await games.canNavigate())return;
     if(kind==='game'){
      // This view may already be mounted when another device adds a game.
      // Reload authoritative account-scoped settings before resolving its ID.
