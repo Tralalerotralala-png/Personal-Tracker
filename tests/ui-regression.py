@@ -629,6 +629,10 @@ for width,height in [(390,844),(1280,900)]:
         assert "Unique test game" in page.locator(".games-view").inner_text()
         assert page.locator(".games-view .game-detail .media-case-stage").count()==1
         assert page.locator(".games-view .game-detail .media-detail-info").count()==1
+        assert page.locator(".games-view .media-case-stage .media-replay").count()==1
+        assert page.locator(".games-view .game-page-head button").count()==1,"Game details should only have Back, no side-panel toggle"
+        page.locator(".games-view .media-case-stage .media-replay").click()
+        assert page.locator(".games-view .game-detail").is_visible(),"Replay must keep the selected game open"
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Games").click()
         assert "Unique test game" in page.locator(".games-view .game-page-head").inner_text()
