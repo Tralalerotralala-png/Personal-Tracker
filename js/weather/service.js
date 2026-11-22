@@ -17,7 +17,7 @@ const dateShift=(date,days)=>{
 // for a target date with later retrospective *model* data, even when the app was
 // not opened on consecutive days. Retain at most 35 days of per-place history.
 export function updateForecastArchive(entry={},daily=[],today){
- const validDay=date=>/^\\d{4}-\\d{2}-\\d{2}$/.test(date||'');
+ const validDay=date=>/^\d{4}-\d{2}-\d{2}$/.test(date||'');
  const oldest=dateShift(today,-34),latest=dateShift(today,7);
  const saved=entry?.forecasts&&typeof entry.forecasts==='object'&&!Array.isArray(entry.forecasts)?entry.forecasts:{};
  const retrospective=new Map((Array.isArray(daily)?daily:[]).filter(d=>validDay(d?.date)).map(d=>[d.date,d]));
