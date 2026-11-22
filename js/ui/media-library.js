@@ -1,6 +1,6 @@
 // One library with four shelves. Game records stay under game_library_v1,
 // preserving existing entries and widgets; other media share a compact generic editor.
-import { h, replace, confirmDialog, toast, libraryCoverButton } from './dom.js';
+import { h, replace, confirmDialog, promptDialog, toast, libraryCoverButton } from './dom.js';
 import { language } from './language.js';
 import { uuid } from '../data/util.js';
 import { createGamesView } from './games.js';
@@ -354,7 +354,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
     newShelfLabel:L().newShelf,addLabel:`${L().add} ${L()[active]}`,
     onToggle:()=>{shelfMode=!shelfMode;render();},
     onNewShelf:async()=>{
-     const kind=active,name=prompt(L().newShelf)?.trim().slice(0,60);
+     const kind=active,name=(await promptDialog({title:L().newShelf,maxLength:60}))?.trim().slice(0,60);
      if(!name||shelfNames(kind).some(x=>x.toLocaleLowerCase()===name.toLocaleLowerCase()))return;
      query='';statusFilter='all';shelfMode=true;
      try{
