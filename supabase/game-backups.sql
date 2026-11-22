@@ -56,3 +56,18 @@ create policy "music tracks owner delete" on storage.objects
  for delete to authenticated using (
   bucket_id='music-tracks' and (storage.foldername(name))[1]=(select auth.uid())::text
  );
+
+-- Extend Tracker's existing restrictive account gate to the new private bucket.
+-- This policy is independent of the per-object authenticated-user path policies.
+do $music_owner_gate$
+begin
+ if exists (select 1 from pg_policies where schemaname='storage'
+   and tablename='objects' and policyname='tracker_private_owner') then
+  alter policy tracker_private_owner on storage.objects
+   using (bucket_id not in ('item-photos','game-backups','music-tracks')
+     or (select public.tracker_account_allowed()))
+   with check (bucket_id not in ('item-photos','game-backups','music-tracks')
+     or (select public.tracker_account_allowed()));
+ end if;
+end
+$music_owner_gate$;
