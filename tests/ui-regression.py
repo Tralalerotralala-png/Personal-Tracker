@@ -403,7 +403,7 @@ for width,height in [(390,844),(1280,900)]:
             assert ratios["scheme"]=="light",ratios
             assert min(ratios["input"],ratios["button"],ratios["nav"])>=4.5,(palette,ratios)
         page.locator(".theme-choice",has_text="Original / Classic").click()
-        page.wait_for_function("document.documentElement.dataset.theme==='classic'")
+        page.wait_for_function("() => document.documentElement.dataset.theme==='classic'")
         page.keyboard.press("Escape")
         page.reload(wait_until="domcontentloaded")
         page.locator(".top .gear").wait_for(timeout=25000)
