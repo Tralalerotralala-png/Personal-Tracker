@@ -141,3 +141,18 @@ test('rating precision is identical for games, books, films and albums',()=>{
   assert.match(source,/Math\.abs\(.*\*10-Math\.round\(.*\*10\)\)/);
  }
 });
+
+test('generated Library and Games icons are committed as small, real PNGs and used in both nav surfaces',()=>{
+ for(const name of ['library-media-pixel','games-controller-pixel']){
+  const image=readFileSync(new URL('../icons/'+name+'.png',import.meta.url));
+  assert.equal(image.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+  assert.equal(image.readUInt32BE(16),72);
+  assert.equal(image.readUInt32BE(20),72);
+  assert.ok(image.length<4096,'Keep original pixel icons tiny for offline use');
+ }
+ const media=read('js/ui/media-art.js'),app=read('js/app.js'),sw=read('sw.js');
+ assert.match(media,/games-controller-pixel\.png/);
+ assert.match(app,/library-media-pixel\.png/);
+ assert.match(sw,/\.\/icons\/library-media-pixel\.png/);
+ assert.match(sw,/\.\/icons\/games-controller-pixel\.png/);
+});
