@@ -137,14 +137,20 @@ export function mediaStarRating(value,{editable=false,label='Rating',onChange=nu
  const clear=h('button',{class:'btn small ghost media-stars-clear',type:'button',
   onclick:()=>{selected=null;preview=null;number.value='';range.value=0;draw();onChange?.();}},
   'Clear');
- function commit(input){
+ function commit(input,{updateNumber=true}={}){
   const v=ratingNumber(input);
   if(v===null)return;
   selected=v;preview=null;
-  range.value=String(v);number.value=v.toFixed(1);draw();onChange?.();
+  range.value=String(v);
+  if(updateNumber)number.value=v.toFixed(1);
+  draw();onChange?.();
  }
  range.addEventListener('input',()=>commit(range.value));
- number.addEventListener('input',()=>{const v=ratingNumber(number.value);if(v!==null)commit(number.value);else if(!number.value){selected=null;draw();onChange?.();}});
+ number.addEventListener('input',()=>{
+  if(number.value===''){selected=null;preview=null;draw();onChange?.();return;}
+  const v=ratingNumber(number.value);
+  if(v!==null)commit(number.value,{updateNumber:false});else onChange?.();
+ });
  range.addEventListener('pointermove',event=>{
   if(event.pointerType!=='mouse'&&event.pointerType!=='pen')return;
   const rect=range.getBoundingClientRect();
