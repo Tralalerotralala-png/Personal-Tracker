@@ -250,7 +250,7 @@ details.more summary { cursor: pointer; padding: 6px 0; }
 .lost-tag { color: var(--danger); font-size: .85rem; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .crumb { padding: 0 8px; background: var(--panel-2); border: 2px solid var(--edge); font-size: .9rem; }
-.crumb.last { border-color: var(--accent); color: var(--accent); background: #0d1b19; }
+.crumb.last { border-color: var(--accent); color: var(--accent); background: var(--nav-selected-bg); }
 .sep { color: var(--ink-dim); }
 
 .empty { text-align: center; padding: 36px 16px; color: var(--ink-dim); display: grid; gap: 14px; justify-items: center; }
@@ -441,7 +441,7 @@ html.scanlines body::after {
 .legend i { width: 10px; height: 10px; background: var(--mc); display: inline-block; }
 @media (min-width: 700px) {
   .cal-day { min-height: 100px; padding: 5px 6px; }
-  .cal-ev { width: auto; height: auto; flex: 1 1 100%; padding: 0 5px; border-left: 3px solid var(--c); background: #110d09; font-size: .8rem; min-width: 0; }
+  .cal-ev { width: auto; height: auto; flex: 1 1 100%; padding: 0 5px; border-left: 3px solid var(--c); background: var(--input-bg); font-size: .8rem; min-width: 0; }
   .cal-ev-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
@@ -474,7 +474,7 @@ html.scanlines body::after {
 .wd-toggles { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
 .wd { min-width: 44px; min-height: 36px; padding: 0 6px; background: var(--panel-2); border: 3px solid var(--edge); color: var(--ink-dim); cursor: pointer; }
 .wd.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-input[type='date'], input[type='time'] { width: 100%; padding: 9px 11px; background: #110d09; color: var(--ink); border: 3px solid var(--edge); font: inherit; border-radius: 0; color-scheme: dark; }
+input[type='date'], input[type='time'] { width: 100%; padding: 9px 11px; background: var(--input-bg); color: var(--ink); border: 3px solid var(--edge); font: inherit; border-radius: 0; color-scheme: inherit; }
 
 /* ---- tuning sheet ---- */
 .tune-row { display: grid; gap: 4px; margin: 12px 0; }
@@ -729,7 +729,7 @@ dialog.editor[open] { display: flex; flex-direction: column; }
 .cat-field-controls input[type=checkbox], .tracking-choices input[type=checkbox] { width: 18px; height: 18px; }
 .tracking-heading { margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--edge); }
 .tracking-control { margin: 8px 0; }
-.tracking-control input[type=date], .form input[type=date] { background: #110d09; color: var(--ink); border: 3px solid var(--edge); font: inherit; padding: 9px; width: 100%; color-scheme: dark; }
+.tracking-control input[type=date], .form input[type=date] { background: var(--input-bg); color: var(--ink); border: 3px solid var(--edge); font: inherit; padding: 9px; width: 100%; color-scheme: inherit; }
 .track-slider { display: flex; align-items: center; gap: 12px; }
 .track-slider input { flex:1; accent-color:var(--accent); }
 .track-readout, .track-chip, .track-warning { font-size: .72rem; }
