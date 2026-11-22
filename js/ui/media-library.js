@@ -21,6 +21,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  const cachedViews=new Map(),warmedCovers=new Map();
  let mountedKind=null,headerNode=null;
  function warmArtwork(){
+  if(typeof Image==='undefined')return;
   for(const kind of KINDS)for(const row of list(kind).slice(0,10)){
    const src=[row.cover,...(Array.isArray(row.coverAlternates)?row.coverAlternates:[])]
     .find(value=>typeof value==='string'&&/^(https:\/\/|data:image\/)/i.test(value));
@@ -106,7 +107,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    img.src=blob;
   });
  }
- function cover(row){
+ function cover(row,{eager=false}={}){
   const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
   const fallback=()=>h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},
    mediaIcon(kind,row.title),h('span',{class:'media-cover-caption'},row.title));
@@ -114,7 +115,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    .filter(url=>typeof url==='string'&&/^(https:\/\/|data:image\/)/i.test(url));
   if(!sources.length)return fallback();
   let index=0;
-  return h('img',{src:sources[0],alt:row.title,loading:'lazy',referrerpolicy:'no-referrer',
+  return h('img',{src:sources[0],alt:row.title,loading:eager?'eager':'lazy',decoding:eager?'sync':'async',referrerpolicy:'no-referrer',
    onerror:e=>{
     index++;
     if(index<sources.length)e.currentTarget.src=sources[index];
@@ -137,7 +138,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const casing=h('div',{class:`media-case media-case-${active} ${comic?'media-case-comic':''}`,
     style:`--media-art-accent:${mediaAccent(row.title)}`},
     book?h('span',{class:'media-book-spine','aria-hidden':'true'}):null,
-    media,h('div',{class:'media-case-front'},cover(row)));
+    media,h('div',{class:'media-case-front'},cover(row,{eager:true})));
   const replay=h('button',{class:'btn small media-replay',type:'button',onclick:()=>{
     const parts=casing.querySelectorAll('.media-case-front,.media-page-flip,.media-comic-panel,.media-vinyl-record,.media-case-disc');
     parts.forEach(node=>{node.style.animation='none';});
@@ -458,7 +459,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    const filter=h('select',{'aria-label':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
- window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
+ window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}cachedViews.clear();warmArtwork();if(active!=='games'&&!page&&!el.hidden)render();});
  return {el,mount:load,show:async()=>{
    if(pendingSearch&&dirty){pendingSearch=null;toast(language()==='es'?'Guarda o descarta el editor antes de abrir otro elemento.':'Save or discard your edits before opening another item.');return;}
    if(pendingSearch){
@@ -475,8 +476,9 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
      return;
     }
     const latest=await store.getSetting(KEY);
-    if(latest&&typeof latest==='object')
-     data=normalizeData(latest);
+    if(latest&&typeof latest==='object'){
+     data=normalizeData(latest);cachedViews.clear();warmArtwork();
+    }
     const row=data[kind]?.find(item=>item.id===id);
     if(row){active=kind;page={entry:row,editing:false};render();return;}
    }
