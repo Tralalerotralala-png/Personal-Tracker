@@ -27,3 +27,13 @@ test('app, wallpaper and offline PWA share the no-gap forecast layout', () => {
   assert.match(read('wallpaper/wallpaper.js'), /class: 'w-forecast-cards' \}, days\.map/);
   assert.match(read('sw.js'), /const VERSION = 'v\d+'/);
 });
+
+test('full Weather page always displays seven days in one horizontal row',()=>{
+ const css=read('css/app.css'),mud=read('js/ui/mud.js');
+ assert.match(mud,/\[today, \.\.\.future\]\.slice\(0, 7\)/);
+ assert.match(css,/\.wx-panel \.wx-outlook\.wx-unified\{[\s\S]*?grid-template-columns:repeat\(7,minmax\(126px,1fr\)\)/);
+ assert.match(css,/\.wx-panel \.wx-outlook\.wx-unified\{[\s\S]*?overflow-x:auto/);
+ assert.match(css,/scroll-snap-type:x proximity/);
+ assert.match(mud,/scroll horizontally to explore all days/);
+ assert.doesNotMatch(css,/\.wx-unified\{gap:7px;grid-template-columns:repeat\(6/);
+});
