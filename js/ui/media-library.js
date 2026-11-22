@@ -91,9 +91,16 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
   const fallback=()=>h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},
    mediaIcon(kind,row.title),h('span',{class:'media-cover-caption'},row.title));
-  return row.cover&&(/^(https:\/\/|data:image\/)/i.test(row.cover))
-   ?h('img',{src:row.cover,alt:row.title,loading:'lazy',referrerpolicy:'no-referrer',
-      onerror:e=>e.currentTarget.replaceWith(fallback())}):fallback();
+  const sources=[row.cover,...(Array.isArray(row.coverAlternates)?row.coverAlternates:[])]
+   .filter(url=>typeof url==='string'&&/^(https:\/\/|data:image\/)/i.test(url));
+  if(!sources.length)return fallback();
+  let index=0;
+  return h('img',{src:sources[0],alt:row.title,loading:'lazy',referrerpolicy:'no-referrer',
+   onerror:e=>{
+    index++;
+    if(index<sources.length)e.currentTarget.src=sources[index];
+    else e.currentTarget.replaceWith(fallback());
+   }});
  }
  async function back(){if(dirty&&!await confirmDialog({title:language()==='es'?'¿Descartar cambios?':'Discard changes?',message:language()==='es'?'Los cambios no guardados se perderán.':'Unsaved changes will be lost.',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true}))return;dirty=false;page=null;render();}
  function show(entry=null,editing=false){page={entry,editing};render();}
@@ -101,7 +108,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  function caseArt(row){
   const book=active==='books',vinyl=active==='albums',comic=book&&row.mediaType==='comic';
   const kind=comic?'comic':active==='films'&&row.mediaType==='series'?'series':active;
-  const media=book?h('div',{class:'media-book-pages','aria-hidden':'true'},
+  const media=book?h('div',{class:'media-book-pages',role:'group','aria-label':row.title+' interior preview'},
     h('span',{class:'media-page-flip'}),
     h('span',{class:'media-page-flip second'},h('span',{class:'media-mini-left'})),
     comic?h('span',{class:'media-comic-panel'}):null,
