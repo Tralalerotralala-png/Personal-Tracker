@@ -10,7 +10,7 @@ const KINDS=['books','films','albums'];
 const LABELS={en:{games:'Games',books:'Books',films:'Films & TV',albums:'Albums',library:'Media Library',add:'Add',name:'Title',creator:'Author / Director / Artist',status:'Status',notes:'Notes',cover:'Cover URL (HTTPS)',save:'Save',cancel:'Back',edit:'Edit',delete:'Delete',journal:'Personal journal',entry:'Add note',shelf:'Shelf',view:'Toggle shelf/grid',rating:'Rating',grid:'Cover grid',shelves:'Bookshelves',replay:'Replay reveal',empty:'Build your collection',noResults:'No matching entries',items:'titles',newShelf:'New shelf'},es:{games:'Juegos',books:'Libros',films:'Películas y TV',albums:'Álbumes',library:'Biblioteca multimedia',add:'Agregar',name:'Título',creator:'Autor / Director / Artista',status:'Estado',notes:'Notas',cover:'URL de portada (HTTPS)',save:'Guardar',cancel:'Volver',edit:'Editar',delete:'Eliminar',journal:'Diario personal',entry:'Agregar nota',shelf:'Estante',view:'Cambiar estantes/cuadrícula',rating:'Calificación',grid:'Cuadrícula',shelves:'Estantes',replay:'Repetir apertura',empty:'Crea tu colección',noResults:'Sin resultados',items:'títulos',newShelf:'Nuevo estante'}};
 const names={books:{en:['To read','Reading','Finished'],es:['Por leer','Leyendo','Terminado']},films:{en:['To watch','Watching','Watched'],es:['Por ver','Viendo','Vista']},albums:{en:['To listen','Listening','Listened'],es:['Por escuchar','Escuchando','Escuchado']}};
 const clamp=(x,max)=>String(x??'').slice(0,max);
-export function createMediaLibraryView({store,backups=null}) {
+export function createMediaLibraryView({store,backups=null,music=null,audioPlayer=null}) {
  const el=h('div',{class:'view media-library-view'});
  const games=createGamesView({store,backups});
  const L=()=>LABELS[language()];
@@ -111,6 +111,39 @@ export function createMediaLibraryView({store,backups=null}) {
    }},L().replay);
   return h('div',{class:'media-case-stage'},casing,replay);
  }
+ function albumSongPanel(album){
+  const panel=h('section',{class:'album-song-panel game-journal'});
+  const status=h('p',{class:'hint',role:'status','aria-live':'polite'});
+  const entries=h('div',{class:'album-song-list'}),available=h('div',{class:'album-song-link'});
+  if(!music){replace(panel,h('h3',{},language()==='es'?'Canciones del álbum':'Album songs'),h('p',{class:'hint'},language()==='es'?'Inicia sesión para subir y escuchar canciones privadas desde la nube.':'Sign in to upload and stream private songs from your cloud account.'));return panel;}
+  const chooser=h('input',{type:'file',multiple:true,accept:'audio/*,.mp3,.m4a,.aac,.ogg,.opus,.wav,.flac,.webm'});
+  const upload=h('button',{class:'btn primary small',type:'button'},language()==='es'?'Subir al álbum':'Upload to album');
+  async function refresh(){
+   try{
+    const songs=await music.list();
+    if(active!=='albums'||page?.entry?.id!==album.id)return;
+    const linked=songs.filter(song=>song.albumId===album.id),unlinked=songs.filter(song=>!song.albumId&&!song.deletionPending);
+    replace(entries,...(linked.length?linked.map(song=>h('div',{class:'album-song-row'},
+      h('button',{class:'btn small ghost',type:'button',onclick:()=>audioPlayer?.playCloud(song)},'▶ '+song.name),
+      h('button',{class:'btn small ghost',type:'button',onclick:async()=>{try{await music.assignAlbum(song,null);await refresh();void audioPlayer?.refreshCloud();}catch(error){status.textContent=error.message;}}},language()==='es'?'Desvincular':'Unlink'))):[h('p',{class:'hint'},language()==='es'?'Aún no hay canciones en este álbum.':'No songs attached to this album yet.')])));
+    replace(available,...(unlinked.length?[h('select',{'aria-label':language()==='es'?'Canción existente':'Existing cloud song'},unlinked.map(song=>h('option',{value:song.id},song.name))),h('button',{class:'btn small',type:'button',onclick:async()=>{
+      const select=available.querySelector('select'),song=unlinked.find(entry=>entry.id===select?.value);
+      if(!song)return;
+      try{await music.assignAlbum(song,album.id);await refresh();void audioPlayer?.refreshCloud();}catch(error){status.textContent=error.message;}
+     }},language()==='es'?'Vincular canción':'Link song')]:[]));
+   }catch(error){status.textContent=error.message||'Could not load cloud songs.';}
+  }
+  upload.onclick=async()=>{
+   const files=[...chooser.files||[]];if(!files.length){status.textContent=language()==='es'?'Elige canciones primero.':'Choose songs first.';return;}
+   upload.disabled=true;let added=0;
+   try{for(const file of files){status.textContent=(language()==='es'?'Subiendo ':'Uploading ')+file.name;await music.upload(file,{albumId:album.id});added++;}
+    chooser.value='';status.textContent=(language()==='es'?'Canciones subidas: ':'Songs uploaded: ')+added;
+   }catch(error){status.textContent=(added?added+' saved. ':'')+(error.message||'Upload failed.');}
+   finally{upload.disabled=false;await refresh();void audioPlayer?.refreshCloud();}
+  };
+  replace(panel,h('h3',{},language()==='es'?'Canciones del álbum':'Album songs'),h('p',{class:'hint'},language()==='es'?'Archivos privados en Supabase, disponibles en tus dispositivos con sesión iniciada. Hasta 25 MB por canción.':'Private Supabase files playable on your signed-in devices. 25 MB per song.'),h('div',{class:'inline-actions'},chooser,upload),status,entries,available);
+  void refresh();return panel;
+ }
  function renderDetail(row){
   const kind=active;
   const journal=h('textarea',{rows:3,maxlength:5000,placeholder:language()==='es'?'Una nota de hoy...':'A note from today...'});
@@ -164,6 +197,7 @@ export function createMediaLibraryView({store,backups=null}) {
     .catch(error=>console.warn('Could not load private book images',error));
    info.append(gallery);
   }
+  if(kind==='albums')info.append(albumSongPanel(row));
   info.append(h('div',{class:'inline-actions'},
    h('button',{class:'btn primary',type:'button',onclick:()=>edit(row)},L().edit),
    h('button',{class:'btn danger',type:'button',onclick:async()=>{
@@ -295,6 +329,7 @@ export function createMediaLibraryView({store,backups=null}) {
     ['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),type:'button',
      'aria-pressed':String(active===k),onclick:async()=>{
        if(k===active)return;
+       if(active==='games'&&!await games.canNavigate())return;
        if(dirty&&!await confirmDialog({title:language()==='es'?'¿Descartar cambios?':'Discard changes?',message:language()==='es'?'Los cambios no guardados se perderán.':'Unsaved changes will be lost.',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true}))return;
        if(active!=='games')categoryUi[active]={page:dirty?null:page,query,statusFilter,shelfMode};
        dirty=false;active=k;
@@ -361,6 +396,7 @@ export function createMediaLibraryView({store,backups=null}) {
    if(pendingSearch){
     const {kind,id}=pendingSearch;pendingSearch=null;
     dirty=false;query='';statusFilter='all';page=null;
+    if(active==='games'&&!await games.canNavigate())return;
     if(kind==='game'){
      // This view may already be mounted when another device adds a game.
      // Reload authoritative account-scoped settings before resolving its ID.
