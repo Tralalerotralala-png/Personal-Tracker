@@ -17,6 +17,20 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  let active='games',data={books:[],films:[],albums:[],shelvesByKind:{books:[],films:[],albums:[]}},shelfMode=true,page=null,dirty=false,query='',statusFilter='all',pendingSearch=null;
   const categoryUi=Object.fromEntries(KINDS.map(kind=>[kind,{page:null,query:'',statusFilter:'all',shelfMode:true}]));
   const bookSpreads=new Map();
+ // Retain actual DOM nodes and decoded image resources when changing categories.
+ const cachedViews=new Map(),warmedCovers=new Map();
+ let mountedKind=null,headerNode=null;
+ function warmArtwork(){
+  for(const kind of KINDS)for(const row of list(kind).slice(0,10)){
+   const src=[row.cover,...(Array.isArray(row.coverAlternates)?row.coverAlternates:[])]
+    .find(value=>typeof value==='string'&&/^(https:\/\/|data:image\/)/i.test(value));
+   if(!src||warmedCovers.has(src))continue;
+   const img=new Image();img.decoding='async';img.src=src;
+   if(typeof img.decode==='function')void img.decode().catch(()=>{});
+   warmedCovers.set(src,img);
+   if(warmedCovers.size>30)warmedCovers.delete(warmedCovers.keys().next().value);
+  }
+ }
  window.addEventListener('tracker-search-open',event=>{
   if(event.detail?.target==='games'&&['game','books','films','albums'].includes(event.detail.kind))
    pendingSearch={kind:event.detail.kind,id:event.detail.id};
@@ -31,7 +45,11 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
     ?[...new Set(val.shelvesByKind[kind].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,60)))]:[];
   return next;
  }
- async function refreshCollection(){const val=await store.getSetting(KEY);data=normalizeData(val);}
+ async function refreshCollection(){
+  const next=normalizeData(await store.getSetting(KEY));
+  if(JSON.stringify(next)===JSON.stringify(data))return false;
+  data=next;cachedViews.clear();warmArtwork();return true;
+ }
  const shelfNames=kind=>[...new Set([...data.shelvesByKind[kind],...list(kind).map(x=>x.shelf||'Collection')])];
  async function load(){await refreshCollection();await games.mount();render();}
  // Read and update the latest settings value INSIDE the store's serialized write.
@@ -43,6 +61,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    return draft;
   },{books:[],films:[],albums:[]});
   data=normalizeData(next);
+  cachedViews.clear();warmArtwork();
   return data;
  }
  const localPagesKey=id=>'media-inner-pages:v1:'+id;
@@ -354,7 +373,12 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   }},L().save);
   return h('div',{},form,saveButton);
  }
- function render(){
+ function render({reuse=false}={}){
+   if(mountedKind!==null&&mountedKind!==active){
+    const fragment=document.createDocumentFragment();
+    for(const node of [...el.childNodes])if(node!==headerNode)fragment.append(node);
+    cachedViews.set(mountedKind,fragment);
+   }
    const tabs=h('div',{class:'hub-tabs media-category-tabs','aria-label':L().library},
     ['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),type:'button',
      'aria-pressed':String(active===k),onclick:async()=>{
@@ -364,17 +388,26 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
        if(active!=='games')categoryUi[active]={page:dirty?null:page,query,statusFilter,shelfMode};
        dirty=false;active=k;
        const saved=categoryUi[k];page=saved?.page||null;query=saved?.query||'';statusFilter=saved?.statusFilter||'all';shelfMode=saved?.shelfMode??true;
-       render();
+       render({reuse:true});
        if(k!=='games'){
-        try {await refreshCollection();if(active===k){
+        try {const changed=await refreshCollection();if(active===k&&changed){
          if(page?.entry?.id){const latest=list(k).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
          render();
         }}catch(error){console.warn('Could not refresh media library',error);}
        }
      }},mediaIcon(k),h('span',{},L()[k]))));
    const top=h('div',{class:'panel-head media-library-header'},h('h2',{},L().library),tabs);
-   if(active==='games'){games.el.hidden=false;replace(el,top,games.el);return;}
-   games.el.hidden=true;
+   games.el.hidden=active!=='games';
+   if(reuse&&mountedKind===active&&headerNode?.isConnected){
+    headerNode.replaceWith(top);headerNode=top;return;
+   }
+   if(reuse&&cachedViews.has(active)){
+    const fragment=cachedViews.get(active);
+    cachedViews.delete(active);
+    replace(el,top,...fragment.childNodes);headerNode=top;mountedKind=active;return;
+   }
+   headerNode=top;mountedKind=active;
+   if(active==='games'){replace(el,top,games.el);return;}
    if(page){replace(el,top,h('div',{class:'game-page-head'},h('button',{class:'btn small',onclick:back},L().cancel),h('h2',{},page.entry?.title||`${L().add} ${L()[active]}`)),h('div',{class:'game-page-body'},page.editing?renderEditor(page.entry):renderDetail(page.entry)));return;}
    const rows=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
    const shelves=[...new Set(rows.map(x=>x.shelf||'Collection'))];
@@ -444,8 +477,8 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    }
    // Keep an in-progress editor mounted when returning from another route.
    if(dirty&&page?.editing)return;
-   await refreshCollection();
-   if(page?.entry?.id){const latest=list(active).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
-   render();
+   const changed=await refreshCollection();
+   if(changed&&page?.entry?.id){const latest=list(active).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
+   render({reuse:!changed});
   },hide:()=>{}};
 }
