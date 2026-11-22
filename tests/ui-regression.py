@@ -391,7 +391,7 @@ for width,height in [(390,844),(1280,900)]:
             page.locator(".theme-choice",has_text=palette).click()
             page.wait_for_function("(id)=>document.documentElement.dataset.theme===id",arg=preset)
             ratios=page.evaluate("""() => {
-              const rgb=value=>[...String(value).matchAll(/[\\d.]+/g)].slice(0,3).map(x=>Number(x[0])/255);
+              const rgb=value=>{const nums=[...String(value).matchAll(/[-+]?(?:\\d*\\.)?\\d+(?:e[-+]?\\d+)?/gi)].slice(0,3).map(x=>Number(x[0]));return String(value).startsWith('color(srgb')?nums:nums.map(n=>n/255);};
               const lum=value=>{const [r,g,b]=rgb(value).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return r*.2126+g*.7152+b*.0722;};
               const ratio=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
               const input=document.createElement('input'),button=document.createElement('button');
