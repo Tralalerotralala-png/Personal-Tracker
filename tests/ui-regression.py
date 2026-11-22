@@ -376,6 +376,11 @@ for width,height in [(390,844),(1280,900)]:
         assert skip.bounding_box()["y"]>=0,"Keyboard skip link did not appear on focus"
         skip.press("Enter")
         assert page.evaluate("document.activeElement.id")=="main","Skip link did not move keyboard focus to main content"
+        # The global Library route uses a combined books/vinyl icon;
+        # Games inside Library uses its distinct controller icon.
+        library_nav=page.locator('.slot[data-route="games"] img.library-nav-art')
+        assert library_nav.count()==1
+        assert library_nav.evaluate("el=>el.complete&&el.naturalWidth===72")
         # Customize a non-backpack icon, then verify it persists across reloads.
         page.locator(".top .gear").click()
         page.locator(".settings-tabs button",has_text="Appearance").click()
@@ -458,8 +463,13 @@ for width,height in [(390,844),(1280,900)]:
         assert game_action_names==["Cover grid","New shelf","Add game"],game_action_names
         assert game_toolbar.locator(".media-collection-title").count()==0
         assert game_toolbar.locator(".media-pixel-icon").count()==0
+        controller=page.locator(".media-category-tabs button",has_text="Games").locator(".media-pixel-icon img.media-pixel-image")
+        assert controller.count()==1
+        assert controller.get_attribute("src")=="./icons/games-controller-pixel.png"
+        controller.wait_for(state="visible")
+        assert controller.evaluate("el=>el.complete&&el.naturalWidth===72")
         icons=page.locator(".media-category-tabs .media-pixel-icon svg.sprite-stacked-asset")
-        assert icons.count()==4
+        assert icons.count()==3
         assert icons.first.evaluate("""el=>{
           const t=getComputedStyle(el).transform;
           if(t==='none')return true;

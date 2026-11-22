@@ -87,9 +87,18 @@ export function mediaIconSvg(kind='books',seed=kind){
  cache.set(key,svg);
  return svg;
 }
-export const mediaIcon=(kind,seed=kind)=>h('span',{
- class:'media-pixel-icon','aria-hidden':'true',html:mediaIconSvg(kind,seed)
-});
+// The Games tab uses the recognizable controller asset; other media icons keep
+// their existing layered pixel artwork and 3D effects.
+export const mediaIcon=(kind,seed=kind)=>{
+ const el=h('span',{class:'media-pixel-icon','aria-hidden':'true'});
+ if(kind==='games'){
+  const image=h('img',{class:'media-pixel-image',src:'./icons/games-controller-pixel.png',
+   width:72,height:72,alt:'',decoding:'async'});
+  image.addEventListener('error',()=>{el.innerHTML=mediaIconSvg(kind,seed);});
+  el.append(image);
+ }else el.innerHTML=mediaIconSvg(kind,seed);
+ return el;
+};
 
 // One toolbar owns the geometry and button order for ALL media categories.
 // Each controller provides its own save/new-shelf handlers; presentation never diverges.

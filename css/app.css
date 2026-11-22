@@ -2928,3 +2928,30 @@ button.w-forecast-day:hover,button.w-forecast-day:focus-visible{border-color:var
  font-variant-numeric:tabular-nums;white-space:nowrap}
 .media-star-rating .media-stars-clear{min-height:29px;padding:4px 7px}
 @media(max-width:480px){.media-stars{font-size:25px}.media-star-rating{gap:6px}}
+
+/* Original pixel-art identity: media shelf in global Library nav, controller
+   within Games. Nearest-neighbour scaling preserves the generated pixel edges. */
+.hotbar .slot[data-route="games"] .slot-icon > .library-nav-art{
+ display:block;width:32px;height:32px;max-width:100%;max-height:100%;
+ object-fit:contain;image-rendering:pixelated;filter:drop-shadow(1px 2px 0 #11182655)
+}
+.nav-icon-preview > .library-nav-art{
+ display:block;width:76px;height:76px;object-fit:contain;image-rendering:pixelated
+}
+.media-pixel-icon > img.media-pixel-image{
+ display:block;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;
+ transform-origin:center center;flex:none
+}
+@media(hover:hover) and (pointer:fine){
+ .media-library-view .media-category-tabs .btn:hover .media-pixel-icon > img.media-pixel-image,
+ .media-library-view .media-category-tabs .btn:focus-visible .media-pixel-icon > img.media-pixel-image{
+  animation:mediaTabTumble .75s cubic-bezier(.19,.73,.2,1) both
+ }
+}
+@media(max-width:480px){
+ .hotbar .slot[data-route="games"] .slot-icon > .library-nav-art{width:25px;height:25px}
+}
+@media(prefers-reduced-motion:reduce){
+ .media-library-view .media-category-tabs .media-pixel-icon > img.media-pixel-image{animation:none!important;transform:none!important}
+}
+.reduce-animations .media-library-view .media-category-tabs .media-pixel-icon > img.media-pixel-image{animation:none!important;transform:none!important}
