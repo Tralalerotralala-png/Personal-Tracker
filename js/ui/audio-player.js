@@ -199,5 +199,5 @@ export function createAudioPlayer({store,cloudMusic=null}){
  window.addEventListener('tracker-audio-changed',()=>{refreshTracks();void refreshCloud();});
  refreshTracks();void refreshCloud();
  store.getSetting('location',null).then(p=>{if(!prefs.region&&p?.label){const parts=p.label.split(',').map(s=>s.trim());if(parts.length>=3)region.value=parts[1];}}).catch(()=>{});
- return {el:floating,mount(host){dockHost=host;place();return {destroy(){if(dockHost===host){dockHost=null;place();}}};},pause(){audio.pause();},playCloud(song){if(song?.cloud||song?.path)void start({...song,cloud:true},'music');},refreshCloud};
+ return {el:floating,mount(host){dockHost=host;place();return {destroy(){if(dockHost===host){dockHost=null;place();}}};},pause(){audio.pause();},playCloud(song){if(song?.cloud||song?.path){mode='music';drawLibrary();if(!dockHost){expanded=true;prefs.expanded=true;savePrefs();place();}void start({...song,cloud:true},'music');}},refreshCloud};
 }
