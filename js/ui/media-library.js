@@ -17,6 +17,21 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  let active='games',data={books:[],films:[],albums:[],shelvesByKind:{books:[],films:[],albums:[]}},shelfMode=true,page=null,dirty=false,query='',statusFilter='all',pendingSearch=null;
   const categoryUi=Object.fromEntries(KINDS.map(kind=>[kind,{page:null,query:'',statusFilter:'all',shelfMode:true}]));
   const bookSpreads=new Map();
+ // Retain actual DOM nodes and decoded image resources when changing categories.
+ const cachedViews=new Map(),warmedCovers=new Map();
+ let mountedKind=null,headerNode=null;
+ function warmArtwork(){
+  if(typeof Image==='undefined')return;
+  for(const kind of KINDS)for(const row of list(kind).slice(0,10)){
+   const src=[row.cover,...(Array.isArray(row.coverAlternates)?row.coverAlternates:[])]
+    .find(value=>typeof value==='string'&&/^(https:\/\/|data:image\/)/i.test(value));
+   if(!src||warmedCovers.has(src))continue;
+   const img=new Image();img.decoding='async';img.src=src;
+   if(typeof img.decode==='function')void img.decode().catch(()=>{});
+   warmedCovers.set(src,img);
+   if(warmedCovers.size>30)warmedCovers.delete(warmedCovers.keys().next().value);
+  }
+ }
  window.addEventListener('tracker-search-open',event=>{
   if(event.detail?.target==='games'&&['game','books','films','albums'].includes(event.detail.kind))
    pendingSearch={kind:event.detail.kind,id:event.detail.id};
@@ -31,7 +46,11 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
     ?[...new Set(val.shelvesByKind[kind].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,60)))]:[];
   return next;
  }
- async function refreshCollection(){const val=await store.getSetting(KEY);data=normalizeData(val);}
+ async function refreshCollection(){
+  const next=normalizeData(await store.getSetting(KEY));
+  if(JSON.stringify(next)===JSON.stringify(data))return false;
+  data=next;cachedViews.clear();warmArtwork();return true;
+ }
  const shelfNames=kind=>[...new Set([...data.shelvesByKind[kind],...list(kind).map(x=>x.shelf||'Collection')])];
  async function load(){await refreshCollection();await games.mount();render();}
  // Read and update the latest settings value INSIDE the store's serialized write.
@@ -43,6 +62,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    return draft;
   },{books:[],films:[],albums:[]});
   data=normalizeData(next);
+  cachedViews.clear();warmArtwork();
   return data;
  }
  const localPagesKey=id=>'media-inner-pages:v1:'+id;
@@ -87,7 +107,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    img.src=blob;
   });
  }
- function cover(row){
+ function cover(row,{eager=false}={}){
   const kind=active==='books'?(row.mediaType==='comic'?'comic':'books'):active==='films'?(row.mediaType==='series'?'series':'films'):'albums';
   const fallback=()=>h('span',{class:'game-placeholder media-cover-placeholder','aria-hidden':'true'},
    mediaIcon(kind,row.title),h('span',{class:'media-cover-caption'},row.title));
@@ -95,7 +115,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    .filter(url=>typeof url==='string'&&/^(https:\/\/|data:image\/)/i.test(url));
   if(!sources.length)return fallback();
   let index=0;
-  return h('img',{src:sources[0],alt:row.title,loading:'lazy',referrerpolicy:'no-referrer',
+  return h('img',{src:sources[0],alt:row.title,loading:eager?'eager':'lazy',decoding:eager?'sync':'async',referrerpolicy:'no-referrer',
    onerror:e=>{
     index++;
     if(index<sources.length)e.currentTarget.src=sources[index];
@@ -118,7 +138,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const casing=h('div',{class:`media-case media-case-${active} ${comic?'media-case-comic':''}`,
     style:`--media-art-accent:${mediaAccent(row.title)}`},
     book?h('span',{class:'media-book-spine','aria-hidden':'true'}):null,
-    media,h('div',{class:'media-case-front'},cover(row)));
+    media,h('div',{class:'media-case-front'},cover(row,{eager:true})));
   const replay=h('button',{class:'btn small media-replay',type:'button',onclick:()=>{
     const parts=casing.querySelectorAll('.media-case-front,.media-page-flip,.media-comic-panel,.media-vinyl-record,.media-case-disc');
     parts.forEach(node=>{node.style.animation='none';});
@@ -208,7 +228,12 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    previous.addEventListener('click',()=>{index=Math.max(0,index-2);draw();});
    next.addEventListener('click',()=>{index=Math.min(Math.max(0,pages.length-1),index+2);draw();});
    draw();
-   pagesFor(row.id).then(saved=>{if(!stage.isConnected||page?.entry?.id!==row.id)return;pages=saved;draw();})
+   pagesFor(row.id).then(saved=>{
+    const current=active==='books'&&page?.entry?.id===row.id&&stage.isConnected;
+    const preserved=cachedViews.get('books')?.contains(stage)&&categoryUi.books?.page?.entry?.id===row.id;
+    if(!current&&!preserved)return;
+    pages=saved;draw();
+   })
     .catch(error=>console.warn('Could not load private book images',error));
   }
   if(kind==='albums')info.append(albumSongPanel(row));
@@ -354,7 +379,12 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   }},L().save);
   return h('div',{},form,saveButton);
  }
- function render(){
+ function render({reuse=false}={}){
+   if(mountedKind!==null&&mountedKind!==active){
+    const fragment=document.createDocumentFragment();
+    for(const node of [...el.childNodes])if(node!==headerNode)fragment.append(node);
+    cachedViews.set(mountedKind,fragment);
+   }
    const tabs=h('div',{class:'hub-tabs media-category-tabs','aria-label':L().library},
     ['games',...KINDS].map(k=>h('button',{class:'btn small '+(active===k?'primary':''),type:'button',
      'aria-pressed':String(active===k),onclick:async()=>{
@@ -364,17 +394,26 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
        if(active!=='games')categoryUi[active]={page:dirty?null:page,query,statusFilter,shelfMode};
        dirty=false;active=k;
        const saved=categoryUi[k];page=saved?.page||null;query=saved?.query||'';statusFilter=saved?.statusFilter||'all';shelfMode=saved?.shelfMode??true;
-       render();
+       render({reuse:true});
        if(k!=='games'){
-        try {await refreshCollection();if(active===k){
+        try {const changed=await refreshCollection();if(active===k&&changed){
          if(page?.entry?.id){const latest=list(k).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
          render();
         }}catch(error){console.warn('Could not refresh media library',error);}
        }
      }},mediaIcon(k),h('span',{},L()[k]))));
    const top=h('div',{class:'panel-head media-library-header'},h('h2',{},L().library),tabs);
-   if(active==='games'){games.el.hidden=false;replace(el,top,games.el);return;}
-   games.el.hidden=true;
+   games.el.hidden=active!=='games';
+   if(reuse&&mountedKind===active&&headerNode?.parentNode===el){
+    headerNode.replaceWith(top);headerNode=top;return;
+   }
+   if(reuse&&cachedViews.has(active)){
+    const fragment=cachedViews.get(active);
+    cachedViews.delete(active);
+    replace(el,top,...[...fragment.childNodes]);headerNode=top;mountedKind=active;return;
+   }
+   headerNode=top;mountedKind=active;
+   if(active==='games'){replace(el,top,games.el);return;}
    if(page){replace(el,top,h('div',{class:'game-page-head'},h('button',{class:'btn small',onclick:back},L().cancel),h('h2',{},page.entry?.title||`${L().add} ${L()[active]}`)),h('div',{class:'game-page-body'},page.editing?renderEditor(page.entry):renderDetail(page.entry)));return;}
    const rows=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
    const shelves=[...new Set(rows.map(x=>x.shelf||'Collection'))];
@@ -420,7 +459,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    const filter=h('select',{'aria-label':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));
    updateResults();replace(el,top,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
- window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}if(active!=='games'&&!page&&!el.hidden)render();});
+ window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}cachedViews.clear();warmArtwork();if(active!=='games'&&!page&&!el.hidden)render();});
  return {el,mount:load,show:async()=>{
    if(pendingSearch&&dirty){pendingSearch=null;toast(language()==='es'?'Guarda o descarta el editor antes de abrir otro elemento.':'Save or discard your edits before opening another item.');return;}
    if(pendingSearch){
@@ -437,15 +476,16 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
      return;
     }
     const latest=await store.getSetting(KEY);
-    if(latest&&typeof latest==='object')
-     data=normalizeData(latest);
+    if(latest&&typeof latest==='object'){
+     data=normalizeData(latest);cachedViews.clear();warmArtwork();
+    }
     const row=data[kind]?.find(item=>item.id===id);
     if(row){active=kind;page={entry:row,editing:false};render();return;}
    }
    // Keep an in-progress editor mounted when returning from another route.
    if(dirty&&page?.editing)return;
-   await refreshCollection();
-   if(page?.entry?.id){const latest=list(active).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
-   render();
+   const changed=await refreshCollection();
+   if(changed&&page?.entry?.id){const latest=list(active).find(row=>row.id===page.entry.id);page=latest?{...page,entry:latest}:null;}
+   render({reuse:!changed});
   },hide:()=>{}};
 }
