@@ -54,7 +54,7 @@ test('pixel-stacked catalogue artwork is deterministic, safely generated and cat
  assert.equal(spindle[12].length,25);
  assert.equal(spindle[12][12],null,'Vinyl needs an open spindle');
  assert.equal(spindle[12][14],'#f0dfbe','Vinyl label should look like cream paper');
- assert.equal(spindle[12][15],'#a94f40','Vinyl label needs the warm red center ring');
+ assert.equal(spindle[12][16],'#a94f40','Vinyl label needs the warm red center ring');
  assert.ok(spindle.flat().includes('#eff2f3'),'Vinyl needs glossy silver reflection');
  assert.ok(spindle.flat().includes('#98a6b9'),'Vinyl needs shaded curved grooves');
  const controller=mediaPixelGrid('games');
