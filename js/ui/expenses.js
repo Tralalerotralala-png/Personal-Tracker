@@ -176,7 +176,7 @@ export async function saveImportedTransactionsBatch(store,entries) {
 
 export function createExpensesView({store}) {
   const el=h('section',{class:'view expense-view'});
-  let entries=[],budgets={},currency='MXN',month=stamp().slice(0,7),search='',typeFilter='all',panel='transactions',editing=null,ready=false,showOnlyMonth=true,pendingSearchId=null;
+  let entries=[],budgets={},currency='MXN',month=stamp().slice(0,7),search='',typeFilter='all',panel='transactions',editing=null,editorDirty=false,ready=false,showOnlyMonth=true,pendingSearchId=null;
   window.addEventListener('tracker-search-open',event=>{
     if(event.detail?.target==='expenses'&&event.detail.kind==='expense')pendingSearchId=event.detail.id;
   });
@@ -197,7 +197,7 @@ export function createExpensesView({store}) {
     const controls=h('div',{class:'expense-controls'},
       field(label('Month','Mes'),h('input',{type:'month',value:month,onchange:e=>{month=e.target.value||month;render();}})),
       field(label('Currency','Moneda'),currSelect(currency,async e=>{currency=e.target.value;await store.setSetting(KEY_PREFS,{currency});render();})),
-      btn(label('Add transaction','Agregar movimiento'),()=>{editing={};renderEditor();},'primary'));
+      btn(label('Add transaction','Agregar movimiento'),()=>{editing={};editorDirty=false;renderEditor();},'primary'));
     const tabs=h('div',{class:'hub-tabs expense-tabs'},...[
       ['transactions',label('Transactions','Movimientos')],['budgets',label('Budgets','Presupuestos')],['subscriptions',label('Subscriptions','Suscripciones')],['calculator',label('Bill calculator','Calculadora de cuentas')],['reports',label('Reports','Informes')]
     ].map(([key,title])=>btn(title,()=>changePanel(key),panel===key?'primary':'')));
@@ -212,7 +212,7 @@ export function createExpensesView({store}) {
     const count=h('span',{class:'hint'}),list=h('div',{class:'expense-list'});
     const updateRows=()=>{
       const rows=activeRows();count.textContent=`${rows.length} ${label('entries','registros')}`;
-      replace(list,...rows.map(row=>h('button',{class:'expense-row',type:'button',onclick:()=>{editing=row;renderEditor();}},
+      replace(list,...rows.map(row=>h('button',{class:'expense-row',type:'button',onclick:()=>{editing=row;editorDirty=false;renderEditor();}},
         h('span',{class:'expense-row-date'},dateString(row.due)),
         h('span',{class:'expense-row-title'},h('b',{},row.title),h('small',{},`${t(row.category)}${row.account?' · '+row.account:''}${row.repeat!=='none'?' · '+label('Recurring','Recurrente'):''}`)),
         h('strong',{class:row.type==='income'?'expense-positive':'expense-negative'},`${row.type==='income'?'+':'−'}${money(row.amount,row.currency)}`))),
@@ -234,6 +234,10 @@ export function createExpensesView({store}) {
       h('p',{class:'hint'},label('Recurring entries are marked for planning only; the app does not create or charge future payments automatically.','Los movimientos recurrentes son solo para organizar tus pagos; la app no crea ni cobra pagos futuros automáticamente.')),upload);
     updateRows();return container;
   }
+  async function closeEditor(){
+    if(editorDirty&&!await confirmDialog({title:label('Discard changes?','¿Descartar cambios?'),message:label('Unsaved transaction details will be lost.','Se perderán los datos no guardados.'),confirmLabel:label('Discard','Descartar'),danger:true}))return;
+    editorDirty=false;editing=null;render();
+  }
   function renderEditor(){
     const original=editing?.id?editing:null; const current=normalizeTransaction(editing||{});
     const title=input(current.title,{required:true,maxlength:200});
@@ -251,12 +255,14 @@ export function createExpensesView({store}) {
       const val=Number(amount.value);
       if(!title.value.trim()||amount.value.trim()===''||!Number.isFinite(val)||val<0||!/^\d{4}-\d{2}-\d{2}$/.test(date.value)){error.textContent=label('Enter a title, valid date and nonnegative amount.','Escribe un título, una fecha válida y un importe mayor o igual a cero.');return;}
       await store.setSetting(`hub_expense:${original?.id||uuid()}`,{...current,title:title.value.trim(),due:date.value,amount:val,type:type.value,currency:currencyPick.value,category:cat.value.trim()||'Other',account:account.value.trim(),repeat:repeat.value,body:notes.value.trim()});
-      editing=null;await load();toast(label('Saved','Guardado'));
+      editorDirty=false;editing=null;await load();toast(label('Saved','Guardado'));
     };
-    const remove=async()=>{if(!original||!await confirmDialog({title:label('Delete transaction?','¿Eliminar movimiento?'),message:label('This cannot be undone.','Esta acción no se puede deshacer.'),danger:true,confirmLabel:label('Delete','Eliminar')}))return;await store.remove('settings',`hub_expense:${original.id}`);editing=null;await load();};
-    replace(el,h('div',{class:'panel-head'},h('h2',{},original?label('Edit transaction','Editar movimiento'):label('New transaction','Nuevo movimiento')),btn(label('Back','Volver'),()=>{editing=null;render();})),
+    const remove=async()=>{if(!original||!await confirmDialog({title:label('Delete transaction?','¿Eliminar movimiento?'),message:label('This cannot be undone.','Esta acción no se puede deshacer.'),danger:true,confirmLabel:label('Delete','Eliminar')}))return;await store.remove('settings',`hub_expense:${original.id}`);editorDirty=false;editing=null;await load();};
+    replace(el,h('div',{class:'panel-head'},h('h2',{},original?label('Edit transaction','Editar movimiento'):label('New transaction','Nuevo movimiento')),btn(label('Back','Volver'),closeEditor)),
       h('div',{class:'expense-editor'},h('div',{class:'expense-form-grid'},field(label('Description','Descripción'),title),field(label('Date','Fecha'),date),field(label('Amount','Importe'),amount),field(label('Type','Tipo'),type),field(label('Currency','Moneda'),currencyPick),field(label('Category','Categoría'),cat),categories,field(label('Payment method / account','Método de pago / cuenta'),account),field(label('Repeat (planning only)','Repetición (solo planificación)'),repeat)),field(label('Notes','Notas'),notes),error,
-        h('div',{class:'expense-actions'},original?btn(label('Delete','Eliminar'),remove,'danger'):null,btn(label('Cancel','Cancelar'),()=>{editing=null;render();}),btn(label('Save transaction','Guardar movimiento'),()=>save().catch(e=>{error.textContent=e.message;}),'primary'))));
+        h('div',{class:'expense-actions'},original?btn(label('Delete','Eliminar'),remove,'danger'):null,btn(label('Cancel','Cancelar'),closeEditor),btn(label('Save transaction','Guardar movimiento'),()=>save().catch(e=>{error.textContent=e.message;}),'primary'))));
+    el.querySelector('.expense-editor')?.addEventListener('input',()=>{editorDirty=true;});
+    el.querySelector('.expense-editor')?.addEventListener('change',()=>{editorDirty=true;});
     title.focus();
   }
   function renderBudgets(){
@@ -285,7 +291,7 @@ export function createExpensesView({store}) {
       sectionHeading(label('Upcoming subscriptions and bills','Próximas suscripciones y pagos de servicios')),
       h('p',{class:'hint'},label('Only entries marked recurring are shown. Due dates are estimates; this app never charges or creates future transactions automatically.','Solo aparecen movimientos marcados como recurrentes. Las fechas son estimaciones; esta aplicación nunca cobra ni crea movimientos futuros automáticamente.')),
       h('div',{class:'expense-summary'},makeStat(label('Recurring items','Movimientos recurrentes'),recurring.length),makeStat(label('Estimated monthly cost','Costo mensual estimado'),money(monthly,currency))),
-      recurring.length?h('div',{class:'expense-list'},recurring.map(x=>h('button',{class:'expense-row',type:'button',onclick:()=>{editing=x;renderEditor();}},
+      recurring.length?h('div',{class:'expense-list'},recurring.map(x=>h('button',{class:'expense-row',type:'button',onclick:()=>{editing=x;editorDirty=false;renderEditor();}},
         h('span',{class:'expense-row-date'},dateString(x.nextDate)),
         h('span',{class:'expense-row-title'},h('b',{},x.title),h('small',{},`${t(x.category)} · ${label('Repeats','Frecuencia')}: ${t(x.repeat)}`)),
         h('strong',{},money(x.amount,currency))))):h('p',{class:'hint'},label('No recurring expenses in this currency. Edit a transaction to mark it as weekly, monthly or yearly.','No hay gastos recurrentes en esta moneda. Edita un movimiento para marcarlo como semanal, mensual o anual.')));
@@ -316,6 +322,7 @@ export function createExpensesView({store}) {
   return {el,async mount(){if(!ready)await load();},async show(){
     if(ready&&editing===null)await load();
     if(pendingSearchId){
+      if(editorDirty){pendingSearchId=null;toast(label('Save or discard your transaction edits first.','Guarda o descarta los cambios del movimiento primero.'));return;}
       const id=pendingSearchId;pendingSearchId=null;
       const match=entries.find(row=>row.id===id);
       if(match){
