@@ -10,7 +10,7 @@ Offline-first, single-owner web dashboard built with vanilla JavaScript, CSS, an
 - **Weather & Calendar Clock:** Unified color-coded 24-hour weather clock linking hourly sky/rain, UV index, ground mud modeling, 7-day forecasts, and Calendar events across full views and widgets.
 - **Offline & Desktop:** Installable PWA with local storage; optional read-only Wallpaper Engine bundle.
 
-See [DESIGN.md](DESIGN.md) for the visual system, 24-hour weather clock grammar, and architecture specification.
+See [setup and design guide](SETUP.md#8-design-and-architecture) for the visual system, 24-hour weather clock grammar, and architecture specification.
 
 ## Quick Start
 
