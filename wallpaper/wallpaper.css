@@ -1,0 +1,34 @@
+/* Wallpaper-only styling. The shared look (colours, widgets) comes from app.css. */
+
+html {
+  /* Everything is sized in rem, so text scales with the screen height:
+     about 20 px on 1080p, 27 px on 1440p, 40 px on 4K. The "Text size" setting multiplies it. */
+  font-size: calc(var(--wp-scale, 1) * 1.85vh);
+  height: 100%;
+  overflow: hidden;
+  cursor: none;
+}
+body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg); user-select: none; }
+
+/* The fixed 16:9 grid of 12 x 8 cells from the layout editor, stretched to whatever screen this is. */
+#wallpaper { position: fixed; inset: 0; padding: var(--wp-margin, 2vmin); }
+.wp-grid {
+  display: grid; width: 100%; height: 100%; gap: 1.1vmin;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+}
+.wp-grid .widget { border-width: .15rem; }
+.wp-grid .widget-head { border-bottom-width: .15rem; padding: .2rem .6rem; }
+.wp-grid .widget-body { padding: .45rem .6rem; }
+
+.wp-message { height: 100%; display: grid; place-content: center; text-align: center; gap: .8rem; max-width: 36rem; margin: 0 auto; padding: 2rem; }
+.wp-message h1 { font-size: 1.8rem; }
+.wp-message p { color: var(--ink-dim); line-height: 1.5; }
+
+/* A small, unobtrusive note in the corner when something needs attention. */
+.wp-status {
+  position: fixed; right: .8rem; bottom: .6rem; z-index: 10; max-width: 34rem; padding: .15rem .6rem;
+  font-size: .75rem; background: rgba(10, 7, 4, .8); border: 2px solid var(--edge); color: var(--ink-dim);
+}
+.wp-status.warn { color: var(--warn); border-color: var(--warn); }
+.wp-status.bad { color: var(--danger); border-color: var(--danger); }

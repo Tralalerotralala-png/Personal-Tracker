@@ -1,0 +1,312 @@
+name: Verify Personal Tracker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check public tree for credential and personal metadata leaks
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import struct
+          import subprocess
+          import sys
+
+          tracked = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          secrets = re.compile(r"\bsb_(?:publishable|secret)_[A-Za-z0-9_-]{25,}|\b[a-z0-9]{20}\.supabase\.co\b|\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|\bsk-(?:proj-)?[A-Za-z0-9_-]{25,}|\bgh[pousr]_[A-Za-z0-9]{30,}")
+          local_paths = re.compile(r"/Users/[A-Za-z0-9_.-]+/|[A-Za-z]:\\Users\\[^\\\s]+\\|/home/(?!runner/)[A-Za-z0-9_.-]+/")
+          email = re.compile(r"[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}")
+          examples = {"example.com", "example.org", "example.net", "example.test"}
+          public_parser_handles = {"gargron@mastodon.social", "name@mastodon.social"}
+          errors = set()
+          for name in filter(None, tracked):
+              p = Path(name)
+              if p.suffix.lower() == ".png":
+                  data = p.read_bytes()
+                  offset = 8
+                  if data[:8] != b"\x89PNG\r\n\x1a\n":
+                      errors.add((name, "invalid PNG"))
+                      continue
+                  while offset + 12 <= len(data):
+                      size, kind = struct.unpack(">I4s", data[offset:offset+8])
+                      if kind in {b"tEXt", b"zTXt", b"iTXt", b"eXIf"}:
+                          errors.add((name, "PNG text or EXIF metadata"))
+                      offset += size + 12
+                  if offset != len(data):
+                      errors.add((name, "invalid or trailing PNG data"))
+                  continue
+              try:
+                  content = p.read_text(encoding="utf-8-sig")
+              except UnicodeDecodeError:
+                  continue
+              if secrets.search(content):
+                  errors.add((name, "credential-shaped literal"))
+              if local_paths.search(content):
+                  errors.add((name, "machine-specific home path"))
+              for address in email.findall(content):
+                  host = address.rsplit("@", 1)[1].lower()
+                  if host not in examples and not host.endswith((".example", ".test", ".invalid", ".localhost")) and address.lower() not in public_parser_handles:
+                      errors.add((name, "non-example email or handle"))
+          for path, reason in sorted(errors):
+              print(f"{path}: {reason}", file=sys.stderr)
+          if errors:
+              sys.exit(1)
+          print("Public-tree privacy checks passed.")
+          PY
+      - name: Check JavaScript syntax
+        run: |
+          find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check sw.js
+      - name: Run automated tests
+        run: node --test
+      - name: Verify Wallpaper Engine build
+        run: |
+          node scripts/build-wallpaper.mjs
+          git diff --exit-code wallpaper/
+
+  browser-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser testing tools
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+      - name: Run mobile and desktop browser smoke test
+        run: |
+          python -m http.server 8099 --bind 127.0.0.1 >/tmp/tracker-http.log 2>&1 &
+          python tests/ui-regression.py
+      - name: Benchmark dashboard and check responsive overflow
+        run: |
+          python tests/browser-benchmark.py --root . --output "$RUNNER_TEMP/tracker-benchmark.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tracker-browser-benchmark
+          path: ${{ runner.temp }}/tracker-benchmark.json
+          if-no-files-found: warn
+
+  database-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: tracker_test
+          POSTGRES_USER: tracker_test
+          POSTGRES_PASSWORD: test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracker_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGPASSWORD: test_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PostgreSQL test client
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Test owner-only RLS and privileged wallpaper RPC in disposable Postgres
+        run: |
+          set -euo pipefail
+          awk '/-- BEGIN_OWNER_HARDENING/,/-- END_OWNER_HARDENING/' supabase/schema.sql > /tmp/owner-hardening.sql
+          for sql in \
+            tests/sql/owner-guard-fixture.sql \
+            /tmp/owner-hardening.sql \
+            /tmp/owner-hardening.sql \
+            tests/sql/owner-guard-assertions.sql; do
+            psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test -f "$sql"
+          done
+
+      - name: Verify signed HTTP requests with disposable PostgREST API
+        run: |
+          set -euo pipefail
+          docker run --rm -d --network host --name tracker-api-test \
+            -e 'PGRST_DB_URI=postgres://tracker_test:test_only@127.0.0.1:5432/tracker_test' \
+            -e 'PGRST_DB_SCHEMAS=public' \
+            -e 'PGRST_DB_ANON_ROLE=anon' \
+            -e 'PGRST_JWT_SECRET=tracker_http_only_test_secret_2026_at_least_32_chars' \
+            -e 'PGRST_SERVER_PORT=3099' \
+            postgrest/postgrest:v14.17
+          trap 'docker logs tracker-api-test || true; docker rm -f tracker-api-test || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3099/ >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3099/ >/dev/null
+          node tests/wallpaper-api-http.mjs
+
+  # Unlike the synthetic JWT fixture above, this job obtains real login
+  # sessions from a disposable Supabase Auth/GoTrue container. It does not
+  # connect to the production project or create real user accounts.
+  auth-issuer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: tracker_test
+          POSTGRES_USER: tracker_test
+          POSTGRES_PASSWORD: test_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracker_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGPASSWORD: test_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PostgreSQL test client
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Initialize isolated owner authorization fixture
+        run: |
+          set -euo pipefail
+          awk '/-- BEGIN_OWNER_HARDENING/,/-- END_OWNER_HARDENING/' supabase/schema.sql > /tmp/owner-hardening.sql
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -f tests/sql/owner-guard-fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -f /tmp/owner-hardening.sql
+      - name: Start disposable SMTP inbox and email-OTP template
+        run: |
+          set -euo pipefail
+          docker run --rm -d --network host --name tracker-mailpit-test axllent/mailpit:v1.34.0
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory tests/fixtures >/tmp/tracker-otp-template.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8025/api/v1/messages >/dev/null 2>&1 && \
+               curl -fsS http://127.0.0.1:8765/gotrue-otp.html >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8025/api/v1/messages >/dev/null
+          curl -fsS http://127.0.0.1:8765/gotrue-otp.html >/dev/null
+      - name: Migrate and launch disposable Supabase Auth issuer
+        run: |
+          set -euo pipefail
+          # Supabase Auth migrations grant table access to the standard
+          # postgres role; the minimal CI postgres service has another owner.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -c 'CREATE ROLE postgres NOLOGIN'
+          # Auth v2.176 migrations assume the factor_type enum is in auth
+          # even on plain upstream PostgreSQL. The standard Supabase image
+          # bootstraps it, whereas this stripped-down disposable fixture does not.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test <<'SQL'
+          DO $enum$ BEGIN
+            CREATE TYPE auth.factor_type AS ENUM ('totp','webauthn');
+          EXCEPTION WHEN duplicate_object THEN NULL;
+          END $enum$;
+          -- The historical MFA migration defines three enum types inside one
+          -- exception handler. Since factor_type already exists, it skips the
+          -- other two unless this isolated fixture bootstraps them as well.
+          DO $status_enum$ BEGIN
+            CREATE TYPE auth.factor_status AS ENUM ('unverified','verified');
+          EXCEPTION WHEN duplicate_object THEN NULL;
+          END $status_enum$;
+          DO $aal_enum$ BEGIN
+            CREATE TYPE auth.aal_level AS ENUM ('aal1','aal2','aal3');
+          EXCEPTION WHEN duplicate_object THEN NULL;
+          END $aal_enum$;
+          -- GoTrue's historical 20221208 migration contains the expression
+          -- "id = user_id::text", where this old fixture has uuid identities.
+          -- Add a disposable compatibility operator for migration only.
+          CREATE FUNCTION auth.tracker_ci_uuid_eq_text(a uuid,b text)
+          RETURNS boolean LANGUAGE sql IMMUTABLE STRICT SET search_path='' AS $op$
+            SELECT a::text=b;
+          $op$;
+          CREATE OPERATOR auth.= (
+            LEFTARG=uuid,RIGHTARG=text,
+            PROCEDURE=auth.tracker_ci_uuid_eq_text
+          );
+          SQL
+          # The historical migration's compatibility operator must be in
+          # the migration session's search path, not only in the auth schema.
+          # Set it on this disposable role before running the migrator.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -c 'ALTER ROLE tracker_test SET search_path TO auth, public'
+          docker run --rm --network host --env-file tests/fixtures/gotrue-ci.env \
+            supabase/auth:v2.176.0 gotrue migrate
+          # This compatibility operator is only needed by an old one-off
+          # migration. Drop it so it cannot alter runtime comparison rules.
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test \
+            -c 'DROP OPERATOR auth.=(uuid,text); DROP FUNCTION auth.tracker_ci_uuid_eq_text(uuid,text)'
+          docker run -d --network host --name tracker-gotrue-test \
+            --env-file tests/fixtures/gotrue-ci.env supabase/auth:v2.176.0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:9999/health >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          if ! curl -fsS http://127.0.0.1:9999/health >/dev/null; then
+            docker logs tracker-gotrue-test --tail 100 || true
+            exit 1
+          fi
+      - name: Authorize only the synthetic GoTrue owner account
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U tracker_test -d tracker_test <<'SQL'
+          CREATE OR REPLACE FUNCTION public.tracker_account_allowed() RETURNS boolean
+          LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+           SELECT EXISTS(SELECT 1 FROM auth.users
+             WHERE id=auth.uid() AND email='owner@tracker.example');
+          $$;
+          SQL
+      - name: Verify Auth-issued sessions against PostgREST owner RLS
+        run: |
+          set -euo pipefail
+          docker run --rm -d --network host --name tracker-auth-api-test \
+            -e 'PGRST_DB_URI=postgres://tracker_test:test_only@127.0.0.1:5432/tracker_test' \
+            -e 'PGRST_DB_SCHEMAS=public' \
+            -e 'PGRST_DB_ANON_ROLE=anon' \
+            -e 'PGRST_JWT_SECRET=tracker_http_only_test_secret_2026_at_least_32_chars' \
+            -e 'PGRST_SERVER_PORT=3099' postgrest/postgrest:v14.17
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3099/ >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3099/ >/dev/null
+          node tests/gotrue-auth-http.mjs
+      - name: Verify app-style email OTP login with Auth-issued JWTs
+        run: node tests/gotrue-email-otp-http.mjs
+      - name: Clean up disposable Auth and API containers
+        if: always()
+        run: |
+          docker logs tracker-gotrue-test --tail 40 || true
+          docker logs tracker-mailpit-test --tail 40 || true
+          docker logs tracker-auth-api-test --tail 40 || true
+          docker rm -f tracker-gotrue-test tracker-auth-api-test tracker-mailpit-test || true

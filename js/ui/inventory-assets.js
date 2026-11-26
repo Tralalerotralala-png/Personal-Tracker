@@ -1,0 +1,105 @@
+import { stackSprite } from './pixel-icon.js';
+import { renderLayeredSprite } from './sprite-stack.js';
+// Hand-authored, pixel-aligned inventory sprites. Each recipe is a distinct object;
+// a shared shaded palette and one-pixel outline match the pharmacy item artwork.
+const PALETTE = {d:'#342419',a:'#756c64',s:'#a8a6a0',i:'#f8e8c9',h:'#dfba86',w:'#93613a',o:'#c77b38',y:'#e6b84d',r:'#b45449',g:'#498d70',l:'#90bd83',b:'#496e9e',c:'#91bdd3',p:'#a483b4'};
+const GROUPS = [["tools","Tools","Herramientas",[["hammer","Hammer","Martillo","4 2 9 4 s;7 5 3 9 w;8 5 1 8 h;4 2 8 1 i;11 3 2 2 a"],["screwdriver","Screwdriver","Destornillador","7 1 2 7 s;7 1 1 5 i;5 7 6 6 r;6 8 2 4 o;6 13 4 1 d"],["wrench","Wrench","Llave ajustable","3 2 3 5 s;8 2 3 5 s;4 5 6 3 s;6 7 3 7 s;6 8 1 5 i;3 2 2 1 i"],["pliers","Pliers","Pinzas","4 1 3 5 s;9 1 3 5 s;6 5 4 3 s;4 8 3 6 r;9 8 3 6 r;5 9 1 4 o;10 9 1 4 o"],["saw","Hand saw","Serrucho","2 3 10 6 s;3 3 8 1 i;3 9 1 1 s;5 9 1 1 s;7 9 1 1 s;9 9 1 1 s;11 5 3 7 w;12 6 1 4 d"],["drill","Power drill","Taladro","2 3 9 5 y;3 4 5 2 g;11 4 3 2 s;7 8 3 4 y;5 12 6 2 d;8 9 1 2 h"],["tape-measure","Tape measure","Flexómetro","3 4 8 8 y;4 5 3 1 i;9 5 2 6 o;5 7 3 3 d;10 9 4 2 h;11 10 1 1 d;13 10 1 1 d"],["level","Spirit level","Nivel de burbuja","1 6 14 4 y;2 7 12 2 o;6 6 4 4 g;7 7 2 2 i;8 7 1 2 d"],["utility-knife","Utility knife","Navaja multiusos","2 3 4 3 s;4 5 3 3 s;5 7 7 5 r;7 8 4 2 o;9 11 4 2 d;3 3 2 1 i"],["socket-set","Socket set","Juego de dados","2 5 12 8 r;3 6 10 6 d;4 7 2 4 s;7 7 2 4 s;10 7 2 4 s;5 3 6 2 s"],["paintbrush","Paintbrush","Brocha","3 2 10 5 h;4 3 1 3 w;7 3 1 3 w;10 3 1 3 w;3 7 10 2 s;6 9 4 5 w;7 10 1 3 h"],["clamp","Clamp","Prensa","3 2 9 2 r;3 4 2 8 r;3 12 9 2 r;9 5 2 7 s;7 5 6 1 s;10 8 3 1 i"],["hex-key","Hex key","Llave Allen","4 2 3 10 s;4 11 8 3 s;4 3 1 8 i;5 11 6 1 i"],["multitool","Multitool","Multiusos","5 5 6 9 r;6 6 4 7 w;5 1 2 5 s;8 2 2 3 s;11 6 2 4 s;7 11 2 2 s"],["toolbox","Toolbox","Caja de herramientas","5 2 6 2 s;2 4 12 9 r;3 5 10 3 o;3 9 10 3 w;2 8 12 1 d;7 7 2 3 y"],["file","Metal file","Lima","6 1 4 8 s;6 2 1 6 i;8 3 1 1 d;8 5 1 1 d;8 7 1 1 d;5 9 6 5 w;6 10 2 3 h"]]],["electronics","Electronics","Electrónica",[["phone","Smartphone","Teléfono celular","4 1 8 14 d;5 2 6 11 b;5 2 6 2 c;6 5 2 2 i;9 8 1 3 p;7 13 2 1 s"],["laptop","Laptop","Computadora portátil","3 2 10 8 d;4 3 8 6 b;4 3 8 1 c;2 10 12 3 s;3 10 10 1 i;6 12 4 1 a"],["tablet-device","Tablet device","Tablet","2 2 12 12 d;3 3 10 10 b;3 3 10 2 c;4 7 3 3 p;10 10 2 2 g"],["monitor","Monitor","Monitor","1 2 14 9 d;2 3 12 7 b;2 3 12 1 c;7 11 2 2 s;4 13 8 1 s"],["keyboard","Keyboard","Teclado","1 5 14 7 s;2 6 12 5 d;3 7 2 1 i;6 7 2 1 i;9 7 2 1 i;12 7 1 1 i;3 9 2 1 i;6 9 5 1 i;12 9 1 1 i"],["mouse","Mouse","Mouse","5 2 6 12 s;4 4 8 8 s;5 4 6 3 i;7 3 2 4 d;5 10 6 2 a"],["headphones","Headphones","Audífonos","4 2 8 2 d;2 4 2 7 d;12 4 2 7 d;3 7 3 6 b;10 7 3 6 b;4 8 1 4 c;11 8 1 4 c"],["earbuds","Earbuds","Audífonos inalámbricos","3 3 4 5 i;3 4 2 2 s;5 6 2 7 i;9 3 4 5 i;11 4 2 2 s;9 6 2 7 i"],["usb","USB drive","Memoria USB","5 2 6 5 s;6 3 1 2 d;9 3 1 2 d;4 7 8 6 b;5 8 6 1 c;7 10 2 2 i"],["power-bank","Power bank","Batería portátil","3 2 10 12 d;4 3 8 10 b;4 3 2 10 c;6 4 1 1 g;8 4 1 1 g;10 4 1 1 g;6 11 4 1 s"],["battery","Battery","Pila","6 1 4 2 s;4 3 8 11 y;5 4 6 4 o;5 8 6 5 d;5 4 1 9 i;7 5 2 1 i"],["camera","Camera","Cámara","3 3 4 2 s;2 5 12 8 d;3 6 10 6 s;6 6 5 5 b;7 7 3 3 c;8 8 1 1 i;11 6 2 1 h"],["controller","Game controller","Control de videojuegos","4 4 8 2 s;2 6 12 6 s;2 11 3 2 a;11 11 3 2 a;4 7 1 4 d;3 8 3 2 d;10 7 1 1 r;12 8 1 1 y;9 9 1 1 g;11 10 1 1 b"],["charger","Charger","Cargador","5 5 7 9 i;6 2 1 3 s;10 2 1 3 s;6 10 5 2 a;7 10 3 1 d"],["router","Router","Router","2 7 12 5 d;3 8 10 3 s;4 2 1 5 d;11 2 1 5 d;4 9 1 1 g;6 9 1 1 g;8 9 1 1 y"],["cable","Cable","Cable","2 4 4 2 s;6 3 6 1 d;11 4 2 7 d;5 11 7 2 d;3 8 2 4 d;4 7 4 2 s"]]],["outdoor","Outdoor & Garden","Exterior y jardín",[["shovel","Shovel","Pala","6 1 4 2 w;7 3 2 6 w;5 9 6 4 s;6 13 4 1 s;6 10 1 3 i"],["rake","Rake","Rastrillo","7 1 2 10 w;2 10 12 2 s;2 12 1 2 s;5 12 1 2 s;8 12 1 2 s;11 12 1 2 s;13 12 1 2 s"],["watering-can","Watering can","Regadera","4 5 8 8 g;5 6 5 2 l;11 3 3 2 g;13 5 1 5 g;2 7 3 2 g;1 5 2 3 g;5 12 6 1 a"],["plant-pot","Plant pot","Maceta","3 8 10 2 w;4 10 8 4 o;5 11 2 3 h;7 3 2 5 g;3 3 4 3 l;9 1 4 4 g;9 2 2 1 l"],["seeds","Seed packet","Semillas","3 2 10 12 h;4 3 8 3 g;4 11 8 2 w;7 6 2 5 g;5 7 3 2 l;9 6 2 2 l"],["gloves-garden","Garden gloves","Guantes de jardín","3 3 2 6 y;5 2 2 6 y;7 3 2 6 y;9 5 2 5 y;2 7 2 4 y;3 9 8 4 o;4 13 6 1 g;4 9 3 2 h"],["flashlight","Flashlight","Lámpara de mano","5 2 6 4 s;4 2 8 2 i;6 6 4 8 g;7 7 2 2 y;6 12 4 2 a"],["tent","Tent","Casa de campaña","7 2 2 2 w;5 4 6 2 g;4 6 8 2 g;3 8 10 2 g;2 10 12 3 g;7 7 2 6 d;6 11 4 2 d;4 9 1 3 l"],["lantern","Lantern","Lámpara de campamento","5 1 6 2 s;6 3 4 2 d;3 5 10 7 y;4 6 8 5 h;7 7 2 4 o;3 12 10 2 s;3 5 1 7 a;12 5 1 7 a"],["compass","Compass","Brújula","5 3 6 1 s;3 4 10 8 s;5 12 6 1 s;4 5 8 6 i;7 6 2 4 r;6 9 2 2 b;7 8 2 1 d;7 1 2 2 s"],["binoculars","Binoculars","Binoculares","3 3 4 5 g;9 3 4 5 g;6 6 4 3 d;2 8 5 5 d;9 8 5 5 d;3 9 3 3 b;10 9 3 3 b;3 9 1 1 c;10 9 1 1 c"],["pruners","Pruning shears","Tijeras de podar","3 2 3 5 s;9 2 3 4 s;5 5 5 3 s;7 7 2 2 y;3 9 3 5 g;10 9 3 5 g;4 10 1 3 l"],["hose","Garden hose","Manguera","4 3 8 2 g;2 5 3 6 g;11 5 3 6 g;4 11 8 2 g;5 6 6 1 l;5 7 2 3 g;7 9 6 2 g;12 11 2 3 y"],["water-bottle","Water bottle","Botella de agua","6 1 4 3 s;4 4 8 10 b;5 5 2 8 c;4 9 8 2 i;6 9 4 2 g"],["camp-stove","Camp stove","Estufa de campamento","4 5 8 3 s;2 8 12 5 g;3 9 10 3 d;6 10 4 2 r;6 2 4 2 o;7 1 2 2 y"],["trowel","Trowel","Pala de jardín","6 1 4 5 w;7 6 2 2 s;4 8 8 3 s;5 11 6 2 s;6 13 4 1 s;5 9 2 3 i"]]],["clothing","Clothing & Gear","Ropa y equipo",[["tshirt","T-shirt","Playera","5 3 6 2 b;2 4 12 4 b;4 7 8 7 b;5 4 6 1 c;7 3 2 2 d;5 9 2 3 c"],["jacket","Jacket","Chamarra","4 3 8 2 g;2 5 12 5 g;4 9 8 5 g;7 4 2 10 d;8 5 1 8 y;5 10 2 2 l;10 10 2 2 l"],["pants","Pants","Pantalón","4 2 8 5 b;4 7 3 7 b;9 7 3 7 b;5 3 6 1 s;5 5 1 6 c;10 8 1 5 a"],["shorts","Shorts","Shorts","3 3 10 5 g;3 8 4 4 g;9 8 4 4 g;4 4 8 1 h;7 5 2 2 d"],["boot","Boot","Bota","4 2 6 9 w;4 7 9 6 w;3 12 11 2 d;5 3 4 2 h;5 6 4 1 h;10 10 2 1 h"],["sneaker","Sneaker","Tenis","3 5 4 6 b;6 8 7 4 b;2 11 12 2 i;4 6 2 3 c;7 9 3 1 i;10 10 2 1 c"],["hat","Cap","Gorra","4 3 8 2 r;3 5 10 5 r;2 10 12 2 r;4 5 2 4 o;8 4 1 5 d;12 10 2 1 o"],["scarf","Scarf","Bufanda","3 3 10 4 r;3 7 4 5 r;4 12 1 2 r;6 12 1 2 r;5 4 6 1 o;4 8 2 1 h"],["backpack","Backpack","Mochila","5 1 6 2 w;3 3 10 11 g;4 4 8 2 l;5 8 6 5 w;6 9 4 2 h;3 7 1 5 a;12 7 1 5 a"],["belt","Belt","Cinturón","2 6 12 5 w;3 7 10 3 h;9 5 5 7 y;10 6 3 5 d;11 8 2 1 y;4 8 1 1 d;6 8 1 1 d"],["watch","Watch","Reloj","6 1 4 4 w;6 11 4 4 w;4 5 8 6 s;5 6 6 4 i;7 6 1 3 d;7 8 3 1 d"],["sunglasses","Sunglasses","Lentes de sol","1 5 14 2 d;2 7 5 4 d;9 7 5 4 d;3 7 3 3 b;10 7 3 3 b;3 7 2 1 c;10 7 2 1 c;7 7 2 1 s"],["socks","Socks","Calcetines","3 2 4 8 i;2 9 5 4 i;3 2 4 2 r;2 11 3 2 r;9 2 4 8 h;8 9 5 4 h;9 2 4 2 b;8 11 3 2 b"],["dress","Dress","Vestido","5 2 2 4 p;9 2 2 4 p;5 5 6 3 p;4 8 8 2 p;3 10 10 4 p;5 9 2 4 h;5 7 6 1 y"],["wallet","Wallet","Cartera","2 4 12 9 w;3 5 10 7 h;3 6 9 2 w;8 8 6 3 w;11 9 1 1 y"],["umbrella","Umbrella","Paraguas","7 2 2 1 s;4 3 8 2 b;2 5 12 4 b;3 6 3 2 c;7 9 2 4 s;8 13 3 1 s;10 12 1 1 s"]]],["household","Household","Hogar",[["mug","Mug","Taza","3 4 8 9 h;10 5 4 6 h;11 6 2 3 d;4 5 6 2 i;4 8 2 4 i;4 12 6 1 w"],["plate","Plate","Plato","4 4 8 1 h;2 5 12 6 h;4 11 8 1 h;4 6 8 4 i;5 7 6 2 s;6 7 4 2 i"],["pan","Frying pan","Sartén","2 4 9 8 d;3 5 7 6 s;4 6 5 4 a;10 8 5 2 w;3 5 5 1 i"],["pot","Cooking pot","Olla","5 2 6 2 d;3 4 10 2 s;2 6 12 2 w;4 6 8 7 s;5 7 2 5 i;10 7 2 5 a"],["kettle","Kettle","Tetera","6 2 4 2 d;4 4 8 9 s;2 5 3 3 s;11 3 3 2 d;13 5 1 5 d;5 5 2 7 i;4 12 8 1 a"],["cutlery","Cutlery","Cubiertos","3 2 1 4 s;5 2 1 4 s;3 6 3 2 s;4 8 1 6 s;10 2 3 6 s;10 8 1 6 s;11 3 1 3 i"],["broom","Broom","Escoba","7 1 2 8 w;5 9 6 2 r;3 11 10 3 h;4 12 1 2 w;7 12 1 2 w;10 12 1 2 w"],["cleaner","Cleaner spray","Limpiador en aerosol","5 2 7 2 s;6 4 3 3 s;4 7 8 7 b;5 8 2 5 c;6 10 5 3 i;7 10 3 1 g"],["soap","Soap","Jabón","3 5 10 7 p;4 6 8 5 h;5 7 6 2 i;5 11 7 1 p"],["tissue-box","Tissue box","Caja de pañuelos","2 7 12 6 b;3 8 10 4 c;5 6 6 2 d;6 2 4 5 i;9 4 2 3 h;4 10 4 1 i"],["lightbulb","Light bulb","Foco","5 2 6 1 y;3 3 10 6 y;5 9 6 2 y;6 11 4 3 s;4 4 3 3 i;7 8 2 3 h"],["candle","Candle","Vela","7 1 2 3 y;7 3 2 2 o;4 5 8 9 h;5 6 2 7 i;9 8 2 6 w"],["clock","Wall clock","Reloj de pared","5 2 6 1 w;3 3 10 10 w;5 13 6 1 w;4 4 8 8 i;7 5 1 4 d;7 8 4 1 d;4 8 1 1 y"],["chair","Chair","Silla","4 2 8 6 w;5 3 6 4 h;3 8 10 3 w;4 11 2 3 w;10 11 2 3 w;4 8 8 1 h"],["pillow","Pillow","Almohada","3 4 10 1 h;2 5 12 7 h;3 12 10 1 h;3 5 10 5 i;4 6 2 3 h;10 10 3 1 s"],["storage-box","Storage box","Caja","2 4 12 3 w;3 7 10 7 w;3 5 10 1 h;4 8 8 5 o;6 9 4 2 h;7 9 2 1 d"]]],["keepsakes","Keepsakes","Recuerdos",[["photo-frame","Photo frame","Marco de foto","2 2 12 12 w;3 3 10 10 h;4 4 8 8 b;5 5 2 2 y;4 10 8 2 g;7 8 3 3 l"],["ring","Ring","Anillo","6 2 4 3 c;5 4 6 2 b;4 6 8 7 y;5 7 6 5 d;6 8 4 3 .;4 7 1 4 h;10 10 1 2 o"],["necklace","Necklace","Collar","3 2 2 5 y;11 2 2 5 y;4 7 2 2 y;10 7 2 2 y;6 9 4 2 y;6 11 4 3 r;7 11 2 2 o"],["medal","Medal","Medalla","4 1 3 6 b;9 1 3 6 r;6 5 4 3 p;4 8 8 5 y;6 13 4 1 o;6 9 4 3 h;7 10 2 1 y"],["trophy","Trophy","Trofeo","4 2 8 7 y;2 3 2 5 y;12 3 2 5 y;5 3 2 4 h;7 9 2 3 y;4 12 8 2 w;5 12 6 1 h"],["letter","Letter","Carta","2 4 12 9 h;3 5 10 7 i;3 5 2 2 w;5 7 2 2 w;7 9 2 2 r;9 7 2 2 w;11 5 2 2 w"],["postcard","Postcard","Tarjeta postal","2 3 12 10 h;3 4 10 8 i;4 5 5 6 b;4 9 5 2 g;5 6 2 2 y;10 5 2 2 r;10 9 2 1 w"],["journal","Journal","Diario","3 2 10 12 w;4 3 8 10 r;4 3 2 10 o;7 5 4 4 h;8 6 2 2 y;9 12 2 2 y"],["book","Book","Libro","2 3 6 10 b;8 3 6 10 b;3 4 4 8 i;9 4 4 8 i;4 6 2 1 s;10 6 2 1 s;4 8 2 1 s;10 8 2 1 s;7 3 2 10 w"],["key","Keepsake key","Llave de recuerdo","3 2 6 6 y;5 4 2 2 d;7 7 2 7 y;9 10 3 2 y;9 13 2 1 y;3 3 1 4 h"],["coin","Coin","Moneda","5 2 6 1 y;3 3 10 10 y;5 13 6 1 y;4 4 8 8 o;5 5 6 6 y;7 6 2 4 h"],["shell","Seashell","Concha","5 3 6 1 h;3 4 10 3 h;2 7 12 3 i;4 10 8 2 h;6 12 4 2 w;5 5 1 5 w;8 4 1 7 w;11 6 1 3 w"],["figurine","Figurine","Figura","6 2 4 4 h;5 6 6 5 p;4 7 2 3 h;10 7 2 3 h;6 11 2 2 p;9 11 2 2 p;4 13 8 1 w"],["music-box","Music box","Caja musical","3 7 10 6 w;4 8 8 1 h;3 3 10 4 w;4 4 8 2 h;6 8 4 4 y;7 9 2 2 d"],["snow-globe","Snow globe","Esfera de nieve","5 2 6 1 c;3 3 10 8 b;5 11 6 1 b;4 4 8 6 c;5 5 1 1 i;10 7 1 1 i;7 6 2 4 g;6 8 4 2 g;4 12 8 2 w"],["gift","Gift box","Regalo","5 2 3 2 y;8 2 3 2 y;2 4 12 3 r;3 7 10 7 r;7 4 2 10 y;4 8 3 1 o;9 8 3 1 o"]]],["pharmacy","Pharmacy","Farmacia",[["blister-pack","Blister pack","Blíster de pastillas","3 2 10 12 s;4 3 8 10 i;5 4 2 3 h;9 4 2 3 h;5 8 2 3 h;9 8 2 3 h;5 4 1 1 y;9 4 1 1 y"],["medicine-box","Medicine carton","Caja de medicamento","3 2 10 12 h;4 3 8 9 i;4 3 8 2 g;7 6 2 5 g;5 8 6 2 g;4 12 8 1 w"],["eye-drops","Eye drops","Gotas para ojos","7 1 2 3 i;6 4 4 3 s;4 7 8 7 i;5 8 6 5 b;7 9 2 3 c;5 12 6 1 h"],["syringe","Syringe","Jeringa","7 1 2 3 s;5 4 6 2 s;6 6 4 5 i;7 7 2 3 b;6 7 1 1 s;6 9 1 1 s;7 11 2 1 s;7 12 1 3 s"],["bandages","Bandages","Curitas","3 4 10 8 h;4 5 8 6 w;6 5 4 6 i;4 6 1 1 h;11 6 1 1 h;4 9 1 1 h;11 9 1 1 h"],["gauze","Gauze roll","Rollo de gasa","4 4 8 8 i;3 6 10 4 h;4 5 8 6 i;5 6 6 4 s;6 7 4 2 i;11 10 3 3 h"],["ointment","Ointment tube","Tubo de pomada","3 2 10 3 i;4 5 8 6 h;5 6 6 4 p;6 11 4 3 s;7 6 2 3 i;6 7 4 1 i"],["thermometer","Thermometer","Termómetro","6 2 4 9 i;7 3 2 7 s;5 11 6 3 i;7 9 2 4 r;8 4 1 1 d;8 6 1 1 d"],["first-aid","First aid kit","Botiquín","5 2 6 2 s;2 4 12 10 r;3 5 10 8 i;7 6 2 6 r;5 8 6 2 r;3 5 10 1 h"],["inhaler","Inhaler","Inhalador","6 2 5 4 s;5 6 7 7 b;3 11 9 3 b;4 12 5 1 c;6 7 2 4 i"],["dropper","Dropper bottle","Gotero","6 1 4 4 d;5 5 6 2 s;4 7 8 7 w;5 8 6 5 h;6 9 4 3 g;5 8 1 4 i"],["syrup","Syrup bottle","Jarabe","5 1 6 3 s;4 4 8 10 w;5 5 2 8 o;4 7 8 5 h;6 8 4 3 r;7 8 2 3 i"],["pill-organizer","Pill organizer","Pastillero","2 4 12 9 b;3 5 10 7 i;5 5 1 7 b;8 5 1 7 b;11 5 1 7 b;3 8 10 1 b;3 6 2 1 r;6 9 2 1 y;9 6 2 1 g"],["antiseptic","Antiseptic bottle","Antiséptico","5 1 6 3 s;4 4 8 10 g;5 5 2 8 l;4 7 8 5 i;7 8 2 3 r;6 9 4 1 r"],["mask","Face mask","Cubrebocas","1 5 2 6 i;13 5 2 6 i;3 4 10 8 b;4 5 8 2 c;4 8 8 1 i;4 10 8 1 c"],["glucose-meter","Glucose meter","Glucómetro","4 2 8 12 d;5 3 6 10 s;6 4 4 4 g;7 5 2 2 i;6 10 4 2 b;7 14 2 1 i"]]]];
+const LEGACY_SPANISH_NAMES = {"asset:wrench":"Llave inglesa","asset:tape-measure":"Cinta métrica","asset:level":"Nivel","asset:utility-knife":"Cúter","asset:socket-set":"Dados","asset:phone":"Teléfono","asset:laptop":"Portátil","asset:tablet-device":"Tableta electrónica","asset:mouse":"Ratón","asset:earbuds":"Auriculares","asset:controller":"Mando","asset:router":"Enrutador","asset:flashlight":"Linterna","asset:tent":"Tienda de campaña","asset:lantern":"Farol","asset:camp-stove":"Estufa portátil","asset:trowel":"Palita","asset:tshirt":"Camiseta","asset:jacket":"Chaqueta","asset:shorts":"Pantalón corto","asset:cleaner":"Limpiador","asset:tissue-box":"Pañuelos","asset:lightbulb":"Bombilla","asset:postcard":"Postal","asset:snow-globe":"Bola de nieve","asset:blister-pack":"Blíster"};
+export const ASSET_GROUPS = GROUPS.map(([id,en,es])=>({id,en,es}));
+export const INVENTORY_ASSETS = GROUPS.flatMap(([group,en,es,items])=>items.map(([id,name,spanish,recipe])=>({id:'asset:'+id,group,name,spanish,recipe})));
+const byId = new Map(INVENTORY_ASSETS.map(item=>[item.id,item]));
+export const isAssetPreset = value=>byId.has(value);
+export function assetGroup(category) {
+  const suffix = String(category?.id||'').match(/^c0000000-0000-4000-8000-00000000000([1-7])$/);
+  if (suffix) return ASSET_GROUPS[Number(suffix[1])-1].id;
+  const name=String(category?.name||'').trim().toLowerCase();
+  return ASSET_GROUPS.find(g=>[g.en,g.es].some(x=>x.toLowerCase()===name))?.id||'all';
+}
+// Two-dimensional material ramps: warm reflected shadows, cool metal
+// highlights and a restrained golden light source from the upper left.
+const RAMP = {
+ d:['#221b18','#342b27','#5b4b3c','#8c7460'],a:['#4b4038','#756c64','#9d8d7c','#d3c0a5'],
+ s:['#615d59','#a8a6a0','#d7d3c8','#fff1d7'],i:['#b89b72','#f8e8c9','#fff2d7','#fff9eb'],
+ h:['#9a7048','#dfba86','#f4d8a4','#fff0c9'],w:['#532e1b','#93613a','#bd844a','#e9b875'],
+ o:['#85451e','#c77b38','#ecab59','#ffd98b'],y:['#9a5c20','#e6b84d','#ffda77','#fff0b0'],
+ r:['#71302d','#b45449','#e27c63','#ffae8b'],g:['#28513e','#498d70','#76b394','#b3d6a0'],
+ l:['#4e7350','#90bd83','#b9d8a0','#e0e7b5'],b:['#30466b','#496e9e','#70a0cf','#b5d8e7'],
+ c:['#4e768e','#91bdd3','#b9dce6','#e2f1ed'],p:['#625078','#a483b4','#cba8d6','#edd1e6']
+};
+const cache=new Map();
+export function inventoryAssetSvg(preset,{style='stack'}={}) {
+  const cacheKey=(style==='flat'?'flat:':'stack:')+preset;
+  if(cache.has(cacheKey))return cache.get(cacheKey);
+  const asset=byId.get(preset);if(!asset)return '';
+  // Derive a stack of actual horizontal slices from the catalog's authored
+  // pixel silhouette. We cannot infer hidden geometry without four separate
+  // orthographic views, so use a bounded group-specific depth approximation.
+  // Every catalog entry uses the same crisp projection and final outline.
+  const front=Array.from({length:16},()=>Array(16).fill(null));
+  for(const cmd of asset.recipe.split(';')){
+    const [sx,sy,sw,sh,key]=cmd.split(' ');
+    const x=Number(sx),y=Number(sy),w=Number(sw),h=Number(sh),color=RAMP[key]?.[1];
+    if(!color)continue;
+    for(let py=y;py<Math.min(16,y+h);py++)
+      for(let px=x;px<Math.min(16,x+w);px++)
+        if(px>=0&&py>=0)front[py][px]=color;
+  }
+  const thickness={tools:3,electronics:4,outdoor:4,clothing:2,household:5,keepsakes:3,pharmacy:4}[asset.group]||4;
+  const specialThin=/^(asset:phone|asset:tablet-device|asset:laptop|asset:letter|asset:postcard|asset:book|asset:mask|asset:blade)$/.test(preset);
+  const stack=style==='flat'?'':renderLayeredSprite(front,{depth:specialThin?2:thickness});
+  if(style!=='flat'&&stack){
+    const svg=stack.replace('class="sprite-stacked-asset"','class="sprite-inventory-depth sprite-stacked-asset"');
+    cache.set(cacheKey,svg);
+    return svg;
+  }
+  // Keep the original carefully shaded flat renderer as a safe fallback.
+  const pixels=Array.from({length:34},()=>Array(34).fill(null));
+  for(const cmd of asset.recipe.split(';')){
+    const [x,y,w,h,key]=cmd.split(' '),color=RAMP[key]?key:null;
+    for(let j=1+2*Number(y);j<1+2*(Number(y)+Number(h));j++)for(let i=1+2*Number(x);i<1+2*(Number(x)+Number(w));i++)pixels[j][i]=color;
+  }
+  // Chamfer external corners on the finer pixel grid, instead of magnifying
+  // the old square blocks. Preserve thin wires, stems, and tool edges.
+  const get=(x,y)=>pixels[y]?.[x]||null;
+  const cuts=[];
+  for(let y=1;y<33;y++)for(let x=1;x<33;x++){
+    const key=get(x,y);if(!key)continue;
+    for(const [dx,dy] of [[1,1],[-1,-1],[1,-1],[-1,1]]){
+      if(!get(x+dx,y)&&!get(x,y+dy)&&get(x-dx,y)===key&&get(x,y-dy)===key&&get(x-dx,y-dy)===key){cuts.push([x,y]);break;}
+    }
+  }
+  for(const [x,y] of cuts)pixels[y][x]=null;
+  const out=[];
+  const lit=(x,y)=>{
+    const k=get(x,y);
+    if(!k)return [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]].some(([dx,dy])=>get(x+dx,y+dy))?'#25180f':null;
+    const ramp=RAMP[k],up=get(x,y-1),left=get(x-1,y),down=get(x,y+1),right=get(x+1,y);
+    if(!up&&!left)return ramp[3];
+    if(!up||!left)return ramp[2];
+    if(!down||!right)return ramp[0];
+    if(up!==k&&left!==k)return ramp[2];
+    if(down!==k&&right!==k)return ramp[0];
+    // Secondary material sheen only on broad faces, not random noisy pixels.
+    if((k==='s'||k==='y'||k==='c'||k==='i')&&x%8===3&&y%7===2&&get(x+2,y)===k&&get(x,y+2)===k)return ramp[2];
+    return ramp[1];
+  };
+  for(let y=0;y<34;y++){
+    for(let x=0;x<34;){
+      const color=lit(x,y);let end=x+1;while(end<34&&lit(end,y)===color)end++;
+      if(color)out.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="'+color+'"/>');x=end;
+    }
+  }
+  const silhouette=[];
+  for(let y=0;y<34;y++)for(let x=0;x<34;){const filled=Boolean(lit(x,y));let end=x+1;while(end<34&&Boolean(lit(end,y))===filled)end++;if(filled)silhouette.push('<rect x="'+x+'" y="'+y+'" width="'+(end-x)+'" height="1" fill="#5e4d39"/>');x=end;}
+  const svg='<svg class="sprite-inventory-depth" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" shape-rendering="crispEdges" aria-hidden="true">'+stackSprite(out.join(''),silhouette.join(''))+'</svg>';
+  cache.set(cacheKey,svg);return svg;
+}
+// Match meaningful item names, never override an explicitly selected sprite.
+const normalizeName=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+export function defaultInventoryAsset(name,category){
+  const query=' '+normalizeName(name)+' ';const group=assetGroup(category);
+  if(group==='pharmacy')return '';
+  const candidates=INVENTORY_ASSETS.filter(a=>group==='all'||a.group===group);
+  const matches=candidates.flatMap(a=>[a.name,a.spanish,LEGACY_SPANISH_NAMES[a.id],a.id.slice(6)].map(normalizeName).filter(n=>n&&query.includes(' '+n+' ')).map(n=>({id:a.id,len:n.length})));
+  matches.sort((a,b)=>b.len-a.len);return matches[0]?.id||'';
+}
