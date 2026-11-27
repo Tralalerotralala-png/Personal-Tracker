@@ -24,7 +24,7 @@
 .game-book.shelf-grabbable{user-select:none;-webkit-user-drag:none}
 .shelf-object-grabbing,.shelf-object-grabbing *{cursor:grabbing!important;user-select:none!important}
 .shelf-avatar{position:fixed;left:0;top:0;width:var(--case-w);height:var(--case-h);z-index:2147483000;pointer-events:none;perspective:600px;will-change:transform;contain:layout style;isolation:isolate}
-.shelf-avatar-object{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 50%;will-change:transform;transition:filter .15s}
+.shelf-avatar-object{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 50%;will-change:transform}
 .shelf-avatar-layer,.shelf-avatar-face{position:absolute;inset:0;border-radius:3px;box-sizing:border-box}
 .shelf-avatar-layer{background:linear-gradient(135deg,#3c4b55,#18232e 60%,#0c121a);border:1px solid #7f929e55;box-shadow:1px 1px 0 #0007}
 .shelf-avatar-face{overflow:hidden;background:#1c2633;outline:1px solid #b9d4de80;transform:translateZ(1px);box-shadow:inset 0 0 0 2px #d7eff422}
@@ -47,7 +47,7 @@
 .shelf-avatar-albums .shelf-avatar-layer{background:#35312d;border-color:#77706a}
 .shelf-avatar-albums .shelf-avatar-edge{background:linear-gradient(90deg,#706356,#18191d 35%,#303136 50%,#17181b 65%,#706356);border-color:#73675b}
 .shelf-avatar-shadow{position:absolute;left:4%;right:4%;top:13%;bottom:-10%;border-radius:12px;background:#000b;transform:translate(14px,13px) scale(.94);filter:blur(12px);opacity:.7;transition:opacity .18s}
-.shelf-avatar-ready .shelf-avatar-object{filter:drop-shadow(0 0 7px #43d7ffb0)}
+.shelf-avatar-ready .shelf-avatar-face{outline:2px solid #43d7ff;box-shadow:0 0 12px #43d7ffb0}
 .shelf-avatar-ready .shelf-avatar-shadow{opacity:.35}
 @media(prefers-reduced-motion:reduce){.shelf-avatar-object,.shelf-avatar-shadow{transition:none}}
 .reduce-animations .shelf-avatar-object,.reduce-animations .shelf-avatar-shadow{transition:none}

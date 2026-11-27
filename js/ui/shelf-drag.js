@@ -23,7 +23,7 @@ export function shelfDragDimensions(kind){return [...(CASES[kind]||CASES.games)]
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 export function shelfDragPose(dx,dy,over=false,reduced=false){
  if(reduced)return {rx:0,ry:0,rz:0};
- const damp=over?.35:1;
+ const damp=over ? .35 : 1;
  return {rx:clamp(-dy*.65+9,-38,38)*damp,ry:clamp(dx*.75-10,-48,48)*damp,rz:clamp(dx*.24-dy*.09-4,-22,22)*damp};
 }
 
