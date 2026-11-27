@@ -1,3 +1,4 @@
+import { createShelfDrag, moveShelfItem } from './shelf-drag.js';
 // One library with four shelves. Game records stay under game_library_v1,
 // preserving existing entries and widgets; other media share a compact generic editor.
 import { h, replace, openSheet, confirmDialog, promptDialog, toast, libraryCoverButton } from './dom.js';
@@ -510,6 +511,13 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
     onAdd:()=>show(null,true)
    });
    const results=h('div',{class:'media-filter-results'});
+   const dragKind=active;
+   const drag=createShelfDrag({host:results,language,shelves:()=>shelfNames(dragKind),
+    move:async(id,to,from)=>{
+     await commit(draft=>{Object.assign(draft,moveShelfItem(draft,dragKind,id,to,from));});
+     if(active===dragKind&&!page)render();
+    }});
+
    function updateResults(){
      const base=list(active).filter(x=>(statusFilter==='all'||x.status===statusFilter)&&(!query||`${x.title} ${x.creator} ${x.notes||''} ${x.shelf||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
      const filtered=sortBy==='rating'
@@ -518,16 +526,16 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
        ?[...base].sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')))
        :base;
      const names=[...new Set([...(!query&&statusFilter==='all'&&shelfMode?data.shelvesByKind[active]:[]),...filtered.map(x=>x.shelf||'Collection')])];
-     replace(results,(filtered.length||(!query&&statusFilter==='all'&&shelfMode&&names.length))?h('div',{class:'game-shelves '+(!shelfMode?'game-library-grid':'')},
+     replace(results,drag.dock,(filtered.length||(!query&&statusFilter==='all'&&shelfMode&&names.length))?h('div',{class:'game-shelves '+(!shelfMode?'game-library-grid':'')},
       names.map(name=>{
        const contents=filtered.filter(x=>(x.shelf||'Collection')===name);
-       return h('section',{class:'game-shelf'},
+       return drag.target(h('section',{class:'game-shelf'},
         h('div',{class:'game-shelf-head'},mediaIcon(active,name),h('h3',{},name),h('small',{},String(contents.length))),
         h('div',{class:'game-cover-grid'},contents.length?contents.map(x=>{
          const button=libraryCoverButton(cover(x),x.title,()=>show(x),el,{transition:false});
          button.classList.add('media-kind-'+active);
-         return button;
-        }):h('p',{class:'media-empty-shelf'},language()==='es'?'Estante vacío':'Empty shelf')),shelfMode?h('div',{class:'game-wood','aria-hidden':'true'}):null);
+         return drag.cover(button,x,name);
+        }):h('p',{class:'media-empty-shelf'},language()==='es'?'Estante vacío':'Empty shelf')),shelfMode?h('div',{class:'game-wood','aria-hidden':'true'}):null),name);
       })):
      h('div',{class:'media-empty-state'},mediaIcon(active),h('h3',{},list(active).length?L().noResults:L().empty),
        h('p',{},list(active).length?(language()==='es'?'Prueba otro filtro.':'Try changing the search or status filter.'):

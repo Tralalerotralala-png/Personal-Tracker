@@ -1,0 +1,20 @@
+/* Shelf movement: stay within the tracker palette; no personal content. */
+.shelf-drag-dock{margin:0 0 12px;position:sticky;top:0;z-index:12}
+.shelf-drag-hint{color:var(--ink-dim);font-size:.78rem;margin:4px 0 12px}
+.shelf-drag-panel{padding:12px;border:1px solid var(--accent);background:#142436;box-shadow:0 6px 24px #0008,0 0 16px #30d6ff26;border-radius:4px}
+.shelf-drag-panel[hidden],.shelf-drag-hint[hidden]{display:none}
+.shelf-drag-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.shelf-drag-heading strong{min-width:0;overflow-wrap:anywhere}
+.shelf-drag-destinations{display:flex;flex-wrap:wrap;gap:8px}
+.shelf-drag-destination{border:1px dashed var(--accent);min-height:42px}
+.game-book[draggable=true]{cursor:grab}
+.game-book[draggable=true]:active{cursor:grabbing}
+.shelf-drag-active .game-book.shelf-drag-source{opacity:.4}
+.shelf-drag-active .game-shelf.shelf-drag-eligible{outline:2px dashed var(--accent);outline-offset:-4px}
+.shelf-drag-active .shelf-drag-eligible{transition:background-color .16s,box-shadow .16s}
+.shelf-drag-active .game-shelf.shelf-drag-over,.shelf-drag-active .shelf-drag-destination.shelf-drag-over{outline:2px solid var(--accent);outline-offset:-2px;background:#1e5264;box-shadow:inset 0 0 22px #36d7ff50,0 0 14px #36d7ff48}
+.shelf-drag-active .game-shelf.shelf-drag-over .game-shelf-head{color:var(--accent)}
+.shelf-drag-active .shelf-drag-destination.shelf-drag-over{transform:translateY(-2px)}
+@media(prefers-reduced-motion:reduce){.shelf-drag-active .shelf-drag-eligible{transition:none}.shelf-drag-active .shelf-drag-destination.shelf-drag-over{transform:none}}
+.reduce-animations .shelf-drag-active .shelf-drag-eligible{transition:none}
+.reduce-animations .shelf-drag-active .shelf-drag-destination.shelf-drag-over{transform:none}
