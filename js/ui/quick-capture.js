@@ -52,7 +52,9 @@ export async function saveQuickCapture(store,{kind,title,body='',date= today(),a
   const key=mediaKeys[kind];
   return store.updateSetting('other_media_library_v1',old=>{
    const current=old&&typeof old==='object'?old:{};
-   return {books:[],films:[],albums:[],...current,[key]:[...(current[key]||[]),{...rec,creator:text(creator,150),shelf:'Collection'}]};
+   const shelves=[...new Set([...(current.shelvesByKind?.[key]||[]),...(current[key]||[]).map(row=>row.shelf||'Collection')])];
+   const shelf=shelves.includes('Collection')?'Collection':shelves[0]||'Collection';
+   return {books:[],films:[],albums:[],...current,[key]:[...(current[key]||[]),{...rec,creator:text(creator,150),shelf}]};
   },{books:[],films:[],albums:[]});
  }
  throw Error('Unknown capture type.');

@@ -51,3 +51,26 @@
 .shelf-avatar-ready .shelf-avatar-shadow{opacity:.35}
 @media(prefers-reduced-motion:reduce){.shelf-avatar-object,.shelf-avatar-shadow{transition:none}}
 .reduce-animations .shelf-avatar-object,.reduce-animations .shelf-avatar-shadow{transition:none}
+
+/* Collection controls: the same quiet toolbar, search row and shelf manager
+   in every category. Advanced tools are opt-in rather than permanent rows. */
+.shelf-manager-row{display:grid;gap:8px;padding:12px;border:1px solid var(--edge);border-radius:4px;background:var(--panel)}
+.shelf-manager-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.shelf-manager-head strong{min-width:0;overflow-wrap:anywhere}
+.shelf-manager-head small{white-space:nowrap;color:var(--ink-dim)}
+.shelf-manager-row .btn{justify-self:end}
+.shelf-manager-row .hint:empty{display:none}
+.media-library-view .media-search-compact{grid-template-columns:minmax(0,2fr) minmax(130px,1fr) auto;align-items:stretch}
+.media-collection-more{position:relative;min-width:0}
+.media-collection-more>summary{list-style:none;display:flex;align-items:center;justify-content:center;min-height:46px;height:100%;white-space:nowrap;cursor:pointer;box-sizing:border-box}
+.media-collection-more>summary::-webkit-details-marker{display:none}
+.media-collection-more[open]>summary{border-color:var(--accent);color:var(--accent)}
+.media-collection-more-panel{position:absolute;right:0;top:calc(100% + 8px);width:min(390px,calc(100vw - 48px));box-sizing:border-box;z-index:24;background:#142436;border:1px solid var(--edge-hi);box-shadow:0 12px 26px #0009;padding:13px;display:grid;gap:12px;border-radius:4px}
+.media-more-sort{display:grid;gap:6px;font-size:.82rem;color:var(--ink-dim)}
+.media-collection-more-panel .media-stats-bar{margin:0;flex-wrap:wrap}
+.media-collection-more-panel .media-song-import{margin:0;flex-wrap:wrap}
+@media(max-width:700px){
+ .media-library-view .media-search-compact{grid-template-columns:minmax(0,1fr) auto}
+ .media-library-view .media-search-compact input[type=search]{grid-column:1/-1}
+ .media-library-view .media-search-compact select{min-width:0}
+}

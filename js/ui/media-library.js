@@ -1,4 +1,4 @@
-import { createShelfDrag, moveShelfItem } from './shelf-drag.js';
+import { createShelfDrag, moveShelfItem, libraryShelfNames, removeLibraryShelf, shelfManagementButton } from './shelf-drag.js';
 // One library with four shelves. Game records stay under game_library_v1,
 // preserving existing entries and widgets; other media share a compact generic editor.
 import { h, replace, openSheet, confirmDialog, promptDialog, toast, libraryCoverButton } from './dom.js';
@@ -17,7 +17,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
  const games=createGamesView({store,backups});
  const L=()=>LABELS[language()];
  let active='games',data={books:[],films:[],albums:[],shelvesByKind:{books:[],films:[],albums:[]}},shelfMode=true,page=null,dirty=false,query='',statusFilter='all',sortBy='default',pendingSearch=null;
-  const categoryUi=Object.fromEntries(KINDS.map(kind=>[kind,{page:null,query:'',statusFilter:'all',shelfMode:true}]));
+  const categoryUi=Object.fromEntries(KINDS.map(kind=>[kind,{page:null,query:'',statusFilter:'all',shelfMode:true,sortBy:'default'}]));
   const bookSpreads=new Map();
  // Retain actual DOM nodes and decoded image resources when changing categories.
  const cachedViews=new Map(),warmedCovers=new Map();
@@ -53,7 +53,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   if(JSON.stringify(next)===JSON.stringify(data))return false;
   data=next;cachedViews.clear();warmArtwork();return true;
  }
- const shelfNames=kind=>[...new Set([...data.shelvesByKind[kind],...list(kind).map(x=>x.shelf||'Collection')])];
+ const shelfNames=kind=>libraryShelfNames(data,kind);
  async function load(){await refreshCollection();await games.mount();render();}
  // Read and update the latest settings value INSIDE the store's serialized write.
  // This prevents an old screen snapshot overwriting a fresh rating, journal or shelf.
@@ -279,7 +279,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
   const rating=mediaStarRating(row?.rating,{editable:true,label:L().rating,onChange:()=>{dirty=true;}});
   const status=h('select',{},names[kind].en.map((name,i)=>
    h('option',{value:name,selected:(row?.status||names[kind].en[0])===name},names[kind][language()][i])));
-  const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||data.shelvesByKind[kind].at(-1)||'Collection'});
+  const shelf=h('input',{type:'text',maxlength:60,value:row?.shelf||shelfNames(kind).at(-1)||'Collection'});
   const choices=kind==='books'?[['book','Book','Libro'],['comic','Comic book','Cómic']]:
    kind==='films'?[['film','Film','Película'],['series','TV series','Serie de TV']]:
    [['vinyl','Vinyl record','Disco de vinilo'],['digital','Digital album','Álbum digital']];
@@ -466,9 +466,9 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
        if(k===active)return;
        if(active==='games'&&!await games.canNavigate())return;
        if(dirty&&!await confirmDialog({title:language()==='es'?'¿Descartar cambios?':'Discard changes?',message:language()==='es'?'Los cambios no guardados se perderán.':'Unsaved changes will be lost.',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true}))return;
-       if(active!=='games')categoryUi[active]={page:dirty?null:page,query,statusFilter,shelfMode};
+       if(active!=='games')categoryUi[active]={page:dirty?null:page,query,statusFilter,shelfMode,sortBy};
        dirty=false;active=k;
-       const saved=categoryUi[k];page=saved?.page||null;query=saved?.query||'';statusFilter=saved?.statusFilter||'all';shelfMode=saved?.shelfMode??true;
+       const saved=categoryUi[k];page=saved?.page||null;query=saved?.query||'';statusFilter=saved?.statusFilter||'all';shelfMode=saved?.shelfMode??true;sortBy=saved?.sortBy||'default';
        render({reuse:true});
        if(k!=='games'){
         try {const changed=await refreshCollection();if(active===k&&changed){
@@ -495,7 +495,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    const header=mediaCollectionToolbar({
     kind:active,title:L()[active],count:list(active).length,
     viewLabel:shelfMode?L().grid:L().shelves,
-    newShelfLabel:L().newShelf,addLabel:`${L().add} ${L()[active]}`,
+    newShelfLabel:L().newShelf,addLabel:(language()==='es'?({books:'Agregar libro',films:'Agregar título',albums:'Agregar álbum'}[active]):({books:'Add book',films:'Add title',albums:'Add album'}[active])),
     onToggle:()=>{shelfMode=!shelfMode;render();},
     onNewShelf:async()=>{
      const kind=active,name=(await promptDialog({title:L().newShelf,maxLength:60}))?.trim().slice(0,60);
@@ -512,6 +512,11 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    });
    const results=h('div',{class:'media-filter-results'});
    const dragKind=active;
+   header.querySelector('.media-collection-actions').prepend(shelfManagementButton({language,kind:dragKind,getData:()=>data,
+    remove:async(name,destination)=>{
+     await commit(draft=>Object.assign(draft,removeLibraryShelf(draft,dragKind,name,destination)));
+     if(active===dragKind&&!page)render();
+    }}));
    const drag=createShelfDrag({host:results,language,kind:dragKind,shelves:()=>shelfNames(dragKind),
     move:async(id,to,from)=>{
      await commit(draft=>{Object.assign(draft,moveShelfItem(draft,dragKind,id,to,from));});
@@ -542,7 +547,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
          (language()==='es'?'Añade tu primer título para empezar.':'Add a title to start your shelf.')),
        list(active).length?null:h('button',{class:'btn primary',type:'button',onclick:()=>show(null,true)},`${L().add} ${L()[active]}`)));
    }
-   const allItems=list(active), rated=allItems.filter(x=>Number.isFinite(Number(x.rating)));
+   const allItems=list(active), rated=allItems.filter(x=>x.rating!==null&&x.rating!==undefined&&x.rating!==''&&Number.isFinite(Number(x.rating)));
    const avgRating=rated.length?(rated.reduce((s,x)=>s+Number(x.rating),0)/rated.length).toFixed(1):null;
    const inProgress=allItems.filter(x=>x.status===names[active].en[1]).length;
    const finished=allItems.filter(x=>x.status===names[active].en[2]).length;
@@ -556,7 +561,12 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    const filter=h('select',{'aria-label':language()==='es'?'Filtrar por estado':'Filter by status',onchange:e=>{statusFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos los estados':'All statuses'],...names[active].en.map((x,i)=>[x,names[active][language()][i]])].map(([value,name])=>h('option',{value,selected:value===statusFilter},name)));
    const sorter=h('select',{'aria-label':es?'Ordenar':'Sort',onchange:e=>{sortBy=e.target.value;updateResults();}},
      [['default',es?'Orden original':'Default order'],['rating',es?'Mejor calificados':'Highest rated'],['title',es?'Título A–Z':'Title A–Z']].map(([value,name])=>h('option',{value,selected:value===sortBy},name)));
-   updateResults();replace(el,top,header,statsBar,active==='albums'?songCsvControls():null,h('div',{class:'media-search-filters'},search,filter,sorter),results);
+   const more=h('details',{class:'media-collection-more'},
+     h('summary',{class:'btn small'},es?'Más':'More',h('span',{'aria-hidden':'true'},' ▾')),
+     h('div',{class:'media-collection-more-panel'},
+      h('label',{class:'media-more-sort'},h('span',{},es?'Ordenar':'Sort by'),sorter),
+      statsBar,active==='albums'?songCsvControls():null));
+   updateResults();replace(el,top,header,h('div',{class:'media-search-filters media-search-compact'},search,filter,more),results);
  }
  window.addEventListener('tracker-quick-capture-saved',async e=>{if(!['book','film','album'].includes(e.detail?.kind))return;const saved=await store.getSetting(KEY);if(!saved)return;for(const k of KINDS){const existing=new Set((data[k]||[]).map(x=>x.id));data[k]=[...(data[k]||[]),...(Array.isArray(saved[k])?saved[k]:[]).filter(x=>!existing.has(x.id))];}cachedViews.clear();warmArtwork();if(active!=='games'&&!page&&!el.hidden)render();});
  return {el,mount:load,show:async()=>{
@@ -564,7 +574,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    if(pendingSearch){
     if(active==='games'&&!await games.canNavigate()){pendingSearch=null;return;}
     const {kind,id}=pendingSearch;pendingSearch=null;
-    if(active!=='games')categoryUi[active]={page,query,statusFilter,shelfMode};
+    if(active!=='games')categoryUi[active]={page,query,statusFilter,shelfMode,sortBy};
     dirty=false;query='';statusFilter='all';page=null;
     if(kind==='game'){
      // This view may already be mounted when another device adds a game.

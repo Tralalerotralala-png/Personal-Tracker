@@ -1,4 +1,4 @@
-import { createShelfDrag, moveShelfItem } from './shelf-drag.js';
+import { createShelfDrag, moveShelfItem, libraryShelfNames, removeLibraryShelf, shelfManagementButton } from './shelf-drag.js';
 // A small, synced personal game library. Reuses the existing settings store;
 // no new database tables, dependencies or private tokens.
 import { h, replace, confirmDialog, promptDialog, toast, libraryCoverButton } from './dom.js';
@@ -55,7 +55,7 @@ export function createGamesView({store,backups=null}){
     ...journalEntries.map(x=>h('div',{class:'game-journal-entry'},h('small',{},new Date(x.date).toLocaleDateString()),h('p',{},x.text))));
   showPage(h('section',{class:'media-detail game-detail'},caseArt(game),h('div',{class:'media-detail-info'},h('h2',{},game.title),h('p',{},`${L().platform}: ${game.platform||'—'}`),h('p',{},`${L().status}: ${game.status||'—'}`),h('div',{class:'media-rating-detail'},h('span',{},L().rating),mediaStarRating(game.rating,{label:L().rating}).el),formatNotes(game.notes||'—'),journalPanel,createGameBackupPanel({backups,gameId:game.id}),h('div',{class:'inline-actions'},edit,remove))),game.title);
  }
- async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=mediaStarRating(existing?.rating,{editable:true,label:L().rating,onChange:()=>{dirty=true;}});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||'Backlog')===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
+ async function editor(existing=null){const title=h('input',{type:'text',maxlength:120,value:existing?.title||'',required:true});const platform=h('input',{type:'text',maxlength:100,value:existing?.platform||''});const notes=h('textarea',{rows:6,maxlength:10000},existing?.notes||'');const coverUrl=h('input',{type:'url',placeholder:'https://…',value:existing?.cover?.startsWith('https:')?existing.cover:''});const upload=h('input',{type:'file',accept:'image/png,image/jpeg,image/webp'});const rating=mediaStarRating(existing?.rating,{editable:true,label:L().rating,onChange:()=>{dirty=true;}});const shelf=h('select',{},state.shelves.map(s=>h('option',{value:s,selected:(existing?.shelf||(state.shelves.includes('Backlog')?'Backlog':state.shelves[0]))===s},s)));const status=h('select',{},['Backlog','Playing','Completed','On hold','Dropped'].map(s=>h('option',{value:s,selected:(existing?.status||'Backlog')===s},s)));const feedback=h('p',{class:'hint'});
  const form=h('div',{class:'form game-editor-form'},h('label',{},L().name),title,h('label',{},L().platform),platform,h('label',{},L().shelf),shelf,h('label',{},L().status),status,h('label',{},L().rating),rating.el,h('label',{},L().cover),coverUrl,h('button',{class:'btn small',onclick:async()=>{
   const q=title.value.trim();if(!q){feedback.textContent='Enter a game title first.';return;}
   feedback.textContent='Searching Wikipedia…';try{const url=`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q+' video game')}&gsrlimit=5&prop=pageimages&piprop=thumbnail&pithumbsize=400&format=json&origin=*`;const r=await fetch(url);if(!r.ok)throw new Error('Search unavailable');const data=await r.json();const pages=Object.values(data.query?.pages||{}).filter(p=>p.thumbnail?.source);if(!pages.length){feedback.textContent='No cover found. Paste a cover URL or upload one.';return;}const first=pages[0];coverUrl.value=first.thumbnail.source;feedback.textContent=`Found image from Wikipedia: ${first.title}. Check that it is the right cover.`;}catch{feedback.textContent='Cover search unavailable. Paste an HTTPS URL or upload an image.';}
@@ -85,13 +85,21 @@ export function createGamesView({store,backups=null}){
   onNewShelf:async()=>{
    const name=(await promptDialog({title:L().newShelf,maxLength:60}))?.trim().slice(0,60);
    if(!name||state.shelves.some(s=>s.toLocaleLowerCase()===name.toLocaleLowerCase()))return;
-   state.shelves.push(name);state.customShelves=[...new Set([...(state.customShelves||[]),name])];
-   state.mode='shelf';await save();
+   state=await store.updateSetting(KEY,raw=>{
+    const names=libraryShelfNames(raw,'games');
+    if(names.some(s=>s.toLocaleLowerCase()===name.toLocaleLowerCase()))return raw;
+    return {...raw,shelves:[...names,name],customShelves:[...new Set([...(raw.customShelves||[]),name])],mode:'shelf'};
+   },state);render();
   },
   onAdd:()=>editor()
  });
+ header.querySelector('.media-collection-actions').prepend(shelfManagementButton({language,kind:'games',getData:()=>state,
+  remove:async(name,destination)=>{
+   state=await store.updateSetting(KEY,raw=>removeLibraryShelf(raw,'games',name,destination),state);
+   if(!page)render();
+  }}));
  const results=h('div',{class:'game-filter-results'});
- const drag=createShelfDrag({host:results,language,kind:'games',shelves:()=>state.shelves,
+ const drag=createShelfDrag({host:results,language,kind:'games',shelves:()=>libraryShelfNames(state,'games'),
   move:async(id,to,from)=>{
    const next=await store.updateSetting(KEY,raw=>moveShelfItem(raw,'games',id,to,from),state);
    state=next;if(!page)render();
@@ -110,7 +118,7 @@ export function createGamesView({store,backups=null}){
  const filter=h('select',{'aria-label':'Filter games by status',onchange:e=>{gameFilter=e.target.value;updateResults();}},[['all',language()==='es'?'Todos':'All statuses'],['Backlog',language()==='es'?'Pendientes':'Backlog'],['Playing',language()==='es'?'Jugando':'Playing'],['Completed',language()==='es'?'Terminados':'Completed'],['On hold',language()==='es'?'En pausa':'On hold'],['Dropped',language()==='es'?'Abandonados':'Dropped']].map(([value,title])=>h('option',{value,selected:value===gameFilter},title)));
  updateResults();replace(el,header,h('div',{class:'media-search-filters'},search,filter),results);
  }
- window.addEventListener('tracker-quick-capture-saved',async e=>{if(e.detail?.kind!=='game')return;const saved=await store.getSetting(KEY);if(!saved)return;const known=new Set(state.games.map(x=>x.id));state.games=[...state.games,...(Array.isArray(saved.games)?saved.games:[]).filter(x=>!known.has(x.id))];if(Array.isArray(saved.shelves))state.shelves=[...new Set([...state.shelves,...saved.shelves])];if(!page)render();});
+ window.addEventListener('tracker-quick-capture-saved',async e=>{if(e.detail?.kind!=='game')return;const saved=await store.getSetting(KEY);if(!saved)return;const known=new Set(state.games.map(x=>x.id));state.games=[...state.games,...(Array.isArray(saved.games)?saved.games:[]).filter(x=>!known.has(x.id))];if(Array.isArray(saved.shelves))state.shelves=[...saved.shelves];if(Array.isArray(saved.customShelves))state.customShelves=[...saved.customShelves];if(!page)render();});
  return {el,mount:load,show:()=>{if(!dirty)render();},hide:()=>{},
    async canNavigate(){if(!dirty)return true;const discard=await confirmDialog({title:L().cancel,message:language()==='es'?'Se perderán los cambios no guardados.':'Discard unsaved game changes?',confirmLabel:language()==='es'?'Descartar':'Discard',danger:true});if(discard){dirty=false;page=null;render();}return discard;},
   openById(id){

@@ -1,5 +1,5 @@
 // Shared shelf movement for the four media categories. Only the shelf changes.
-import { h, replace, toast } from './dom.js';
+import { h, replace, toast, openSheet } from './dom.js';
 
 export function moveShelfItem(data, kind, id, to, from) {
  if(!['games','books','films','albums'].includes(kind)||typeof to!=='string'||!to.trim())throw Error('Invalid shelf');
@@ -15,6 +15,63 @@ export function moveShelfItem(data, kind, id, to, from) {
  // Keep an emptied custom shelf available for future drops and Undo.
  if(kind!=='games')next.shelvesByKind={...data.shelvesByKind,[kind]:[...new Set([...(data.shelvesByKind?.[kind]||[]),from,to])]};
  return next;
+}
+
+// Shelf management operates on the full saved collection, not filtered results.
+export function libraryShelfNames(data,kind){
+ if(!['games','books','films','albums'].includes(kind))throw Error('Invalid collection');
+ const saved=kind==='games'?data?.shelves:data?.shelvesByKind?.[kind];
+ const rows=Array.isArray(data?.[kind])?data[kind]:[];
+ return [...new Set([...(Array.isArray(saved)?saved:[]),...rows.map(row=>row.shelf||'Collection')].filter(name=>typeof name==='string'&&name.trim()))];
+}
+export function removeLibraryShelf(data,kind,name,destination=null){
+ const names=libraryShelfNames(data,kind);
+ if(!names.includes(name))throw Error('Shelf no longer exists');
+ const rows=Array.isArray(data?.[kind])?data[kind]:[];
+ const remaining=names.filter(s=>s!==name);
+ if(kind==='games'&&!remaining.length)throw Error('Keep at least one game shelf');
+ const occupied=rows.some(row=>(row.shelf||'Collection')===name);
+ if(occupied&&!remaining.includes(destination))throw Error('Choose another shelf for all items');
+ const next={...data,[kind]:rows.map(row=>(row.shelf||'Collection')===name?{...row,shelf:destination}:row)};
+ if(kind==='games'){
+  next.shelves=remaining;
+  next.customShelves=(data.customShelves||[]).filter(s=>s!==name);
+ }else next.shelvesByKind={...data.shelvesByKind,[kind]:remaining};
+ return next;
+}
+
+export function shelfManagementButton({language,getData,kind,remove}){
+ const es=()=>language()==='es';
+ const tr=(en,spanish)=>es()?spanish:en;
+ const title=tr('Manage shelves','Administrar estantes');
+ return h('button',{class:'btn small shelf-manage-button',type:'button',title,onclick:()=>{
+  const current=getData(),names=libraryShelfNames(current,kind);
+  const rows=Array.isArray(current?.[kind])?current[kind]:[];
+  const body=h('div',{class:'form shelf-manager'},h('p',{class:'hint'},tr('Remove a shelf without deleting any titles. Move its contents to another shelf first, or choose a destination below.','Elimina un estante sin borrar títulos. Mueve su contenido primero o elige un destino aquí.')));
+  const sheet=openSheet({title,body,size:'small'});
+  if(!names.length){body.append(h('p',{},tr('No shelves yet. Use New shelf to create one.','No hay estantes. Usa Nuevo estante para crear uno.')));return;}
+  let saving=false;
+  for(const name of names){
+   const count=rows.filter(row=>(row.shelf||'Collection')===name).length;
+   const others=names.filter(s=>s!==name);
+   const blocked=!others.length&&(kind==='games'||count>0);
+   const destination=count&&others.length?h('select',{'aria-label':tr('Destination for '+name,'Destino de '+name)},
+    h('option',{value:''},tr('Choose destination…','Elige un destino…')),
+    others.map(s=>h('option',{value:s},s))):null;
+   const error=h('p',{class:'hint',role:'status'});
+   const button=h('button',{class:'btn small danger',type:'button',disabled:blocked||!!destination,onclick:async()=>{
+    if(saving)return;saving=true;button.disabled=true;error.textContent='';
+    try{await remove(name,destination?.value||null);sheet.close();toast(tr('Removed shelf: '+name,'Estante eliminado: '+name));}
+    catch(err){console.warn('Shelf removal failed',err);error.textContent=tr('Could not remove this shelf. Reopen the manager and try again.','No se pudo eliminar el estante. Abre el administrador e inténtalo de nuevo.');button.disabled=false;}
+    finally{saving=false;}
+   }},tr('Remove shelf','Eliminar estante'));
+   destination?.addEventListener('change',()=>{button.disabled=!destination.value;});
+   body.append(h('section',{class:'shelf-manager-row'},
+    h('div',{class:'shelf-manager-head'},h('strong',{},name),h('small',{},count+' '+tr(count===1?'title':'titles',count===1?'título':'títulos'))),
+    blocked?h('p',{class:'hint'},tr('Create another shelf before removing this one.','Crea otro estante antes de eliminar este.')):null,
+    destination,button,error));
+  }
+ }},title);
 }
 
 // Fixed geometry, independent of the original artwork's pixel dimensions.
