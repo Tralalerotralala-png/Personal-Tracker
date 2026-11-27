@@ -91,7 +91,7 @@ export function createGamesView({store,backups=null}){
   onAdd:()=>editor()
  });
  const results=h('div',{class:'game-filter-results'});
- const drag=createShelfDrag({host:results,language,shelves:()=>state.shelves,
+ const drag=createShelfDrag({host:results,language,kind:'games',shelves:()=>state.shelves,
   move:async(id,to,from)=>{
    const next=await store.updateSetting(KEY,raw=>moveShelfItem(raw,'games',id,to,from),state);
    state=next;if(!page)render();

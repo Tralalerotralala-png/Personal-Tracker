@@ -7,8 +7,8 @@
 .shelf-drag-heading strong{min-width:0;overflow-wrap:anywhere}
 .shelf-drag-destinations{display:flex;flex-wrap:wrap;gap:8px}
 .shelf-drag-destination{border:1px dashed var(--accent);min-height:42px}
-.game-book[draggable=true]{cursor:grab}
-.game-book[draggable=true]:active{cursor:grabbing}
+.game-book.shelf-grabbable{cursor:grab}
+.game-book.shelf-grabbable:active{cursor:grabbing}
 .shelf-drag-active .game-book.shelf-drag-source{opacity:.4}
 .shelf-drag-active .game-shelf.shelf-drag-eligible{outline:2px dashed var(--accent);outline-offset:-4px}
 .shelf-drag-active .shelf-drag-eligible{transition:background-color .16s,box-shadow .16s}
@@ -18,3 +18,36 @@
 @media(prefers-reduced-motion:reduce){.shelf-drag-active .shelf-drag-eligible{transition:none}.shelf-drag-active .shelf-drag-destination.shelf-drag-over{transform:none}}
 .reduce-animations .shelf-drag-active .shelf-drag-eligible{transition:none}
 .reduce-animations .shelf-drag-active .shelf-drag-destination.shelf-drag-over{transform:none}
+
+/* Physical, resolution-independent media objects. Their layers are actual
+   offset planes with a spine and page/case edges, not native drag ghosts. */
+.game-book.shelf-grabbable{user-select:none;-webkit-user-drag:none}
+.shelf-object-grabbing,.shelf-object-grabbing *{cursor:grabbing!important;user-select:none!important}
+.shelf-avatar{position:fixed;left:0;top:0;width:var(--case-w);height:var(--case-h);z-index:2147483000;pointer-events:none;perspective:600px;will-change:transform;contain:layout style;isolation:isolate}
+.shelf-avatar-object{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 50%;will-change:transform;transition:filter .15s}
+.shelf-avatar-layer,.shelf-avatar-face{position:absolute;inset:0;border-radius:3px;box-sizing:border-box}
+.shelf-avatar-layer{background:linear-gradient(135deg,#3c4b55,#18232e 60%,#0c121a);border:1px solid #7f929e55;box-shadow:1px 1px 0 #0007}
+.shelf-avatar-face{overflow:hidden;background:#1c2633;outline:1px solid #b9d4de80;transform:translateZ(1px);box-shadow:inset 0 0 0 2px #d7eff422}
+.shelf-avatar-face::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 2px #d1e6f533,inset 0 -10px 20px #0003;background:linear-gradient(112deg,#e5f9ff12,transparent 36%,transparent 78%,#0002)}
+.shelf-avatar-face>.library-cover-art,.shelf-avatar-face>img,.shelf-avatar-face>.game-placeholder,.shelf-avatar-placeholder{position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-width:0!important;aspect-ratio:auto!important;object-fit:cover!important;transform:none!important;box-shadow:none!important;margin:0!important;border:0!important;border-radius:0!important;animation:none!important;overflow:hidden}
+.shelf-avatar-face .library-cover-art img{display:block;width:100%;height:100%;object-fit:cover}
+.shelf-avatar-face .game-placeholder,.shelf-avatar-placeholder{display:grid!important;place-items:center;text-align:center;color:#d8e9f5;overflow-wrap:anywhere;padding:10px}
+.shelf-avatar-face .game-placeholder svg{max-width:70%;max-height:70%}
+.shelf-avatar-spine,.shelf-avatar-edge{position:absolute;top:0;width:var(--case-depth);height:100%;transform-origin:left center;backface-visibility:hidden;box-sizing:border-box}
+.shelf-avatar-spine{left:0;transform:rotateY(-90deg) translateX(calc(-1 * var(--case-depth)));background:linear-gradient(90deg,#354552,#101a23);border:1px solid #687d89;overflow:hidden}
+.shelf-avatar-spine span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(90deg);white-space:nowrap;max-width:calc(var(--case-h) - 10px);overflow:hidden;text-overflow:ellipsis;font:700 8px/1 monospace;color:#e5f1f7}
+.shelf-avatar-edge{left:100%;transform:rotateY(90deg);background:repeating-linear-gradient(90deg,#111d28 0 2px,#677a84 2px 3px,#253541 3px 5px);border:1px solid #60737d}
+.shelf-avatar-top,.shelf-avatar-bottom{position:absolute;left:0;width:100%;height:var(--case-depth);transform-origin:center top;box-sizing:border-box;background:linear-gradient(#576b79,#1a2734);border:1px solid #82939d66}
+.shelf-avatar-top{top:0;transform:rotateX(90deg) translateY(calc(-1 * var(--case-depth)))}
+.shelf-avatar-bottom{top:100%;transform:rotateX(-90deg)}
+.shelf-avatar-books .shelf-avatar-layer{background:#b7ac94;border-color:#dcd1ba}
+.shelf-avatar-books .shelf-avatar-edge,.shelf-avatar-books .shelf-avatar-top,.shelf-avatar-books .shelf-avatar-bottom{background:repeating-linear-gradient(90deg,#e6ddc8 0 2px,#a79e88 2px 3px,#f1e7cf 3px 5px);border-color:#847b6a}
+.shelf-avatar-books .shelf-avatar-top,.shelf-avatar-books .shelf-avatar-bottom{background:repeating-linear-gradient(0deg,#e6ddc8 0 2px,#a79e88 2px 3px,#f1e7cf 3px 5px)}
+.shelf-avatar-books .shelf-avatar-spine{background:linear-gradient(90deg,#5d3d31,#241c1c)}
+.shelf-avatar-albums .shelf-avatar-layer{background:#35312d;border-color:#77706a}
+.shelf-avatar-albums .shelf-avatar-edge{background:linear-gradient(90deg,#706356,#18191d 35%,#303136 50%,#17181b 65%,#706356);border-color:#73675b}
+.shelf-avatar-shadow{position:absolute;left:4%;right:4%;top:13%;bottom:-10%;border-radius:12px;background:#000b;transform:translate(14px,13px) scale(.94);filter:blur(12px);opacity:.7;transition:opacity .18s}
+.shelf-avatar-ready .shelf-avatar-object{filter:drop-shadow(0 0 7px #43d7ffb0)}
+.shelf-avatar-ready .shelf-avatar-shadow{opacity:.35}
+@media(prefers-reduced-motion:reduce){.shelf-avatar-object,.shelf-avatar-shadow{transition:none}}
+.reduce-animations .shelf-avatar-object,.reduce-animations .shelf-avatar-shadow{transition:none}

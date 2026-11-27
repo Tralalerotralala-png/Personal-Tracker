@@ -512,7 +512,7 @@ export function createMediaLibraryView({store,backups=null,music=null,audioPlaye
    });
    const results=h('div',{class:'media-filter-results'});
    const dragKind=active;
-   const drag=createShelfDrag({host:results,language,shelves:()=>shelfNames(dragKind),
+   const drag=createShelfDrag({host:results,language,kind:dragKind,shelves:()=>shelfNames(dragKind),
     move:async(id,to,from)=>{
      await commit(draft=>{Object.assign(draft,moveShelfItem(draft,dragKind,id,to,from));});
      if(active===dragKind&&!page)render();
