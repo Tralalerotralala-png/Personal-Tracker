@@ -475,7 +475,7 @@ for width,height in [(390,844),(1280,900)]:
         # Search must read the real locations table, not a missing "places" table.
         page.locator(".pixel-search-toggle").click()
         page.locator(".global-search-input").fill("Headlamp")
-        first_result=page.locator(".global-search-results .global-search-result").first
+        first_result=page.locator(".global-search-results .global-search-result").filter(has_text="Headlamp").first
         first_result.wait_for(state="visible",timeout=5000)
         assert "Headlamp" in first_result.inner_text(),"Global search did not return a seeded inventory item"
         first_result.click()
@@ -488,7 +488,7 @@ for width,height in [(390,844),(1280,900)]:
         page.locator(".overview .widget").first.wait_for(state="visible",timeout=10000)
         page.locator(".pixel-search-toggle").click()
         page.locator(".global-search-input").fill("Bin day")
-        calendar_result=page.locator(".global-search-results .global-search-result").first
+        calendar_result=page.locator(".global-search-results .global-search-result").filter(has_text="Bin day").first
         calendar_result.wait_for(state="visible",timeout=5000)
         assert "Bin day" in calendar_result.inner_text()
         calendar_result.click()
@@ -509,9 +509,9 @@ for width,height in [(390,844),(1280,900)]:
         game_toolbar=page.locator(".games-view .media-collection-toolbar")
         game_toolbar.wait_for(state="visible",timeout=10000)
         game_bounds=game_toolbar.bounding_box()
-        assert game_toolbar.locator(".media-collection-actions button").count()==3
+        assert game_toolbar.locator(".media-collection-actions button").count()==4
         game_action_names=[x.strip() for x in game_toolbar.locator(".media-collection-actions button").all_inner_texts()]
-        assert game_action_names==["Cover grid","New shelf","Add game"],game_action_names
+        assert game_action_names==["Manage shelves","Cover grid","New shelf","Add game"],game_action_names
         assert game_toolbar.locator(".media-collection-title").count()==0
         assert game_toolbar.locator(".media-pixel-icon").count()==0
         controller=page.locator(".media-category-tabs button",has_text="Games").locator(".media-pixel-icon img.media-pixel-image")
@@ -534,13 +534,13 @@ for width,height in [(390,844),(1280,900)]:
         books_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
         books_toolbar.wait_for(state="visible",timeout=10000)
         books_bounds=books_toolbar.bounding_box()
-        assert books_toolbar.locator(".media-collection-actions button").count()==3
+        assert books_toolbar.locator(".media-collection-actions button").count()==4
         assert abs(game_bounds["x"]-books_bounds["x"])<=4,(game_bounds,books_bounds)
         assert abs(game_bounds["width"]-books_bounds["width"])<=4,(game_bounds,books_bounds)
         def action_names(toolbar):
             return [s.strip() for s in toolbar.locator(".media-collection-actions button").all_inner_texts()]
-        assert game_action_names[:2]==action_names(books_toolbar)[:2],(game_action_names,action_names(books_toolbar))
-        assert action_names(books_toolbar)==["Cover grid","New shelf","Add Books"],action_names(books_toolbar)
+        assert game_action_names[:3]==action_names(books_toolbar)[:3],(game_action_names,action_names(books_toolbar))
+        assert action_names(books_toolbar)==["Manage shelves","Cover grid","New shelf","Add book"],action_names(books_toolbar)
         books_toolbar.locator("button",has_text="New shelf").click()
         shelf_prompt=page.locator("dialog.sheet[open]").last
         shelf_prompt.locator("input[type=text]").fill("Example comics shelf")
@@ -549,6 +549,14 @@ for width,height in [(390,844),(1280,900)]:
         shelf=page.locator(".media-library-view .game-shelf",has=page.locator("h3",has_text="Example comics shelf"))
         shelf.wait_for(state="visible",timeout=10000)
         assert shelf.locator(".media-empty-shelf").count()==1
+        # The new shelf manager must remove only the selected empty shelf.
+        books_toolbar.get_by_role("button",name="Manage shelves",exact=True).click()
+        manager=page.locator("dialog.sheet[open] .shelf-manager")
+        manager.wait_for(state="visible")
+        row=manager.locator(".shelf-manager-row").filter(has=page.locator("strong",has_text="Example comics shelf"))
+        row.get_by_role("button",name="Remove shelf",exact=True).click()
+        manager.wait_for(state="detached",timeout=10000)
+        shelf.wait_for(state="detached",timeout=10000)
         # No personal media is seeded on a fresh account.
         assert page.locator(".media-library-view .game-book").count()==0
         page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
@@ -613,7 +621,9 @@ for width,height in [(390,844),(1280,900)]:
         assert page.locator(".media-library-view .media-interiors").count()==0,"Pages belong inside the miniature, not below the journal"
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Films").click()
-        page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
+        films_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
+        assert action_names(films_toolbar)==["Manage shelves","Cover grid","New shelf","Add title"],action_names(films_toolbar)
+        films_toolbar.locator(".btn.primary").click()
         page.locator(".media-editor input[type=text]").first.fill("Example TV Series")
         page.locator(".media-editor input[type=number]").fill("4.0")
         page.locator(".media-editor select").nth(1).select_option("series")
@@ -649,8 +659,13 @@ for width,height in [(390,844),(1280,900)]:
         album_bounds=albums_toolbar.bounding_box()
         assert abs(game_bounds["x"]-album_bounds["x"])<=4,(game_bounds,album_bounds)
         assert abs(game_bounds["width"]-album_bounds["width"])<=4,(game_bounds,album_bounds)
-        assert action_names(albums_toolbar)==["Cover grid","New shelf","Add Albums"],action_names(albums_toolbar)
+        assert action_names(albums_toolbar)==["Manage shelves","Cover grid","New shelf","Add album"],action_names(albums_toolbar)
         assert page.locator(".media-library-view .media-search-filters select[aria-label=\"Filter by status\"]").input_value()=="all"
+        more=page.locator(".media-library-view .media-collection-more")
+        more.locator("summary").click()
+        assert more.get_by_label("Sort",exact=True).is_visible()
+        assert more.locator('input[accept*=".csv"]').count()==1
+        more.locator("summary").click()
         page.locator(".media-library-view > .media-collection-toolbar .btn.primary").click()
         page.locator(".media-editor input[type=text]").first.fill("Example Album")
         page.locator(".media-editor + .btn.primary").click()
