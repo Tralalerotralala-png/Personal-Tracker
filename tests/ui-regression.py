@@ -649,11 +649,11 @@ for width,height in [(390,844),(1280,900)]:
         assert page.locator(".media-detail-info .media-stars-filled").evaluate("(el)=>el.style.width")=="97%"
         page.locator(".media-library-view .game-page-head button",has_text="Back").click()
         page.locator(".media-library-view .hub-tabs button",has_text="Books").click()
-        media_search=page.locator(".media-library-view .media-search-filters input")
+        media_search=page.locator(".media-library-view .media-search-filters input[type=search]")
         media_search.fill("unmatched title")
         page.locator(".media-library-view .media-search-filters select[aria-label=\"Filter by status\"]").select_option("Finished")
         page.locator(".media-library-view .hub-tabs button",has_text="Albums").click()
-        assert page.locator(".media-library-view .media-search-filters input").input_value()==""
+        assert page.locator(".media-library-view .media-search-filters input[type=search]").input_value()==""
         albums_toolbar=page.locator(".media-library-view > .media-collection-toolbar")
         albums_toolbar.wait_for(state="visible",timeout=10000)
         album_bounds=albums_toolbar.bounding_box()
